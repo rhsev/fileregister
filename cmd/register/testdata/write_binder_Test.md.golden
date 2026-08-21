@@ -1,0 +1,8 @@
+### d.pdf
+```yaml
+type: ref
+id: '5'
+binder: Docs
+filename: d.pdf
+kind: pdf
+```

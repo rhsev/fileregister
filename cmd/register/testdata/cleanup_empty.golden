@@ -1,0 +1,19 @@
+exit: 0
+=== stdout ===
+(report mode — rerun with --interactive to act on findings)
+=== Stale context blocks (0) ===
+    Markdown block whose binder is no longer in the index (e.g. after remove).
+    Default action: delete the block, or re-add the binder.
+(none)
+
+=== Unindexed annotations (0) ===
+    Markdown block whose id has no index record (legacy / hand-written).
+    Usually: run 'register reindex'. Or delete here if obsolete.
+(none)
+
+=== Bookmarks (0) ===
+    Records in no binder. A bookmark is not cruft — listed for review only,
+    never deleted automatically.
+(none)
+=== stderr ===
+Collecting index records and annotations…

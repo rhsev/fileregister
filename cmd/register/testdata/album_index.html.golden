@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alb</title>
+<style>body.album-page { margin: 0; background: Canvas; }
+.album { color-scheme: light dark; font-family: -apple-system, sans-serif;
+         max-width: 72rem; margin: 0 auto; padding: 2rem 1rem; color: CanvasText; }
+.album h1 { font-weight: 600; letter-spacing: .02em; }
+.album .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+        gap: 2rem; margin-top: 2rem; }
+/* Offscreen-Einträge nicht rendern — macht auch sehr große Alben flüssig,
+   ohne Paginierung (Browser überspringt Layout/Paint außerhalb des Viewports). */
+.album figure, .album .card { content-visibility: auto; contain-intrinsic-size: auto 24rem; }
+.album figure { margin: 0; }
+.album figure img { width: 100%; height: auto; border-radius: 6px; display: block; }
+.album figcaption h3 { margin: .6rem 0 .2rem; font-size: 1rem; font-weight: 600; }
+.album figcaption p { margin: .2rem 0; font-size: .92rem; line-height: 1.45; }
+.album .meta { opacity: .6; font-size: .8rem !important; }
+.album .card { border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+        border-radius: 6px; padding: 1rem; }
+.album .card a { font-weight: 600; }
+/* Detailansicht: CSS-only Overlay via :target — Bild links, Metadaten oben
+   rechts, Karte unten rechts. Schließen springt zurück zum Thumbnail. */
+.album .detail { display: none; }
+.album .detail:target { display: grid; position: fixed; inset: 0; z-index: 10;
+  grid-template-columns: minmax(0, 2.2fr) minmax(16rem, 1fr); gap: 1.2rem;
+  padding: 1.5rem; background: color-mix(in srgb, Canvas 94%, transparent);
+  backdrop-filter: blur(8px); }
+.album .detail-media { display: flex; align-items: center; justify-content: center; min-height: 0; }
+.album .detail-media img { max-width: 100%; max-height: calc(100vh - 3rem);
+  object-fit: contain; border-radius: 6px; }
+.album .detail-side { display: flex; flex-direction: column; gap: 1.2rem;
+  min-height: 0; overflow: auto; }
+.album .detail-info h3 { margin: 0 0 .4rem; }
+.album .detail-info p { margin: .2rem 0; font-size: .95rem; line-height: 1.5; }
+.album .detail-map { flex: 1; min-height: 16rem; border: 0; border-radius: 6px; }
+.album .detail-close { position: fixed; top: .6rem; right: 1.2rem; font-size: 1.8rem;
+  line-height: 1; text-decoration: none; color: CanvasText; z-index: 11; }
+@media (max-width: 50rem) {
+  .album .detail:target { grid-template-columns: 1fr; overflow: auto; }
+  .album .detail-media img { max-height: 60vh; }
+}
+</style>
+</head>
+<body class="album-page">
+<div class="album">
+<h1>Alb</h1>
+<div class="grid">
+<div class="card">
+  <a href="x-devonthink-item://A">Erstes</a>
+  <h3>Erstes</h3><p>Ein &lt;Test&gt;</p>
+</div>
+
+<div class="card">
+  <a href="https://example.com/x?a=1&amp;b=2">two &amp; three.md</a>
+  <h3>two &amp; three.md</h3>
+</div>
+
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,7 @@
+exit: 0
+=== stdout ===
+2 record(s) in Markdown have no index entry.
+  + 2  Docs  b.pdf
+  + 3  Photos  c.jpg
+(dry run — nothing written)
+=== stderr ===

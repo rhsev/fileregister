@@ -1,0 +1,5 @@
+exit: 0
+=== stdout ===
+=== stderr ===
+Collecting records for binder 'Ghost'…
+No records for binder 'Ghost'. Nothing to marshal.

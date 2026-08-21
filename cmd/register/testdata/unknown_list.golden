@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+register list: unknown option '--xyz'

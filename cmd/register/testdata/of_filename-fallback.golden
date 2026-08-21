@@ -1,0 +1,9 @@
+exit: 0
+=== stdout ===
+file:     <FILE>
+id:       800000001
+binder:   Photos
+filename: beach.jpg
+managed:  no
+=== stderr ===
+(matched by filename — the file carries no id xattr, so this is best-effort)

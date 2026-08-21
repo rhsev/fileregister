@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Error: --set key 'a b' is not a plain YAML key

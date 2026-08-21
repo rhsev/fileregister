@@ -1,0 +1,5 @@
+exit: 0
+=== stdout ===
+No refs found for binder 'Ghost'
+=== stderr ===
+Collecting refs for binder 'Ghost'…

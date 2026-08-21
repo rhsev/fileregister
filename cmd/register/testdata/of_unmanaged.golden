@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Not managed by fileregister: no id on the file, and no index record matches its name.

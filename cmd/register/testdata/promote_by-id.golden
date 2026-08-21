@@ -1,0 +1,6 @@
+exit: 0
+=== stdout ===
+Annotating 1 record(s) → binder_Docs.md
+Promote complete:
+  Annotated : 1
+=== stderr ===

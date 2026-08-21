@@ -1,0 +1,11 @@
+exit: 0
+=== stdout ===
+Marshaled 'Ship' → <OUT>
+  records      : 2
+  files packed : 0
+  url refs     : 2
+  notes packed : 1
+  notes not packed (outside collections/, use --all-notes): 1
+    - ../scattered.md
+=== stderr ===
+Collecting records for binder 'Ship'…

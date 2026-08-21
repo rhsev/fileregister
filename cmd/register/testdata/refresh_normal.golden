@@ -1,0 +1,14 @@
+exit: 0
+=== stdout ===
+Refreshed (itemprojects): doc.txt → Docs
+
+Refresh complete:
+  Refreshed    : 1
+  Already ok   : 0
+  Skipped (url) : 1
+
+Broken bookmarks (1) — run 'register repair' to fix:
+  [Ghost] z.txt (999999999) (in: inbox.jsonl)
+=== stderr ===
+Collecting type:ref records…
+Found 3 ref record(s). Resolving bookmarks…

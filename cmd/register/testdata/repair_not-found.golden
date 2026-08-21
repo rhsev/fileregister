@@ -1,0 +1,17 @@
+exit: 0
+=== stdout ===
+Found 1 broken bookmark(s).
+
+Repairing: [RepairBnd] zzz_repair_unlikely_9f3a.txt
+  Not found — skipped
+
+Repair complete: 0 repaired, 1 unresolved.
+
+Unresolved (1):
+  [RepairBnd] zzz_repair_unlikely_9f3a.txt (id: 999999999)
+    in: <NOTES>/collections/inbox.jsonl
+
+Hint: run with --interactive to provide paths manually.
+=== stderr ===
+Collecting type:ref records…
+Resolving bookmarks for 1 record(s)…

@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Error: 'id' is reserved: identity — register assigns it at add time

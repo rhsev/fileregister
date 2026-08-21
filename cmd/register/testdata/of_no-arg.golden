@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Usage: register of <file>

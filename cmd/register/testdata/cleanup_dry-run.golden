@@ -1,0 +1,18 @@
+exit: 0
+=== stdout ===
+=== Stale context blocks (1) ===
+    Markdown block whose binder is no longer in the index (e.g. after remove).
+    Default action: delete the block, or re-add the binder.
+  • 1 (OldRemoved) in binder_Docs.md
+
+=== Unindexed annotations (1) ===
+    Markdown block whose id has no index record (legacy / hand-written).
+    Usually: run 'register reindex'. Or delete here if obsolete.
+  • 2 (Docs) in binder_Docs.md
+
+=== Bookmarks (1) ===
+    Records in no binder. A bookmark is not cruft — listed for review only,
+    never deleted automatically.
+  • c.pdf (3) (id=3)
+=== stderr ===
+Collecting index records and annotations…

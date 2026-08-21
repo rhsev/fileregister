@@ -1,0 +1,4 @@
+exit: 0
+=== stdout ===
+x-devonthink-item://ABC
+=== stderr ===

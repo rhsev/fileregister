@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Error: --aka applies to a single file; omit it when adding multiple files

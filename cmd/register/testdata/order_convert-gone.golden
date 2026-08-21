@@ -1,0 +1,5 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+register order: unknown subcommand 'convert'
+Run 'register order --help' for usage.

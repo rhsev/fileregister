@@ -1,0 +1,6 @@
+exit: 0
+=== stdout ===
+gone.pdf   (broken bookmark)
+note-a.md  x-devonthink-item://AAA  [doc]
+note-b.md  x-devonthink-item://BBB
+=== stderr ===

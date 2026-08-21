@@ -1,0 +1,6 @@
+exit: 0
+=== stdout ===
+{"id":"600000001","binder":["Mix"],"filename":"gone.pdf","kind":"","broken":true}
+{"id":"500000001","binder":["Mix"],"filename":"note-a.md","kind":"doc","aka":["a"],"url":"x-devonthink-item://AAA"}
+{"id":"500000002","binder":["Mix"],"filename":"note-b.md","kind":"","url":"x-devonthink-item://BBB"}
+=== stderr ===

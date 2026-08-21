@@ -1,0 +1,9 @@
+exit: 0
+=== stdout ===
+Marshaled 'Ship' → <OUT>
+  records      : 2
+  files packed : 0
+  url refs     : 2
+  notes packed : 2
+=== stderr ===
+Collecting records for binder 'Ship'…

@@ -1,0 +1,37 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # About half the suite drives a live fileanchor and SKIPS without one, so
+      # the engine has to exist before the tests run — otherwise this job is
+      # green without having checked much.
+      - name: Build the fileanchor engine
+        run: make fileanchor
+
+      - run: go build ./...
+      - run: go vet ./...
+
+      # A skip here means the engine step silently produced nothing, which would
+      # otherwise pass as success. Fail loudly instead.
+      - name: Test (no skips tolerated)
+        run: |
+          set -o pipefail
+          go test ./... -count=1 -v 2>&1 | tee test.log
+          if grep -qE '^\s*--- SKIP' test.log; then
+            echo "::error::tests were skipped — the fileanchor engine is missing"
+            grep -E '^\s*--- SKIP' -A1 test.log
+            exit 1
+          fi

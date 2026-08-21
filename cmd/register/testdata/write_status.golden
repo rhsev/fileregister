@@ -1,0 +1,10 @@
+exit: 1
+=== stdout ===
+{"ok":true,"_note_file":"<N>/collections/binder_Test.md","action":"appended","xattr":"skipped"}
+{"ok":true,"_note_file":"<N>/collections/binder_Test.md","action":"noop","xattr":"skipped"}
+{"ok":true,"_note_file":"<N>/collections/extra.jsonl","action":"appended","xattr":"skipped"}
+{"ok":false,"_note_file":"<N>/collections/binder_Test.md","error":"v1 supports type:ref records only"}
+{"ok":false,"_note_file":"<N>/collections/binder_Test.md","error":"missing required field: id"}
+{"ok":false,"_note_file":null,"error":"missing _note_file"}
+{"ok":false,"_note_file":"<N>/collections/bad.txt","error":"unsupported target format: .txt"}
+=== stderr ===

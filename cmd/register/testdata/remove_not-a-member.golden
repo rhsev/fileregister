@@ -1,0 +1,4 @@
+exit: 0
+=== stdout ===
+=== stderr ===
+Not a member of binder 'Other': doc.txt

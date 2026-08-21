@@ -1,0 +1,4 @@
+exit: 0
+=== stdout ===
+Created ordering for 'Ord' (rule: name) → binder_Ord.md
+=== stderr ===

@@ -1,0 +1,6 @@
+exit: 0
+=== stdout ===
+Added URL to 'B' → inbox.jsonl [updated]
+  url      : x-devonthink-item://X
+  id       : 5
+=== stderr ===

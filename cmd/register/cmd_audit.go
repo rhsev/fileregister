@@ -1,0 +1,252 @@
+package main
+
+// cmd_audit — read-only consistency report (index ↔ files ↔ xattr).
+
+import (
+	"github.com/rhsev/fileregister/internal/index"
+
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// ghostReport prints a ghost entry (a file tagged with a binder that the index
+// doesn't record) and returns 1, or 0 if it's a known record.
+func ghostReport(fpath, binderName, layer string, recordIndex map[string]bool) int {
+	fpath = strings.TrimSpace(fpath)
+	if fpath == "" {
+		return 0
+	}
+	key := index.PathKey(fpath) + "|" + binderName
+	if recordIndex[key] {
+		return 0
+	}
+	fmt.Printf("  GHOST (%s) [%s] %s\n", layer, binderName, filepath.Base(fpath))
+	fmt.Printf("    path: %s\n", fpath)
+	fmt.Printf("    → run: register add '%s' --binder %s\n", fpath, binderName)
+	return 1
+}
+
+// binderTag renders a record's binder list for a report line; a binderless
+// record shows as "bookmark".
+func binderTag(binders []string) string {
+	if len(binders) == 0 {
+		return "bookmark"
+	}
+	return strings.Join(binders, ", ")
+}
+
+func cmdAudit(args []string) int {
+	binderFilter := ""
+	hasBinderFilter := false
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--binder" && i+1 < len(args):
+			i++
+			binderFilter = args[i]
+			hasBinderFilter = true
+		case strings.HasPrefix(a, "--binder="):
+			binderFilter = strings.TrimPrefix(a, "--binder=")
+			hasBinderFilter = true
+		case a == "-h" || a == "--help":
+			fmt.Println("Usage: register audit [options]")
+			return 0
+		case a == "-v" || a == "--version":
+			fmt.Println("register audit " + registerVersion)
+			return 0
+		default:
+			if strings.HasPrefix(a, "-") {
+				return unknownOption("audit", a)
+			}
+		}
+	}
+
+	nd, err := notesDir()
+	if err != nil {
+		return 1
+	}
+
+	fmt.Fprintln(os.Stderr, "Collecting type:ref records…")
+	all := mustRefs(nd)
+	var active, bookmarks []map[string]any
+	for _, r := range all {
+		binders := nonEmptyBinders(r)
+		if hasBinderFilter {
+			match := false
+			for _, b := range binders {
+				if b == binderFilter {
+					match = true
+					break
+				}
+			}
+			if !match {
+				continue
+			}
+		}
+		if len(binders) > 0 {
+			active = append(active, r)
+		} else {
+			// Binderless bookmarks are first-class: their bookmark must still
+			// resolve, they just carry no xattr expectations.
+			bookmarks = append(bookmarks, r)
+		}
+	}
+	checked := append(append([]map[string]any{}, active...), bookmarks...)
+	if len(checked) == 0 {
+		fmt.Println("No active ref records found.")
+		return 0
+	}
+
+	resolved, rerr := resolveRecordPaths(checked)
+	if rerr != nil {
+		// With the engine failing, every record would report as broken.
+		fmt.Fprintf(os.Stderr, "Error: fileanchor batch resolve failed: %v — cannot audit\n", rerr)
+		return 1
+	}
+
+	type brokenT struct {
+		binders         []string
+		noteFile, label string
+	}
+	type missingFileT struct {
+		binders                  []string
+		noteFile, refPath, label string
+	}
+	type missingXattrT struct {
+		binder, noteFile, refPath, label, backend, layer string
+	}
+	var brokenBookmark []brokenT
+	var missingFile []missingFileT
+	var missingXattr []missingXattrT
+	okCount := 0
+
+	fmt.Printf("=== Direction 1: Record → File (%d record(s)) ===\n", len(checked))
+	fmt.Println("")
+
+	for _, rec := range checked {
+		id := index.AsString(rec["id"])
+		binders := nonEmptyBinders(rec)
+		noteFile := index.AsString(rec["_note_file"])
+		backend := index.XattrBackend(rec)
+		label := refLabel(rec)
+
+		if index.URLRef(rec) {
+			okCount++
+			continue
+		}
+
+		refPath := resolved[id]
+		if refPath == "" {
+			brokenBookmark = append(brokenBookmark, brokenT{binders, noteFile, label})
+			continue
+		}
+		if !index.FileExists(refPath) {
+			missingFile = append(missingFile, missingFileT{binders, noteFile, refPath, label})
+			continue
+		}
+		if len(binders) == 0 || backend == "none" {
+			okCount++
+			continue
+		}
+		for _, binder := range binders {
+			if index.XattrBackendIncludes(refPath, binder, backend) {
+				okCount++
+			} else {
+				layer := "kMDItemProjects"
+				if backend == "tags" {
+					layer = "kMDItemUserTags"
+				}
+				missingXattr = append(missingXattr, missingXattrT{binder, noteFile, refPath, label, backend, layer})
+			}
+		}
+	}
+
+	if len(brokenBookmark) == 0 && len(missingFile) == 0 && len(missingXattr) == 0 {
+		fmt.Printf("All %d record(s) are consistent.\n", okCount)
+	} else {
+		if okCount > 0 {
+			fmt.Printf("OK: %d record(s)\n", okCount)
+		}
+		if len(brokenBookmark) > 0 {
+			fmt.Println("")
+			fmt.Printf("BROKEN BOOKMARK (%d) — bookmark does not resolve:\n", len(brokenBookmark))
+			for _, b := range brokenBookmark {
+				fmt.Printf("  [%s] %s\n", binderTag(b.binders), b.label)
+				fmt.Printf("    in: %s\n", b.noteFile)
+				fmt.Println("    → run: register repair")
+			}
+		}
+		if len(missingFile) > 0 {
+			fmt.Println("")
+			fmt.Printf("MISSING FILE (%d) — bookmark resolves but file not found:\n", len(missingFile))
+			for _, m := range missingFile {
+				fmt.Printf("  [%s] %s\n", binderTag(m.binders), m.label)
+				fmt.Printf("    expected: %s\n", m.refPath)
+			}
+		}
+		if len(missingXattr) > 0 {
+			fmt.Println("")
+			fmt.Printf("MISSING XATTR (%d) — file lacks expected metadata:\n", len(missingXattr))
+			for _, mx := range missingXattr {
+				fmt.Printf("  [%s] %s (%s)\n", mx.binder, mx.label, mx.backend)
+				fmt.Printf("    file: %s\n", mx.refPath)
+				fmt.Printf("    expected in: %s\n", mx.layer)
+				fmt.Println("    → run: register refresh")
+			}
+		}
+	}
+
+	// Direction 2: File → Record (ghost xattr scan via mdfind).
+	var binderNames []string
+	if hasBinderFilter {
+		binderNames = []string{binderFilter}
+	} else {
+		bseen := map[string]bool{}
+		for _, r := range active {
+			for _, b := range nonEmptyBinders(r) {
+				if !bseen[b] {
+					bseen[b] = true
+					binderNames = append(binderNames, b)
+				}
+			}
+		}
+	}
+	if len(binderNames) == 0 {
+		return 0
+	}
+
+	fmt.Println("")
+	fmt.Printf("=== Direction 2: File → Record (%d binder(s) via mdfind) ===\n", len(binderNames))
+	fmt.Println("")
+
+	recordIndex := map[string]bool{}
+	for _, rec := range active {
+		rp := resolved[index.AsString(rec["id"])]
+		if rp == "" {
+			continue
+		}
+		for _, b := range index.AsStrings(rec["binder"]) {
+			recordIndex[index.PathKey(rp)+"|"+b] = true
+		}
+	}
+
+	ghostCount := 0
+	for _, binderName := range binderNames {
+		for _, f := range index.ByXattrItemProjects(binderName, "") {
+			ghostCount += ghostReport(f, binderName, "itemprojects", recordIndex)
+		}
+		for _, f := range index.ByXattrTags(binderName, "") {
+			ghostCount += ghostReport(f, binderName, "tags", recordIndex)
+		}
+	}
+
+	if ghostCount == 0 {
+		fmt.Println("No ghost xattr entries found.")
+	} else {
+		fmt.Println("")
+		fmt.Printf("%d ghost entry(ies) found.\n", ghostCount)
+	}
+	return 0
+}

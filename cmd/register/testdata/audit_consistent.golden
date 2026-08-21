@@ -1,0 +1,11 @@
+exit: 0
+=== stdout ===
+=== Direction 1: Record → File (2 record(s)) ===
+
+All 2 record(s) are consistent.
+
+=== Direction 2: File → Record (2 binder(s) via mdfind) ===
+
+No ghost xattr entries found.
+=== stderr ===
+Collecting type:ref records…

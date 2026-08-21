@@ -1,0 +1,15 @@
+exit: 0
+=== stdout ===
+=== Direction 1: Record → File (1 record(s)) ===
+
+
+BROKEN BOOKMARK (1) — bookmark does not resolve:
+  [AudBroken] z.txt (999999999)
+    in: <NOTES>/collections/inbox.jsonl
+    → run: register repair
+
+=== Direction 2: File → Record (1 binder(s) via mdfind) ===
+
+No ghost xattr entries found.
+=== stderr ===
+Collecting type:ref records…

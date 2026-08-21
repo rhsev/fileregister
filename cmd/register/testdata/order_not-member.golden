@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Error: '999' is not a member of the binder (id or aka)

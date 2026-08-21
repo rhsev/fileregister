@@ -1,0 +1,9 @@
+exit: 0
+=== stdout ===
+file:     <FILE>
+id:       700000001
+aka:      r, report
+binder:   Docs
+filename: report.pdf
+managed:  no
+=== stderr ===

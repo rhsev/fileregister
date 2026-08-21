@@ -1,0 +1,6 @@
+exit: 0
+=== stdout ===
+x-devonthink-item://AAA
+x-devonthink-item://BBB
+=== stderr ===
+Warning: 1 member(s) with broken bookmarks omitted — run register repair

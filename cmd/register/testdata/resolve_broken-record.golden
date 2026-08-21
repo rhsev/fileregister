@@ -1,0 +1,8 @@
+exit: 1
+=== stdout ===
+id:       600000001
+binder:   Docs
+filename: report.pdf
+aka:      r, report
+path:     (broken bookmark)
+=== stderr ===

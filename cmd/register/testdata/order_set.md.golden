@@ -1,0 +1,6 @@
+### · Ord (ordering)
+```yaml
+type: ordering
+binder: Ord
+rule: name
+```

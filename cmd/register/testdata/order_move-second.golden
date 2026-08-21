@@ -1,0 +1,4 @@
+exit: 0
+=== stdout ===
+Moved b.pdf (3) → position 2 of 3
+=== stderr ===

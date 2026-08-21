@@ -1,0 +1,7 @@
+exit: 0
+=== stdout ===
+id:       500000001
+binder:   Links
+aka:      mylink
+url:      x-devonthink-item://ABC
+=== stderr ===

@@ -1,0 +1,34 @@
+### alpha.pdf
+
+From stdin.
+
+```yaml
+type: ref
+id: '11'
+binder: Anno
+amount: 5
+tags:
+- x
+- y
+```
+
+### beta.pdf
+```yaml
+type: ref
+id: '22'
+binder: Anno
+```
+
+### gamma.pdf (hand-written, aka in the id slot)
+```yaml
+type: ref
+id: ha
+binder: Anno
+```
+
+### · Anno (ordering)
+```yaml
+type: ordering
+binder: Anno
+rule: name
+```

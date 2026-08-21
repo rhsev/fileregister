@@ -1,0 +1,5 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+No annotation block for '11' in binder 'Other'.
+Create one first: register promote --binder Other --id 11

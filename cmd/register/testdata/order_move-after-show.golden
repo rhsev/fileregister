@@ -1,0 +1,7 @@
+exit: 0
+=== stdout ===
+Ord — 3 member(s), rule: name
+  1. a.pdf (2)
+  2. c.pdf (1)
+  3. b.pdf (3)
+=== stderr ===

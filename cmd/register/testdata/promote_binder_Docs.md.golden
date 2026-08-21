@@ -1,0 +1,13 @@
+### a.pdf
+```yaml
+type: ref
+id: '1'
+binder: Docs
+```
+
+### b.pdf
+```yaml
+type: ref
+id: '2'
+binder: Docs
+```

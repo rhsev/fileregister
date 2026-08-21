@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Error: --xattr does not apply to --url records (no file to cache on)

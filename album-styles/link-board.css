@@ -1,0 +1,71 @@
+/* link-board.css — a compact, linkding-style list for `register album`.
+ *
+ * Styles the stable album markup for a binder of URL refs: each member becomes
+ * one row — bold title link + muted description. No photo grid, no detail
+ * overlay. Use with:  register album <binder> --css album-styles/link-board.css
+ * or copy to ~/.config/fileregister/album.css to make it your default look.
+ *
+ * Theme-aware via system colors (Canvas/CanvasText/LinkText). */
+
+/* color-scheme on the body too, so the page background (Canvas) flips in dark
+ * mode — not only the system colors inside .album. */
+body.album-page { margin: 0; background: Canvas; color-scheme: light dark; }
+
+.album {
+  color-scheme: light dark;
+  font-family: -apple-system, system-ui, sans-serif;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+  color: CanvasText;
+}
+
+.album h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  margin: 0 0 .5rem;
+}
+
+/* One vertical list instead of the photo grid. */
+.album .grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 1rem;
+}
+
+/* Each entry is a thin row with a hairline separator. */
+.album .card {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  border-radius: 0;
+  padding: .7rem .25rem;
+}
+.album .card:hover { background: color-mix(in srgb, CanvasText 4%, transparent); }
+
+/* The link IS the title — bold, quiet until hovered. */
+.album .card a {
+  font-weight: 600;
+  font-size: 1rem;
+  text-decoration: none;
+  color: LinkText;
+}
+.album .card a:hover { text-decoration: underline; }
+
+/* The annotation title is already the link text, so hide the duplicate <h3>. */
+.album .card h3 { display: none; }
+
+/* comment: → description. */
+.album .card p {
+  margin: .2rem 0 0;
+  font-size: .88rem;
+  line-height: 1.45;
+  opacity: .75;
+}
+.album .card p.meta { font-size: .75rem; opacity: .5; margin-top: .25rem; }
+
+/* A link board has no images or detail overlay — keep any stray ones out. */
+.album figure,
+.album .detail,
+.album .detail-close { display: none; }

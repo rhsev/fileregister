@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Error: 'binder' is reserved: membership — use register add/remove

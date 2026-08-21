@@ -1,0 +1,6 @@
+exit: 0
+=== stdout ===
+All bookmarks resolve correctly. Nothing to repair.
+=== stderr ===
+Collecting type:ref records…
+Resolving bookmarks for 1 record(s)…

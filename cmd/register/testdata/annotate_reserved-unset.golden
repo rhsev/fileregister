@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Error: 'sort' is reserved: ordering key — use register order move

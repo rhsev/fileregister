@@ -1,0 +1,30 @@
+### · Ord (ordering)
+```yaml
+type: ordering
+binder: Ord
+rule: name
+```
+
+### a.pdf
+```yaml
+type: ref
+id: '2'
+binder: Ord
+sort: i
+```
+
+### c.pdf
+```yaml
+type: ref
+id: '1'
+binder: Ord
+sort: r
+```
+
+### b.pdf
+```yaml
+type: ref
+id: '3'
+binder: Ord
+sort: m
+```

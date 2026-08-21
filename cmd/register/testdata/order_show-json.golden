@@ -1,0 +1,6 @@
+exit: 0
+=== stdout ===
+{"position":1,"id":"2","filename":"a.pdf"}
+{"position":2,"id":"3","filename":"b.pdf"}
+{"position":3,"id":"1","filename":"c.pdf"}
+=== stderr ===

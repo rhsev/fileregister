@@ -1,0 +1,28 @@
+=== manifest ===
+{"aka":"alpha","binder":["Ship"],"file":null,"filename":"a.md","id":"1","kind":"doc","markdown":"notes/ship-notes.md","origin":null,"type":"ref","url":"x-devonthink-item://AAA"}
+{"binder":["Ship"],"file":null,"filename":"b.md","id":"2","markdown":"notes/ship-notes.md","origin":null,"type":"ref","url":"x-devonthink-item://BBB"}
+{"file":"notes/scattered.md","origin":"../scattered.md","type":"note"}
+{"file":"notes/ship-notes.md","origin":"ship-notes.md","type":"note"}
+=== notes/scattered.md ===
+```yaml
+type: ref
+id: 1
+binder: Ship
+filename: a.md
+```
+=== notes/ship-notes.md ===
+# Ship notes
+
+```yaml
+type: ref
+id: 1
+binder: Ship
+filename: a.md
+```
+
+```yaml
+type: ref
+id: 2
+binder: Ship
+filename: b.md
+```

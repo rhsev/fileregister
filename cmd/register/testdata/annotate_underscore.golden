@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Error: '_'-prefixed keys are injected at read time, never stored

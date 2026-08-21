@@ -1,0 +1,5 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Error: --binder is required (or set REGISTER_BINDER env var)
+Usage: register remove <file>... --binder <name>

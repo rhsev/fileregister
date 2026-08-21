@@ -1,0 +1,40 @@
+### alpha.pdf
+
+Old prose line one.
+
+```yaml
+type: ref
+id: '11'
+binder: Anno
+amount: 5
+tags:
+- x
+- y
+```
+
+Trailing prose after the block.
+
+### beta.pdf
+
+Beta prose.
+
+```yaml
+type: ref
+id: '22'
+binder: Anno
+k: v
+```
+
+### gamma.pdf (hand-written, aka in the id slot)
+```yaml
+type: ref
+id: ha
+binder: Anno
+```
+
+### · Anno (ordering)
+```yaml
+type: ordering
+binder: Anno
+rule: name
+```

@@ -1,0 +1,7 @@
+exit: 0
+=== stdout ===
+Removed 'Docs' from 1 record(s) in inbox.jsonl
+Removed 'Docs' from kMDItemProjects
+Unmarked ★ (no remaining membership)
+Done: doc.txt removed from 'Docs'
+=== stderr ===

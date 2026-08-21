@@ -1,0 +1,6 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Collecting refs for binder 'Real'…
+Error: binder 'Other' already exists (1 record(s)) — renaming would merge the two sets.
+Rerun with --merge to do that on purpose.

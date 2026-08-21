@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Bookmark for id 600000001 does not resolve (broken — try 'register repair')
