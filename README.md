@@ -101,7 +101,7 @@ record on their own.
 **Query the whole thing.** The index is JSONL and the notes are YAML in
 Markdown, so [grubber](https://github.com/rhsev/grubber) can query both and
 [matterbase](https://github.com/rhsev/matterbase) gives you a table view and a
-query builder over them. See [COLLECTIONS.md](COLLECTIONS.md).
+query builder over them. See [WORKFLOWS.md](WORKFLOWS.md).
 
 For the "macOS already has tags" question, see [RATIONALE.md](RATIONALE.md).
 The short version: fileregister uses them and can rebuild them.
@@ -252,7 +252,7 @@ the set. See SPEC §Bookmarks.
 ## Documentation
 
 - [SPEC.md](SPEC.md) — on-disk format, data model, design decisions
-- [COLLECTIONS.md](COLLECTIONS.md) — querying binders from the matterbase TUI
+- [WORKFLOWS.md](WORKFLOWS.md) — organizing and querying collections
 - [ORDERING.md](ORDERING.md) — `sort:` keys and `register order`
 - [ALBUM.md](ALBUM.md) — static photo albums, and serving them on the LAN
 - [RATIONALE.md](RATIONALE.md) — why this exists when macOS already has tags

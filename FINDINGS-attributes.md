@@ -1,19 +1,19 @@
 # Findings: macOS file attributes (for fileregister)
 
-> Hard-won, empirically verified facts about macOS xattr / Spotlight metadata.
-> Verified on macOS 26.4, 2026-06. **Trust the tables, not intuition** — several
-> of these are counterintuitive and cost real debugging time.
+> Empirically verified facts about macOS xattr / Spotlight metadata. Verified on
+> macOS 26.4 (2026-06). Several are counterintuitive; the tables below are
+> authoritative.
 
-## The one that bites: storage name ≠ Spotlight key
+## Storage name ≠ Spotlight key
 
-Finder Tags live under **two different names** that constantly get conflated:
+Finder Tags live under **two different names** that are easily conflated:
 
-- **xattr storage name** (what you write/read with `xattr`):
+- **xattr storage name** (written/read with `xattr`):
   `com.apple.metadata:_kMDItemUserTags` — **with leading underscore**.
-- **Spotlight query key** (what you use in `mdfind`):
+- **Spotlight query key** (used in `mdfind`):
   `kMDItemUserTags` — **no underscore**.
 
-So the working pattern is asymmetric:
+The pattern is asymmetric:
 
 ```
 write / read xattr :  com.apple.metadata:_kMDItemUserTags   (with _)
@@ -41,20 +41,21 @@ system-special-cased.
 | `com.apple.metadata:kMDItemInformation#S` | — | bookmark id + sync flag — **does NOT sync** (Apple `kMDItem*` prefix blocked regardless of `#S`) | string | no | no | **no** |
 | `com.fileregister.id#S` | — | bookmark id, cross-device — **syncs** (custom namespace + `#S`) | string | no | no | **yes — verified** |
 
-## iCloud Drive sync (macOS 26.4 — Howard Oakley)
+## iCloud Drive
+
+*The default-sync change below is based on Howard Oakley's finding (eclecticlight.co), extended by the cross-device table further down.*
 
 - iCloud Drive **stopped syncing `com.apple.metadata:kMDItem*` by default.**
   Only these still sync reliably: `_kMDItemUserTags` (Finder Tags),
   `com.apple.lastuseddate#PS`, `com.apple.quarantine`, `com.apple.TextEncoding`.
-- Append **`#S`** to the xattr *name* (`kMDItemInformation#S`) → FileProvider
-  syncs it — **but** it is then **not** Spotlight-indexed and **not** Finder-shown
+- Appending **`#S`** to the xattr *name* (`kMDItemInformation#S`) makes FileProvider
+  sync it, **but** it is then **not** Spotlight-indexed and **not** Finder-shown
   (the `#S` is treated as part of the type name by Spotlight/Finder). Useful only
-  for data you resolve yourself (e.g. a bookmark id), never for searchable/visible
+  for self-resolved data (e.g. a bookmark id), never for searchable or visible
   metadata.
-- The `#S` behaviour is undocumented and has shifted between releases — **always
-  re-verify with a real round-trip** before relying on it.
+- The `#S` behaviour is undocumented and has shifted between releases.
 
-### Verified cross-device (iCloud Drive, our test — fresh file, read-only on the receiver)
+### Cross-device: iCloud Drive (fresh file, read-only on the receiver)
 
 | xattr written on Mac A | arrived on Mac B? |
 |---|---|
@@ -63,12 +64,11 @@ system-special-cased.
 | `com.apple.metadata:kMDItemInformation#S` (Apple key + `#S`) | **no** |
 | `com.apple.metadata:kMDItemProjects` (Apple key, no flag) | **no** |
 
-**Refinement of Howard:** `#S` syncs a **custom-namespace** xattr
+**`#S` scope:** `#S` syncs a **custom-namespace** xattr
 (`com.fileregister.*`) but **not** a `com.apple.metadata:kMDItem*` name — that
-prefix is blocked regardless of `#S`. (Howard reported Apple-key `#S` syncing;
-on this macOS build it did not. Re-verify per OS version.)
+prefix is blocked regardless of `#S`.
 
-### Verified cross-device (Resilio Sync — fresh file, read-only on the receiver)
+### Cross-device: Resilio Sync (fresh file, read-only on the receiver)
 
 | xattr written on Mac A | arrived on Mac B? |
 |---|---|
@@ -80,19 +80,19 @@ on this macOS build it did not. Re-verify per OS version.)
 **Resilio syncs Finder tags only; it strips all other xattrs** (custom and
 Apple alike — `#S` is meaningless to it, it's an iCloud/FileProvider flag).
 
-### Verified cross-device (AirDrop — fresh file, read on the receiver)
+### Cross-device: AirDrop (fresh file, read on the receiver)
 
 AirDrop preserves **all** xattrs verbatim — it wraps the file in an archive and
 copies extended attributes unfiltered. Confirmed survivors: `_kMDItemUserTags`
 (★), `com.fileregister.id#S`, `com.apple.metadata:kMDItemInformation#S`,
 **and** `com.apple.metadata:kMDItemProjects` (the ones iCloud strips). It is the
-most metadata-faithful transport of the three — the opposite of Resilio.
+most metadata-faithful transport of the three.
 
-> **TCC gotcha:** AirDrop'd files land in `~/Downloads` (TCC-protected) and carry
+> **TCC caveat:** AirDrop'd files land in `~/Downloads` (TCC-protected) and carry
 > a `com.apple.macl` (app access-control) xattr, so a plain terminal gets
-> `Operation not permitted` from `xattr`. Not a stripped attribute — grant the
-> terminal Full Disk Access, or move the file (via Finder) to `~/` (home root is
-> not TCC-protected) and read it there.
+> `Operation not permitted` from `xattr`. This is not a stripped attribute:
+> reading it requires Full Disk Access for the terminal, or moving the file (via
+> Finder) to `~/`, which is not TCC-protected.
 
 ### Transport summary
 
@@ -103,30 +103,30 @@ most metadata-faithful transport of the three — the opposite of Resilio.
 | AirDrop | ✅ | ✅ | ✅ |
 
 **★ survives every transport → the cross-device keystone.** The id survives
-iCloud + AirDrop, not Resilio. So reconcile is **transport-agnostic**: enumerate
-via ★, read the id xattr **if present**, else match by filename against
+iCloud + AirDrop, not Resilio. Reconcile is therefore **transport-agnostic**:
+enumerate via ★, read the id xattr **if present**, else match by filename against
 the (separately-synced) records.
 
-**Test discipline (this bit us repeatedly):**
+**Test discipline:**
 
-- A same-Mac "Remove Download → re-download" is **not** a sync test — the local
-  placeholder keeps all xattrs, so everything "survives" spuriously. You must
-  read on a **different device**.
-- On the receiving device, **read only** — do not `echo`/rewrite the file. A
-  re-write there clobbers the synced xattrs *and syncs the bare version back*,
-  poisoning the file everywhere. Use a **fresh filename** for each clean run.
+- A same-Mac "Remove Download → re-download" is **not** a sync test: the local
+  placeholder keeps all xattrs, so everything survives spuriously. A valid test
+  reads on a **different device**.
+- On the receiving device, only reading is safe. A re-write there clobbers the
+  synced xattrs *and syncs the bare version back*, poisoning the file everywhere.
+  Each clean run needs a **fresh filename**.
 
 ## Tag value encoding
 
-- Finder Tags are a **binary plist ARRAY of strings** — not a plain-string
-  xattr. Write via a plist (`plutil -convert binary1` / Python `plistlib`) and
-  `xattr -wx <hex>`, or use the `tag` CLI.
+- Finder Tags are a **binary plist ARRAY of strings**, not a plain-string
+  xattr. Written via a plist (`plutil -convert binary1` / Python `plistlib`) and
+  `xattr -wx <hex>`, or the `tag` CLI.
 - Optional Finder **colour** suffix on a tag string: `"name\n<0-7>"`
-  (newline + digit). Strip it when reading the name.
+  (newline + digit); removed when reading the name.
 
 ## Codepoint choice (sigils, markers)
 
-- Prefer **ASCII** or **NFC-stable single codepoints**. mdfind matching depends
+- **ASCII** or **NFC-stable single codepoints** are safest. mdfind matching depends
   on Unicode normalization; the wrong glyph silently fails to match.
 - **Safe:** `★` U+2605, `°` U+00B0, `~` U+007E — no decomposition under any
   normalization form. (★ verified as a working tag value + mdfind match.)
@@ -134,7 +134,7 @@ the (separately-synced) records.
   `˚` U+02DA RING ABOVE — it NFKD-decomposes to space + combining ring and has
   three look-alikes (`° ∘ ◦`), so it is both unreproducible and match-fragile.
 
-## How to verify on a Mac (the method that settled all of the above)
+## How to verify on a Mac
 
 1. **Find the real storage key:** let Finder (Get Info → Tags) or `tag --add`
    write a tag, then `xattr -l <file>` → the name macOS itself writes is
@@ -152,7 +152,7 @@ the (separately-synced) records.
   `kMDItemUserTags`.
 - `kMDItemProjects` (quiet binder cache) → not Finder-visible, not synced; fine,
   it is a regenerable local cache.
-- Bookmark id → for cross-device, store with `#S` (syncs, not searchable —
-  resolved via our own index, enumerated via the ★ marker).
+- Bookmark id → for cross-device, stored with `#S` (syncs, not searchable —
+  resolved via the index, enumerated via the ★ marker).
 
 See also: [SPEC.md](SPEC.md) §macOS metadata layer.

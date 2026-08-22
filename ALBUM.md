@@ -3,8 +3,8 @@
 An album is a rendered binder: membership lives in the index, the narrative
 (title, comments, order, place) as YAML fields in the annotation note —
 grubber-readable like everything else. `register album` turns that into a
-static, self-contained HTML folder. No catalog, no daemon, no lock-in: editing
-an album means editing Markdown.
+static, self-contained HTML folder. No catalog, no daemon: editing an album
+means editing Markdown.
 
 ## Quick start
 
@@ -25,7 +25,7 @@ register album safari --open
 The result lands in `<notes>/collections/albums/safari/` (`--out DIR` picks
 another location, e.g. a dylan path for the LAN): `index.html`, `media/`
 (copies of the originals), `thumbs/` (JPEG via sips, HEIC included). Copy, zip,
-or serve the folder — it is complete.
+or serve the self-contained folder.
 
 ## The album fields
 
@@ -65,11 +65,6 @@ place should be preserved independently of the file.
 
 **Prose below the block is private** (working notes) and never reaches the HTML.
 
-A note on sorting: letters with gaps (`b`, `d`, `f`) — inserting between them is
-then a `c` (or `bc`), never a renumbering. It is a pure string sort, so avoid
-numbers (`'10' < '2'`). If you would rather not write keys by hand,
-`register order move` computes them.
-
 ## Detail view
 
 Clicking an image opens the overlay (pure CSS, no JavaScript): image on the
@@ -77,32 +72,31 @@ left, metadata top right (title, comment, place · date, camera), map bottom
 right as an OpenStreetMap embed. The × closes and jumps back to the thumbnail;
 the browser's back button works too.
 
-The map is the album's **only internet dependency** — offline, it is the one
-thing missing.
+The map is the album's only internet dependency; offline, everything else still
+works.
 
 ## Non-images
 
 PDFs and other files in the binder appear as cards among the photos — the entry
 ticket belongs in the album. `title`/`comment`/`sort` work just the same.
 
-## Your own look
+## Custom styling
 
 ```sh
 register album safari --css my-style.css            # per call
 cp my-style.css ~/.config/fileregister/album.css    # for every album
 ```
 
-Your stylesheet replaces the built-in one entirely. Starting points: the
+A custom stylesheet replaces the built-in one entirely. Starting points: the
 `albumCSS` constant in `cmd/register/cmd_album.go`, or the bundled
 `album-styles/link-board.css` (a compact, linkding-like list look for binders of
 URL refs). The markup is the stable contract — everything lives inside an
-`.album` wrapper, so your rules address `.album h1`, `.album .grid`,
+`.album` wrapper, so rules address `.album h1`, `.album .grid`,
 `.album figure`/`figcaption`, `.meta`, `.card`, and `.detail` with
 `.detail-media`, `.detail-info`, `.detail-map`, `.detail-close`. Page chrome
 (background, margins) belongs on `body.album-page` — only the standalone
 document carries that class, so nothing leaks into a host page when Stage embeds
-the album. Add `@page` rules and "Save as PDF" turns it into a printable photo
-book — without a line of code.
+the album. `@page` rules make "Save as PDF" produce a printable photo book.
 
 ## milan & dylan: albums on the LAN
 
@@ -156,10 +150,10 @@ output, mi.lan June 2026 or later.)
   `grubber extract ~/notes --blocks-only -f type=ref -f binder=safari` plus
   full text finds the image by its comment, not by `IMG_2041`.
 
-## Limits, honestly
+## Limits
 
 - IPTC/EXIF fallbacks need Spotlight: freshly copied files may not be indexed
-  yet (wait a moment, or curate the fields).
+  yet, in which case the curated fields are the reliable source.
 - HEIC: thumbnails are always JPEG; the linked original may show nothing outside
   Safari.
 - Very large albums stay smooth thanks to `content-visibility` — but a curated

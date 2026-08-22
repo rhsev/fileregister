@@ -1,20 +1,12 @@
 # Ordering — arranging the members of a binder
 
 A **binder** is a membership set: a file is in it or not, recorded once in the
-JSONL index, queryable as a field. That meaning is unchanged and stays sacred —
-"binder" is always the *set*.
+JSONL index, queryable as a field. "binder" always means the *set*.
 
-An **ordering** is a separate thing: a *presentation* that puts a binder's
-members into a sequence. It lives outside the index, in the binder's Markdown
-note, as `sort:` keys on the member blocks. A binder may have an ordering or
-none; consumers declare what they eat — a binder (set) or an ordering
-(sequence).
-
-> **History.** v1 (2026-07-03) shipped two kinds, `relative` (rule + sparse
-> `after:` exceptions) and `absolute` (materialized `sort:` keys). The relative
-> kind — a multi-pass `after:`-chain resolver — was removed in the 2026-07
-> consolidation: orderings are **absolute-only** now. Leftover `after:` fields
-> and `kind:` lines in existing notes are inert and can stay.
+An **ordering** is separate: a *presentation* that puts a binder's members into
+a sequence. It lives outside the index, in the binder's Markdown note, as
+`sort:` keys on the member blocks. A binder may have an ordering or none; each
+consumer declares which it reads — a binder (set) or an ordering (sequence).
 
 ## The data
 
@@ -65,11 +57,11 @@ grubber inherits frontmatter into every block of a file.
 
 `sort:` keys are fractional lexicographic strings over `0-9a-z` (base 36).
 Between any two keys a new one fits, so a single move writes a single key.
-Hand-editing is fine — **string comparison is the whole contract**. Pick
-letters with gaps (`b`, `d`, `f`; squeezing in is a `c` or `bc`) and avoid
-numbers, which sort as strings (`'1' < '10' < '2'`). When `order move` cannot
-place a single key (an unkeyed neighbour, or a degenerate hand-edited pair),
-it materializes fresh keys for **all** members in the intended order.
+Hand-editing works: **string comparison is the whole contract**. Letters with
+gaps (`b`, `d`, `f`) leave room to insert (a squeeze-in is `c` or `bc`); numbers
+sort lexically (`'1' < '10' < '2'`), so they make poor keys. When `order move`
+cannot place a single key (an unkeyed neighbour, or a degenerate hand-edited
+pair), it materializes fresh keys for **all** members in the intended order.
 
 ## The CLI
 
@@ -95,5 +87,5 @@ directly (keyed first, then filename order). See [ALBUM.md](ALBUM.md).
 ## Multiple orderings
 
 The data model permits several ordering files per binder (`--note`); the
-current convention is one, in the canonical note. Labels (`as:`) only if real
-need appears.
+current convention is one, in the canonical note. Labels (`as:`) are unused for
+now.

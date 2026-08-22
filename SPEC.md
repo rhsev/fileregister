@@ -2,7 +2,7 @@
 
 This document specifies how **collections** — the practice of organizing files into named binders that share a common context (e.g. a project, a research topic, an event) — are represented, managed, and queried in the grubber ecosystem.
 
-It is the contract between the canonical data layer (the central JSONL index and its optional Markdown annotations) and the operating-system metadata layer (macOS bookmarks and Spotlight metadata). The `register` CLI in this repository implements the read/write/maintain side. [matterbase](https://github.com/rhsev/matterbase), as a query-construction TUI, is one consumer — it can browse and filter collections through standard grubber filters but has no built-in collection management UI. Collections live and breathe on the command line.
+It is the contract between the canonical data layer (the central JSONL index and its optional Markdown annotations) and the operating-system metadata layer (macOS bookmarks and Spotlight metadata). The `register` CLI in this repository implements the read/write/maintain side. [matterbase](https://github.com/rhsev/matterbase), as a query-construction TUI, is one consumer — it can browse and filter collections through standard grubber filters but has no built-in collection management UI. Managing collections is a command-line concern.
 
 ## Concept
 
@@ -395,23 +395,13 @@ in the annotation blocks, grubber-readable like everything else:
 | `place`, `lat`, `lon` | Curated location: display text and coordinates. Fallback is the IPTC/EXIF data **inside** the image (read via Spotlight) — durable in the file itself, but lost to EXIF-stripping transports and unreadable without Spotlight. The YAML fields preserve the location independently; the image file is never written to. |
 
 The album title is the binder name. Location and date come from Spotlight's
-IPTC/EXIF index (`mdls` — City/Country/creation date), so the standards photo
-apps ignore are finally on display. Markdown **prose** under a block is private
-working notes and is never rendered. Non-image members (PDF — a ticket, a map)
-render as link cards: albums are not limited to photos. Thumbnails via `sips`
-(JPEG, browser-safe even for HEIC originals). Renderer, not a photo manager —
-editing the album IS editing the annotation note.
+IPTC/EXIF index (`mdls` — City/Country/creation date). Markdown **prose** under a
+block is private working notes and is never rendered. Non-image members (a PDF
+ticket, a map) render as link cards. Thumbnails go through `sips` (JPEG,
+browser-safe even for HEIC originals). It is a renderer, not a photo manager:
+editing the album means editing the annotation note.
 
-Clicking a photo opens a **detail view** (CSS-only `:target` overlay, no
-JavaScript): image left, metadata (title, caption, place · date, camera) top
-right, and — when the photo carries GPS — an OpenStreetMap embed bottom right
-(lazy iframe, no API key; the map is the album's only internet dependency).
-The stable markup contract for custom stylesheets: everything lives inside an
-`.album` wrapper (`​.album h1`, `.album .grid`, `figure`/`figcaption`, `.meta`,
-`.card`, and `.detail` with `.detail-media`, `.detail-info`, `.detail-map`,
-`.detail-close`); page chrome goes on `body.album-page`, which only the
-standalone document carries — so nothing leaks into a host page when the
-album is served embedded (dylan Stage).
+The detail view (a CSS-only `:target` overlay, no JavaScript) and the stable CSS-class contract for custom stylesheets are documented in [ALBUM.md](ALBUM.md).
 
 ### `register reindex [--dry-run]`
 
@@ -436,27 +426,11 @@ Collections are **not** integrated as a dedicated UI feature in matterbase. Two 
 
 ### Querying collections from matterbase
 
-Collections are queryable like any other field via matterbase's existing filter mechanism. Two ways:
-
-**Filter buttons in config.yml** — declarative, persistent:
-
-```yaml
-filters:
-  - label: "Testdateien"
-    query: ["binder=Testdateien"]
-  - label: "Project Alpha"
-    query: ["binder=project-alpha"]
-```
-
-Clicking the button narrows the visible records to those matching. The yanked grubber command reflects the filter, ready to pipe.
-
-**Direct in the shell** — exploratory, ad-hoc:
+A binder is an ordinary field, so matterbase reaches it through the same filter and SQL mechanism as any other — no dedicated collection UI. The matterbase-side keys and preset config live in [WORKFLOWS.md](WORKFLOWS.md); this section fixes only the grubber query mechanics the records rely on. Directly in the shell:
 
 ```sh
 grubber extract ~/notes --blocks-only -f type=ref -f binder=Testdateien
 ```
-
-No special matterbase support is required for either approach.
 
 A bare Markdown scan returns only the **annotated subset** — records that carry a per-binder context block, with their custom fields and prose. To query the **full index** (every record, annotated or not), add the JSONL store as a merge source. Because the index holds one record per file with `binder` as an array, `--explode binder` first projects each index record into one row per membership, so the per-binder Markdown blocks line up and collapse on `(id, binder)`:
 
@@ -464,7 +438,7 @@ A bare Markdown scan returns only the **annotated subset** — records that carr
 grubber extract ~/notes --from-jsonl ~/notes/collections/ --explode binder --merge-on id,binder --blocks-only -f type=ref -f binder=Testdateien
 ```
 
-So the Markdown-only scan is the rich "annotated view"; `--from-jsonl` widens it to the complete directory; `--explode binder` turns the one-per-file index into per-membership rows; and `--merge-on id,binder` ensures each membership appears once — as its annotation block, back-filled with the index fields — rather than as two entries. For a **per-file** view (one row per file, bookmarks included), omit `--explode`/`--merge-on` and filter on the array directly (`-f binder=Testdateien` matches a value inside the set). See [COLLECTIONS.md](COLLECTIONS.md) for the matterbase-side configuration and [grubber/IDEAS.md](https://github.com/rhsev/grubber/blob/main/IDEAS.md) for `--explode`.
+So the Markdown-only scan is the rich "annotated view"; `--from-jsonl` widens it to the complete directory; `--explode binder` turns the one-per-file index into per-membership rows; and `--merge-on id,binder` ensures each membership appears once — as its annotation block, back-filled with the index fields — rather than as two entries. For a **per-file** view (one row per file, bookmarks included), omit `--explode`/`--merge-on` and filter on the array directly (`-f binder=Testdateien` matches a value inside the set). See [WORKFLOWS.md](WORKFLOWS.md) for the matterbase-side configuration and [grubber/IDEAS.md](https://github.com/rhsev/grubber/blob/main/IDEAS.md) for `--explode`.
 
 ### Management lives in the CLI
 
