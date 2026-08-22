@@ -19,7 +19,7 @@ Each record can carry a Markdown sidecar: a note per file that keeps the hard
 facts as YAML fields (an amount, a payment date, a supplier, a caption), with
 free prose alongside for everything that isn't a field. The fields are what
 grubber and matterbase query; the prose is for you. That is what turns a plain
-set of files into a self-documenting binder: a workbook for a piece of work, a
+set of files into a self-documenting binder: a workbook for a project, a
 photo album, a collection that explains itself.
 
 Everything written onto the file itself (the id in its xattr, a macOS bookmark,
@@ -51,7 +51,7 @@ file and reports which binders it is in.
 
 ## What you can do with it
 
-**Collect the documents for a piece of work.** A binder is a set on the
+**Collect the documents for a project.** A binder is a set on the
 record, not a folder: the contract, two scans and a spreadsheet stay where they
 are across several different folders and still form one working set for the
 session. Adding a file to a binder does not move it, and the same file can sit
@@ -256,10 +256,6 @@ the set. See SPEC §Bookmarks.
 - [ORDERING.md](ORDERING.md) — `sort:` keys and `register order`
 - [ALBUM.md](ALBUM.md) — static photo albums, and serving them on the LAN
 - [RATIONALE.md](RATIONALE.md) — why this exists when macOS already has tags
-
-A related tool, [tagback](https://github.com/rhsev/tagback), backs up Finder
-tags and comments to Markdown. It shares the conventions and lives in its own
-repo.
 
 ## License
 
