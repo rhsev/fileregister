@@ -180,9 +180,13 @@ make install PREFIX=/usr/local/bin
 ```
 
 Requires Go, and macOS for the current fileanchor build. `register` is a single
-self-contained Go binary with no runtime dependencies; every subcommand is
+self-contained Go binary; every subcommand is
 native. The CLI carries no macOS coupling of its own. All of that lives in the
 fileanchor engine, so a Linux port is a fileanchor port, not a register one.
+
+### Companion releases
+
+`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) is optional: the `register` commands run without it, but the Markdown sidecar layer only makes sense with grubber, which is what queries its fields. This release is tested against **fileanchor 1.0.2** and **grubber v0.16.0**.
 
 ### Configuration
 
