@@ -1,3 +1,4 @@
+BIN           = register
 PREFIX       ?= $(HOME)/bin
 LIBEXEC_DIR   = $(PREFIX)/libexec
 BUILD_DIR     = $(CURDIR)/.build
@@ -10,10 +11,10 @@ WORKFLOWS     = add-to-binder binder-of
 FILEANCHOR_REPO    ?= https://github.com/rhsev/fileanchor.git
 FILEANCHOR_VERSION ?= 1.0.2
 
-.PHONY: build fileanchor install uninstall install-services uninstall-services test
+.PHONY: build fileanchor link unlink install uninstall install-services uninstall-services test
 
 build:
-	go build -o $(BUILD_DIR)/register ./cmd/register
+	go build -o $(CURDIR)/$(BIN) ./cmd/register
 
 # Build the fileanchor engine from source at the pinned tag. Needs a Swift
 # toolchain (Xcode or the Command Line Tools); macOS arm64, 13 or later.
@@ -24,13 +25,17 @@ fileanchor:
 	@install -m 755 $(BUILD_DIR)/fileanchor-src/.build/release/fileanchor $(BUILD_DIR)/fileanchor
 	@echo "→ $(BUILD_DIR)/fileanchor ($(FILEANCHOR_VERSION))"
 
+# `install` copies, and stays that way: this repo is published, and an
+# outsider's clone is not a stable location to point a symlink at. On the
+# development machine use `make link` instead.
+#
 # `register` is a single self-contained Go binary. The engine is installed
 # alongside it under libexec/, which is where the binary looks when neither
 # $FILEANCHOR nor a `fileanchor` on PATH resolves. Run `make fileanchor` first,
 # or install the engine yourself and skip that step.
 install: build
 	install -d $(PREFIX)
-	install -m 755 $(BUILD_DIR)/register $(PREFIX)/register
+	install -m 755 $(CURDIR)/$(BIN) $(PREFIX)/$(BIN)
 	@if [ -x $(BUILD_DIR)/fileanchor ]; then \
 		install -d $(LIBEXEC_DIR); \
 		install -m 755 $(BUILD_DIR)/fileanchor $(LIBEXEC_DIR)/fileanchor; \
@@ -39,6 +44,15 @@ install: build
 		echo "installed $(PREFIX)/register"; \
 		echo "note: no engine installed — put fileanchor on PATH, set \$$FILEANCHOR, or run 'make fileanchor && make install'"; \
 	fi
+
+# Development machine: link once, then `make build` is all that deploying takes.
+link: build
+	@install -d $(PREFIX)
+	@ln -sfn $(CURDIR)/$(BIN) $(PREFIX)/$(BIN)
+	@echo "linked $(PREFIX)/$(BIN) -> $(CURDIR)/$(BIN)"
+
+unlink:
+	rm -f $(PREFIX)/$(BIN)
 
 uninstall:
 	rm -f $(PREFIX)/register
