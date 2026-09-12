@@ -10,15 +10,14 @@ carry across to another.
 
 ## What it does
 
-`register` writes a record for every file you hand it: a permanent id, the
+`register` writes a record for every file you pass to it: a permanent id, the
 binders it belongs to, and any fields you add. The records live in a JSONL index
-next to your notes: readable with `cat`, searchable with grep, kept in git.
+in the root of your notes: readable with `cat`, searchable with grep, kept in git.
 The index is the source of truth.
 
-Each record can carry a Markdown sidecar: a note per file that keeps the hard
-facts as YAML fields (an amount, a payment date, a supplier, a caption), with
-free prose alongside for everything that isn't a field. The fields are what
-grubber and matterbase query; the prose is for you. That is what turns a plain
+Each record can carry a Markdown sidecar: a note per file that keeps the data as YAML fields (an amount, a payment date, a supplier, a caption), with
+free notes outside the yaml-block alongside for everything that isn't a field. The fields are what
+grubber and matterbase query; the note is for you. That is what turns a plain
 set of files into a self-documenting binder: a workbook for a project, a
 photo album, a collection that explains itself.
 
@@ -30,7 +29,7 @@ or a copy strips it.
 
 `register` itself is portable Go; the OS-specific work lives behind the
 [fileanchor](https://github.com/rhsev/fileanchor) engine, today built for macOS.
-A Linux fileanchor is the only piece between here and running on Linux.
+A Linux fileanchor is the only currently missing piece to run it on Linux.
 
 ## A first session
 
@@ -43,9 +42,8 @@ register resolve car-policy           # prints the path, whatever it is called n
 open "$(register resolve car-policy)"
 ```
 
-You scanned the document under a throwaway name; `--aka car-policy` gives it a
-handle you'll actually remember. Six months later the file is called
-`policy-2026.pdf` and sits on a NAS. `register resolve car-policy` still prints
+You scanned the document and saved it with whatever name; `--aka car-policy` gives it a
+handle you'll actually remember or just like to use. Six months later the file is renamed and moved to a different place. `register resolve car-policy` still prints
 its path, and `register of /Volumes/nas/policy-2026.pdf` reads the id off the
 file and reports which binders it is in.
 
@@ -61,21 +59,21 @@ pipe somewhere.
 
 **Attach data to a file.** `register promote` writes a Markdown note with
 one YAML block per file, and you fill in whatever the binder is about: an
-amount, a payment date, a supplier, a caption, prose. The same file can carry
+amount, a payment date, a supplier, a caption and a note alongside the YAML block. The same file can carry
 different fields in a different binder. `register annotate` does the same edits
-from a script or a GUI without you opening the note.
+from a script or a GUI without opening the note.
 
 **Link to a file so the link keeps working.** Yes, like Hookmark, but in plain
 text instead of a database. `--aka` gives a record a handle that has nothing to
 do with the filename. `register resolve <handle>` turns it back into a path,
-behind a `milan://` URL, in a Shortcut, or in a shell alias. The lookup goes
+behind a `ref://` URL (if you install mi.lan), in a Shortcut, or in a shell alias. The lookup goes
 through the record, so the link survives renames and moves.
 
 **Look a file up in reverse.** `register of <file>` answers "what is this, and
 what is it part of?" from the id on the file, so renaming does not break it.
 
-**Put a binder in an order.** The binder stays an unordered set; the order is
-`sort:` keys in the note, edited with `register order move`. See
+**Put a binder in an order.** The binder files are usually in the same order as the YAML blocks; using
+`sort:` keys you can reorder them, edited with `register order move`. See
 [ORDERING.md](ORDERING.md).
 
 **Render a binder as a photo album.** `register album <binder> --open` produces
@@ -92,19 +90,19 @@ container from someone else can't write anywhere it likes. The container is OS-n
 the trip may go through exFAT, rsync without `-E`, or a cloud folder that
 eats xattrs.
 
-**Keep the macOS side in sync.** `register refresh` pushes record state back
+**Keep macOS Spotlight up to date.** `register refresh` pushes record state back
 into tags, Spotlight fields and xattrs. `register audit` reports drift in both
 directions, `register repair` re-binds files that moved, and `register cleanup`
 walks you through anything that needs a human decision. None of them delete a
 record on their own.
 
-**Query the whole thing.** The index is JSONL and the notes are YAML in
+**Query everything.** The index is JSONL and the notes are YAML in
 Markdown, so [grubber](https://github.com/rhsev/grubber) can query both and
 [matterbase](https://github.com/rhsev/matterbase) gives you a table view and a
 query builder over them. See [WORKFLOWS.md](WORKFLOWS.md).
 
 For the "macOS already has tags" question, see [RATIONALE.md](RATIONALE.md).
-The short version: fileregister uses them and can rebuild them.
+The short version: fileregister gives you an extra layer of information and can be rebuilt on another Mac.
 
 ## Commands
 
@@ -116,7 +114,7 @@ register <subcommand> [args...]
 |---|---|
 | `add` | Record files in the index (bookmark + xattr + record). With `--binder` the file joins that binder, without it you get a bookmark: a permanent id and an optional `aka`, no binder. `--md` also writes an annotation note |
 | `promote` | Write the per-binder Markdown block for a binder's records; `--edit` opens the note in `$EDITOR` |
-| `annotate` | Edit an existing block's fields or prose from the command line (`--set`, `--unset`, `--prose`) |
+| `annotate` | Edit an existing block's fields or note from the command line (`--set`, `--unset`, `--prose`) |
 | `remove` | Take files out of a binder; a record whose binder set runs empty stays as a bookmark |
 | `refresh` | Push record state into macOS metadata |
 | `audit` | Read-only consistency report in both directions |
@@ -165,7 +163,9 @@ register reindex --dry-run
 
 ## Installation
 
-If you already have `fileanchor` on your `PATH`:
+**Apple Silicon: download the prebuilt bundle** from the [latest release](https://github.com/rhsev/fileregister/releases/latest). `fileregister-macos-arm64.tar.gz` contains `register` and the `fileanchor` engine in the layout register expects. Fetched with `curl` it runs as-is; after a browser download, clear the quarantine flag once: `xattr -dr com.apple.quarantine register libexec/fileanchor`.
+
+Or build it yourself. If you already have `fileanchor` on your `PATH`:
 
 ```sh
 go install github.com/rhsev/fileregister/cmd/register@latest
@@ -186,7 +186,7 @@ fileanchor engine, so a Linux port is a fileanchor port, not a register one.
 
 ### Companion releases
 
-`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) is optional: the `register` commands run without it, but the Markdown sidecar layer only makes sense with grubber, which is what queries its fields. This release is tested against **fileanchor 1.0.2** and **grubber v0.16.0**.
+`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) is needed to use all features: the `register` commands run without it, but the Markdown sidecar layer only makes sense with grubber, which is what queries its fields. This release is tested against **fileanchor 1.0.2** and **grubber v0.16.0**.
 
 ### Configuration
 
@@ -229,7 +229,7 @@ spend most of its time on process startup.
 No binary ships in this repo. `make fileanchor` clones fileanchor at a pinned
 tag and builds it with SwiftPM; `make install` puts it next to the CLI. Bump
 `FILEANCHOR_VERSION` in the [Makefile](Makefile) for a newer engine. Building it
-needs a Swift toolchain (Xcode or the Command Line Tools) and produces an arm64
+needs a Swift toolchain (Xcode or the Command Line Tools) and produces a 
 binary for macOS 13 or later.
 
 Resolution order, first match wins:
@@ -270,4 +270,4 @@ Free to read, use, and build on for anything non-commercial.
 ---
 
 *Built on [fileanchor](https://github.com/rhsev/fileanchor). Part of a family of
-plain-text tools. The [profile page](https://github.com/rhsev) has the map.*
+plain-text tools. The [profile page](https://github.com/rhsev) provides an overview.*
