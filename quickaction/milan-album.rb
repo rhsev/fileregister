@@ -74,9 +74,10 @@ end
 
 # Same renderer the pinboard uses. `unified` parses YAML frontmatter instead of
 # dumping it into the page the way gfm would — album attachments are the user's
-# own notes and often carry one.
+# own notes and often carry one. `--hardbreaks` keeps every newline a newline;
+# a list typed without blank lines should not come back as one run-on line.
 def render_markdown(md)
-  cmd = ENV["ALBUM_MD"].to_s != "" ? ENV["ALBUM_MD"].split : [find_bin("apex", "APEX_BIN"), "--mode", "unified"]
+  cmd = ENV["ALBUM_MD"].to_s != "" ? ENV["ALBUM_MD"].split : [find_bin("apex", "APEX_BIN"), "--mode", "unified", "--hardbreaks"]
   out, status = Open3.capture2(*cmd, stdin_data: md, err: File::NULL)
   # capture2 tags the bytes with the external encoding, whatever that happens to
   # be; apex emits UTF-8. Saying so here keeps the check below from raising —
