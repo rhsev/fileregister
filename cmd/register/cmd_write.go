@@ -67,6 +67,11 @@ func writeParse(line string) writeItem {
 	if !rec.Valid() {
 		return writeItem{status: writeStatusErr(targetStr, "missing required field: id")}
 	}
+	if rec.Binder != "" {
+		if p := index.BinderNameProblem(rec.Binder); p != "" {
+			return writeItem{status: writeStatusErr(targetStr, "binder name '"+rec.Binder+"' "+p)}
+		}
+	}
 	return writeItem{
 		queued:  true,
 		target:  targetStr,

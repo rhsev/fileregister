@@ -69,6 +69,12 @@ func cmdRename(args []string) int {
 		fmt.Fprintln(os.Stderr, "Error: old and new names are the same")
 		return 1
 	}
+	// Only the new name is checked: an old binder that breaks the rule must
+	// stay renamable.
+	if p := index.BinderNameProblem(newName); p != "" {
+		fmt.Fprintf(os.Stderr, "Error: binder name '%s' %s\n", newName, p)
+		return 1
+	}
 
 	fmt.Fprintf(os.Stderr, "Collecting refs for binder '%s'…\n", oldName)
 	// A record's binder lives in the index (jsonl) and in any annotation copies

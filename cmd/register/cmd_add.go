@@ -116,6 +116,12 @@ func cmdAdd(args []string) int {
 		opts.hasBinder = opts.binder != ""
 	}
 	binderSet := opts.binder != ""
+	if binderSet {
+		if p := index.BinderNameProblem(opts.binder); p != "" {
+			fmt.Fprintf(os.Stderr, "Error: binder name '%s' %s\n", opts.binder, p)
+			return 1
+		}
+	}
 	targetIsMd := strings.HasSuffix(strings.ToLower(opts.target), ".md")
 
 	if opts.md && opts.target != "" {

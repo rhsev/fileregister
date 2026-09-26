@@ -148,6 +148,23 @@ func cmdUnmarshal(args []string) int {
 		}
 	}
 
+	// A container made elsewhere may carry binders this side refuses. Stop
+	// before anything is written rather than fail at the xattr write.
+	var badBinders []string
+	for _, e := range refLines {
+		for _, b := range index.NormalizeBinders(e["binder"]) {
+			name := index.AsString(b)
+			if p := index.BinderNameProblem(name); p != "" && !containsStr(badBinders, name) {
+				badBinders = append(badBinders, name)
+				fmt.Fprintf(os.Stderr, "Error: binder name '%s' %s\n", name, p)
+			}
+		}
+	}
+	if len(badBinders) > 0 {
+		fmt.Fprintln(os.Stderr, "Nothing imported. Rename the binder where the container was made, then marshal it again.")
+		return 1
+	}
+
 	if lerr := index.LockBookmarks(); lerr != nil {
 		fmt.Fprintln(os.Stderr, "register:", lerr)
 		return 1

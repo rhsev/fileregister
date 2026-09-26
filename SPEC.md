@@ -72,7 +72,7 @@ Fields:
 |---|---|---|
 | `type` | yes | Always `ref` for file-reference records |
 | `id` | yes | Bookmark identifier (random 9-digit). The file's **permanent identity** — assigned once, travels with the file, never changes (repair re-binds the blob under the same id). |
-| `binder` | optional | **Set (JSON array)** of binder names this file belongs to. An empty or absent set is a [bookmark](#bookmarks-binderless-records) — a tracked file in no binder. Add/remove are set operations on this one field. |
+| `binder` | optional | **Set (JSON array)** of binder names this file belongs to. An empty or absent set is a [bookmark](#bookmarks-binderless-records) — a tracked file in no binder. Add/remove are set operations on this one field. A new binder name may hold no comma, no control character and no leading or trailing whitespace, and is at most 255 bytes (see [Binder names](#binder-names)). |
 | `filename` | recommended | Basename of the referenced file at add-time (e.g. `brief.pdf`). Plain-text anchor that survives bookmark breakage and xattr loss. Set by `register add`; not maintained when the underlying file is later renamed. |
 | `kind` | optional | Coarse classification used for display and filtering (e.g. `pdf`, `image`, `mail`, `video`). Auto-detected from the file's extension on `register add` (jpg/png/heic/… → `image`, mp4/mov/… → `video`, eml/mbox/… → `mail`, md/markdown → `md`, typ → `typst`; unknown extensions fall back to the extension itself, no-extension to `file`). `--kind` overrides the auto-detect. For URL refs, derived from the scheme (`https` → `web`, `x-devonthink-item` → `devonthink`, `message` → `mail`; unknown schemes fall back to the scheme itself). |
 | `url` | optional | Locator alternative to the bookmark: the record references a URL (e.g. `x-devonthink-item://…`) instead of a file. Mutually exclusive with the bookmark identity — see [URL refs](#url-refs). |
@@ -142,6 +142,21 @@ binder: project-alpha
 ````
 
 The H3 heading is the filename (human recognition); the YAML block is the back-reference plus whatever custom fields and prose the user adds. A block names a **single** `binder` — it is the file's context *in that binder*. The same file may therefore carry **several** annotation blocks, one per binder, each with its own custom fields and prose (an invoice filed under `rechnungen-2024` with an amount, and under `projekt-a` with a deadline). The index stays one record per file; the Markdown layer is per-binder context, linked back by `id`. Annotations never replace the index entry — they are the optional, disposable custom layer. `register promote` (or `add --md`) creates them; grubber-over-Markdowns reads them for rich queries (with `--explode binder --merge-on id,binder`; see [matterbase Touchpoints](#matterbase-touchpoints)).
+
+### Binder names
+
+A binder ends up on files as a Finder tag or a `kMDItemProjects` entry, so its
+name follows fileanchor's label rule, which holds for every platform's engine
+(fileanchor's PLATFORMS.md): **no comma** (Linux keeps tags as a
+comma-separated list), no control characters, no leading or trailing
+whitespace, at most 255 bytes. Spaces, colons (`2024:berlin`) and any other
+Unicode are fine.
+
+The rule is checked where a name is introduced — `add --binder` (and
+`REGISTER_BINDER`), the new name of `rename`, `write`, and `unmarshal`, which
+refuses the whole container before importing anything. Existing binders are
+not checked, so one that breaks the rule can still be listed, removed from,
+and renamed away.
 
 ### Bookmarks (binderless records)
 
