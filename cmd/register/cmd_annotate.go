@@ -31,7 +31,7 @@ var reservedAnnotateKeys = map[string]string{
 	"id":     "identity — register assigns it at add time",
 	"type":   "record identity — never editable",
 	"binder": "membership — use register add/remove",
-	"aka":    "identity handle — set at add time (register add --aka)",
+	"aka":    "identity handle — use register aka --add/--remove",
 	"sort":   "ordering key — use register order move",
 }
 

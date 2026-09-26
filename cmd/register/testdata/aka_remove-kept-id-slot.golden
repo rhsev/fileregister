@@ -1,0 +1,60 @@
+exit: 0
+=== stdout ===
+aka 'alpha' removed from alpha.pdf (11)
+  3 Markdown block(s) updated
+=== stderr ===
+=== inbox.jsonl ===
+{"aka":["al"],"binder":["Anno","Other"],"filename":"alpha.pdf","id":"11","type":"ref"}
+{"type":"ref","id":"22","binder":["Anno"],"filename":"beta.pdf"}
+{"type":"ref","id":"33","binder":["Anno"],"filename":"gamma.pdf","aka":["ha"]}
+{"type":"ref","id":"44","binder":["Anno"],"filename":"delta.pdf","aka":["de","delta"]}
+=== binder_Anno.md ===
+### alpha.pdf
+```yaml
+type: ref
+id: '11'
+binder: Anno
+aka:
+- al
+amount: 5
+```
+
+### gamma.pdf (hand-written, aka in the id slot)
+```yaml
+type: ref
+id: ha
+binder: Anno
+```
+
+### delta.pdf (hand-written, aka only)
+```yaml
+type: ref
+binder: Anno
+aka: [de]
+note: keep me
+```
+
+### loose.pdf (hand-written, unindexed)
+```yaml
+type: ref
+id: loose
+binder: Anno
+```
+
+### alpha.pdf (hand-written, other handle in the id slot)
+```yaml
+type: ref
+id: al
+binder: Anno
+```
+=== binder_Other.md ===
+### alpha.pdf
+Prose.
+
+```yaml
+type: ref
+id: '11'
+aka:
+- al
+binder: Other
+```

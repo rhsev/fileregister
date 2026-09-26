@@ -94,6 +94,23 @@ func TestAddUrlReuse(t *testing.T) {
 		strings.Join(manifestMultiset(t, filepath.Join(n, "collections", "inbox.jsonl")), "\n")+"\n")
 }
 
+// TestAddAkaNotApplied: --aka on an existing record lands only as a backfill
+// (new membership, no aka yet); otherwise add says so and names the verb.
+func TestAddAkaNotApplied(t *testing.T) {
+	anchor := engineBin(t)
+	n := seedInbox(t, `{"type":"ref","id":"5","binder":["A"],"url":"x-devonthink-item://X","aka":["old"]}`)
+	_, gErr, gCode := runGoAdd(t, addEnv(t, n, anchor), "--url", "x-devonthink-item://X", "--binder", "A", "--aka", "new")
+	if gCode != 0 || !strings.Contains(gErr, "--aka 'new' not applied; use: register aka 5 --add new") {
+		t.Errorf("want not-applied note, exit 0; got %d:\n%s", gCode, gErr)
+	}
+
+	n = seedInbox(t, `{"type":"ref","id":"5","binder":["A"],"url":"x-devonthink-item://X"}`)
+	_, gErr, gCode = runGoAdd(t, addEnv(t, n, anchor), "--url", "x-devonthink-item://X", "--binder", "B", "--aka", "new")
+	if gCode != 0 || strings.Contains(gErr, "not applied") {
+		t.Errorf("backfill case must stay silent; got %d:\n%s", gCode, gErr)
+	}
+}
+
 // TestAddFileBehavior: a real file add writes the index record, stamps the id,
 // and marks ★.
 func TestAddFileBehavior(t *testing.T) {

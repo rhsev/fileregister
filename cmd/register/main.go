@@ -163,6 +163,7 @@ Register — bookmark index (identity & membership):
             [<binder> --json]               (JSONL per member: id, aka, filename, kind, path)
   resolve   <key>                           (id or aka handle → file path; --record for details)
   of        <file>                          (reverse lookup: file → id, aka, collection(s))
+  aka       <id|aka> [--add <handle>]... [--remove <handle>]...  (edit a record's aka handles)
   rename    <old-name> <new-name> [--merge]
   refresh   [--dry-run]
   audit     [--binder <name>]
@@ -215,6 +216,7 @@ func topLevel(args []string) {
 // after the subcommand and returns the process exit code.
 var commands = map[string]func([]string) int{
 	"add":       cmdAdd,
+	"aka":       cmdAka,
 	"album":     cmdAlbum,
 	"annotate":  cmdAnnotate,
 	"audit":     cmdAudit,

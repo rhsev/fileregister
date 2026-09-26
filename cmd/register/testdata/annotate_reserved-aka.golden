@@ -1,4 +1,4 @@
 exit: 1
 === stdout ===
 === stderr ===
-Error: 'aka' is reserved: identity handle — set at add time (register add --aka)
+Error: 'aka' is reserved: identity handle — use register aka --add/--remove

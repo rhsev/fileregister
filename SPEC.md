@@ -297,10 +297,19 @@ The target must be a `.md` file. There is **no `demote`**, and promote never del
 Edits an **existing** annotation block — the tool-shaped form of "the user edits it directly" (see [Record Identity](#record-identity)), built for GUI clients (binderview's entry inspector) that must never grow a second Markdown engine. `annotate` never creates a block (`promote` stays the one creation chokepoint) and never touches the index.
 
 - `--set k=v` replaces the field in place (an array-valued field collapses to the scalar, its `- ` items go with it) or appends it; `--unset k` removes field and items, absent = no-op. Values are scalars: numerals and booleans are written plain (`amount=129.50` means a number; leading-zero numerals stay quoted strings), everything else follows promote's quoting.
-- **Reserved keys are refused**: `id`, `type` (identity), `binder` (membership — `add`/`remove`), `aka` (identity handle — `add --aka`), `sort` (ordering — `order move`). Identity and membership have their own verbs; `_`-prefixed keys are injected, never stored.
+- **Reserved keys are refused**: `id`, `type` (identity), `binder` (membership — `add`/`remove`), `aka` (identity handle — `aka --add/--remove`), `sort` (ordering — `order move`). Identity and membership have their own verbs; `_`-prefixed keys are injected, never stored.
 - `--prose` replaces the section's prose — every line of the section that is neither the heading nor a fenced `yaml`/`yml` block — with the given text (`-` reads stdin, empty clears), rewritten canonically between heading and block. The heading and the blocks themselves stay byte-identical. This is a **deliberate policy change**: register historically never touched prose; `annotate --prose` may, on explicit request, because register is the family's only Markdown writer and the alternative would be exactly the second engine the rule exists to prevent.
 
 Blocks are matched over id ∪ aka like every other block lookup; all matching `(id ∪ aka, binder)` blocks are edited, wherever the note lives. A block without a preceding heading refuses `--prose` (no section to rebuild). Writes are atomic, one write per file, fields and prose in the same pass.
+
+### `register aka <id|aka> [--add <handle>]… [--remove <handle>]…`
+
+Edits a record's `aka` handles after add time — the identity verb `annotate` refuses to be. `add --aka` sets a handle once; on an existing record it only backfills an absent `aka` on a new membership, and otherwise says so and points here.
+
+- The record is resolved over id ∪ aka; the edit lands on the **index** record (every JSONL file holding the id), so it applies to all binders at once.
+- `--add` refuses a handle that resolves to another record (uniqueness across the index) or is the record's own id. A handle already on the record, or a `--remove` of one it does not carry, is a no-op, not an error. The same handle in `--add` and `--remove` is refused.
+- **Remove cleans the record's blocks.** A block is the record's when its `id:` is the record's id or one of its handles, or it has no `id:` and reaches the record through a handle. In each such block carrying a removed handle, the handle leaves the `aka:` list (an emptied list drops the key; a later re-use of the handle cannot match a stale block), and a block whose `id:` *was* the handle — or that had none — gets the real id, inserted after `type:` where missing. An aka-only block that lost its handle would be a record without a file; an aka in the `id:` slot would make `reindex` mint a phantom record. All other lines stay byte-identical. Markdown is written before the index; a block that cannot be given the id aborts before the index changes.
+- **Ambiguous blocks refuse.** A block carrying a changing handle that is *not* the record's — another record's id, or an id no index record knows — is named and the command refuses, in both directions: remove would hand it to nobody, add would silently adopt it. `--add` otherwise does not touch Markdown — the record's blocks already match by id.
 
 ### `register refresh [--dry-run]`
 
@@ -498,7 +507,7 @@ Non-conforming input is rejected per-record with a status entry; the stream is n
 
 ### Record Identity
 
-In the JSONL index a record is identified by `id` alone (one record per file); `register write` set-inserts the input's `binder` into the existing record rather than appending a second line. In Markdown a context block is identified by `(id, binder)`. Other fields (kind, aka, tags) may differ between input and existing record — `register write` does not rewrite an existing record's other fields, only ensures the membership is present. To change an existing record's fields, the user edits it directly.
+In the JSONL index a record is identified by `id` alone (one record per file); `register write` set-inserts the input's `binder` into the existing record rather than appending a second line. In Markdown a context block is identified by `(id, binder)`. Other fields (kind, aka, tags) may differ between input and existing record — `register write` does not rewrite an existing record's other fields, only ensures the membership is present. To change an existing record's fields, the user edits it directly (handles: `register aka`).
 
 ### Heading Convention
 
@@ -625,6 +634,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | `write` | Internal helper: idempotent append of one ref record per input. Used by `add`; available as a subcommand for advanced use. |
 | `list` | List all binders with file counts (pure register, no Markdown scan), or files in one binder. `--inbox`/`--curated` filter by annotation status and read the optional Markdown layer on demand. `--paths` (with a binder) prints only resolved absolute paths, one per line (unresolvable members are omitted with a stderr warning); `--json` prints neutral JSONL per member (id, binder, filename, kind, aka, path/url — a member whose bookmark does not resolve carries `"broken":true` instead of a path) for a consumer to shape. |
 | `resolve` | Forward lookup: a key (`id` or `aka`) → the file's path. `--record` prints id/binder/filename/aka/path. |
+| `aka` | Add or remove a record's `aka` handles in the index, uniqueness-checked; guarded against Markdown blocks that reach the record only through the handle. |
 | `of` | Reverse lookup: a file → its `id`, `aka`, and collection membership. Reads the `id` stamped on the file (so it survives rename); falls back to a filename match, else reports the file as unmanaged. |
 | `album` | Renders a binder as a static, self-contained HTML album (`sort`/`title`/`comment` from the annotation YAML, IPTC via Spotlight as fallback). An album *is* an `absolute` ordering. |
 | `order` | Arranges a binder's members for presentation: `set` (config), `show` (resolved order), `move` (one member, one override write). Orderings are absolute-only — materialized `sort:` keys. Membership stays untouched. See [ORDERING.md](ORDERING.md). |

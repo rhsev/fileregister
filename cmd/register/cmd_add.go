@@ -390,6 +390,10 @@ func cmdAdd(args []string) int {
 		annotated, _, _ = promoteRecords(recMaps, annotateTarget, opts.binder)
 	}
 
+	if opts.aka != "" && len(records) == 1 {
+		warnAkaNotApplied(nd, opts.aka, records[0].ID)
+	}
+
 	// 5. Report.
 	targetLabel := filepath.Base(target)
 	if explicitJSONL != "" && target == explicitJSONL {
@@ -564,6 +568,9 @@ func addURLRecord(opts addOptions, binderSet bool) int {
 	fmt.Printf("Added URL %s → %s [%s]\n", label, filepath.Base(dest), action)
 	fmt.Printf("  url      : %s\n", url)
 	fmt.Printf("  id       : %s\n", id)
+	if opts.aka != "" {
+		warnAkaNotApplied(nd, opts.aka, id)
+	}
 	if annotateTarget != "" {
 		fmt.Printf("  annotated: %d → %s\n", annotated, filepath.Base(annotateTarget))
 	}

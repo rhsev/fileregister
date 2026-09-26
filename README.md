@@ -67,7 +67,8 @@ from a script or a GUI without opening the note.
 text instead of a database. `--aka` gives a record a handle that has nothing to
 do with the filename. `register resolve <handle>` turns it back into a path,
 behind a `ref://` URL (if you install mi.lan), in a Shortcut, or in a shell alias. The lookup goes
-through the record, so the link survives renames and moves.
+through the record, so the link survives renames and moves. Handles can be
+added or dropped later with `register aka <key> --add/--remove`.
 
 **Look a file up in reverse.** `register of <file>` answers "what is this, and
 what is it part of?" from the id on the file, so renaming does not break it.
@@ -125,6 +126,7 @@ register <subcommand> [args...]
 | `list` | All binders with counts, or the files in one; `--inbox`/`--curated` filter by annotation status, `--paths` and `--json` for piping |
 | `resolve` | Turn an id or `aka` handle into a path; `--record` prints the full record |
 | `of` | Given a file, report its id, `aka` and binders |
+| `aka` | Add or remove a record's `aka` handles later (`--add`, `--remove`) |
 | `marshal` | Pack a binder's files, notes and manifest into a portable tar.gz |
 | `unmarshal` | Unpack a container, mirror files to their origin, recreate records; idempotent, conflicts parked. Origins outside `collections/` need `--scatter` |
 | `reindex` | Rebuild the index from Markdown ref blocks; `--dry-run` to preview |
@@ -140,6 +142,7 @@ export REGISTER_BINDER=project-alpha
 register add document.pdf --kind pdf
 register add ~/scans/*.pdf --kind pdf        # one batch: one bookmark write, one append
 register add document.pdf --aka alpha-brief  # no binder: a bookmark with a handle
+register aka alpha-brief --add brief         # a second handle, later
 register add document.pdf --md               # and write the annotation note
 
 register promote                             # blocks for the whole binder

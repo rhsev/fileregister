@@ -1,0 +1,62 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+Error: Markdown blocks carry the handle but belong to no or another record:
+  binder_Anno.md: binder 'Anno', id: 22
+Fix their id: by hand, then retry.
+=== inbox.jsonl ===
+{"type":"ref","id":"11","binder":["Anno","Other"],"filename":"alpha.pdf","aka":["al","alpha"]}
+{"type":"ref","id":"22","binder":["Anno"],"filename":"beta.pdf"}
+{"type":"ref","id":"33","binder":["Anno"],"filename":"gamma.pdf","aka":["ha"]}
+{"type":"ref","id":"44","binder":["Anno"],"filename":"delta.pdf","aka":["de","delta"]}
+=== binder_Anno.md ===
+### alpha.pdf
+```yaml
+type: ref
+id: '11'
+binder: Anno
+aka:
+- al
+- alpha
+amount: 5
+```
+
+### gamma.pdf (hand-written, aka in the id slot)
+```yaml
+type: ref
+id: ha
+binder: Anno
+```
+
+### delta.pdf (hand-written, aka only)
+```yaml
+type: ref
+binder: Anno
+aka: [de]
+note: keep me
+```
+
+### loose.pdf (hand-written, unindexed)
+```yaml
+type: ref
+id: loose
+binder: Anno
+```
+
+### beta.pdf (hand-written, stale handle)
+```yaml
+type: ref
+id: '22'
+binder: Anno
+aka: [al]
+```
+=== binder_Other.md ===
+### alpha.pdf
+Prose.
+
+```yaml
+type: ref
+id: '11'
+aka: [alpha, al]
+binder: Other
+```
