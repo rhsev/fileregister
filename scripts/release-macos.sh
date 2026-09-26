@@ -12,11 +12,11 @@
 # requires FULL Xcode. With only the Command Line Tools we build the host arch.
 # register itself (pure Go) cross-compiles freely; fileanchor is the constraint.
 #
-# Env: FILEANCHOR_VERSION (tag, default 1.0.2), FILEANCHOR_SRC (local checkout)
+# Env: FILEANCHOR_VERSION (tag, default 1.1.0), FILEANCHOR_SRC (local checkout)
 set -eu
 cd "$(dirname "$0")/.."
 
-FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.0.2}"
+FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.1.0}"
 FILEANCHOR_REPO="${FILEANCHOR_REPO:-https://github.com/rhsev/fileanchor.git}"
 ARCH="arm64"
 OUT="$(pwd)/.build/dist"
@@ -62,7 +62,7 @@ developer cannot be verified, clear the quarantine flag once:
 
 Point register at a notes directory first: export GRUBBER_NOTES=~/notes (README).
 Intel Mac? Build from source instead (go install + `make fileanchor`).
-Tested with fileanchor 1.0.2 and grubber v0.16.0.
+Tested with fileanchor 1.1.0 and grubber v0.16.0.
 NOTE
 
 TARBALL="$OUT/fileregister-macos-$ARCH.tar.gz"

@@ -9,7 +9,7 @@ WORKFLOWS     = add-to-binder binder-of
 # The metadata engine is a separate project. Pin the tag the checks run against;
 # bump it deliberately rather than drifting to whatever main happens to be.
 FILEANCHOR_REPO    ?= https://github.com/rhsev/fileanchor.git
-FILEANCHOR_VERSION ?= 1.0.2
+FILEANCHOR_VERSION ?= 1.1.0
 
 .PHONY: build fileanchor link unlink install uninstall install-services uninstall-services test
 
