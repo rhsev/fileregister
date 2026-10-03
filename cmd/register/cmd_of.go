@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	unorm "golang.org/x/text/unicode/norm"
 )
 
 const ofUsage = `Usage: register of <file>
@@ -61,7 +63,25 @@ func cmdOf(args []string) int {
 		return 1
 	}
 
-	ids := index.OfFileIDs(path)
+	db, err := index.LoadDB()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
+	// A copy carries its original's id: name the original instead of
+	// presenting its record as this file's.
+	ids := index.OwnIDs(db, path)
+	if err := index.EngineError(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
+	if len(ids) == 0 {
+		if id, orig := index.CopiedFrom(db, path); id != "" {
+			fmt.Printf("A copy of record %s: %s\n", id, orig)
+			fmt.Println("It carries the original's metadata but is not registered itself.")
+			return 1
+		}
+	}
 	var recs []map[string]any
 	if len(ids) > 0 {
 		idSet := map[string]bool{}
@@ -75,20 +95,49 @@ func cmdOf(args []string) int {
 		}
 	}
 
-	// Fallback: no id on the file (never added / xattr stripped) → match by basename.
-	matchedByFilename := false
+	// Fallback: no id on the file (never added / xattr stripped). A record
+	// with the file's name is only a candidate. Its bookmark decides where it
+	// can: resolving to this file settles it, resolving to another existing
+	// file rules it out. Without a usable bookmark the name is all there is.
+	// Names are compared NFC — the name on disk is often decomposed, the
+	// recorded one as it was typed.
+	matchedByBookmark, matchedByName := false, false
+	var sameName []string
 	if len(recs) == 0 {
-		base := filepath.Base(path)
+		base := unorm.NFC.String(filepath.Base(path))
+		var candidates []map[string]any
 		for _, r := range refs {
-			if index.AsString(r["filename"]) == base {
-				recs = append(recs, r)
+			if !index.URLRef(r) && unorm.NFC.String(index.AsString(r["filename"])) == base {
+				candidates = append(candidates, r)
 			}
 		}
-		matchedByFilename = len(recs) > 0
+		resolved, rerr := resolveRecordPaths(candidates)
+		if rerr != nil {
+			fmt.Fprintln(os.Stderr, "Error:", rerr)
+			return 1
+		}
+		var byName []map[string]any
+		for _, r := range candidates {
+			switch p := resolved[index.AsString(r["id"])]; {
+			case p != "" && index.PathsEqual(p, path):
+				recs = append(recs, r)
+			case p != "" && index.FileExists(p):
+				sameName = append(sameName, index.AsString(r["id"]))
+			default:
+				byName = append(byName, r)
+			}
+		}
+		matchedByBookmark = len(recs) > 0
+		if len(recs) == 0 && len(byName) > 0 {
+			recs, matchedByName = byName, true
+		}
 	}
 
 	if len(recs) == 0 {
-		if len(ids) == 0 {
+		if len(ids) == 0 && len(sameName) > 0 {
+			fmt.Fprintf(os.Stderr, "Not managed by fileregister: no id on the file. Record(s) %s have the same name but are other files.\n",
+				strings.Join(uniqStrings(sameName, true), ", "))
+		} else if len(ids) == 0 {
 			fmt.Fprintln(os.Stderr, "Not managed by fileregister: no id on the file, and no index record matches its name.")
 		} else {
 			fmt.Fprintf(os.Stderr, "File carries id %s but no index record references it (try 'register reindex').\n", strings.Join(ids, ", "))
@@ -120,7 +169,10 @@ func cmdOf(args []string) int {
 	} else {
 		fmt.Println("managed:  no")
 	}
-	if matchedByFilename {
+	if matchedByBookmark {
+		fmt.Fprintln(os.Stderr, "(found by its bookmark — the file carries no id xattr)")
+	}
+	if matchedByName {
 		fmt.Fprintln(os.Stderr, "(matched by filename — the file carries no id xattr, so this is best-effort)")
 	}
 	return 0

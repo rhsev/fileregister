@@ -220,3 +220,48 @@ func TestCopiedFromNamesTheOriginal(t *testing.T) {
 		t.Errorf("the original counts as a copy of %s", id)
 	}
 }
+
+func runOf(t *testing.T, env []string, path string) (string, string, int) {
+	t.Helper()
+	return runGoOf(t, env, path)
+}
+
+// of must not take a broken engine for "no id", nor a copy or a same-named
+// file for the registered one.
+func TestOfTellsFilesApart(t *testing.T) {
+	anchor := engineBin(t)
+	notes := t.TempDir()
+	env := identityEnv(t, notes, anchor)
+	dir := t.TempDir()
+	nfc := "Rechnung-Müller.pdf"
+	orig := filepath.Join(dir, nfc)
+	writeFile(t, orig, "o")
+	if _, e, code := runGoAdd(t, env, orig, "--binder", "x"); code != 0 {
+		t.Fatalf("add: %d %s", code, e)
+	}
+	dup := filepath.Join(dir, "Kopie.pdf")
+	exec.Command("cp", orig, dup).Run()
+
+	if out, _, code := runOf(t, env, dup); code != 1 || !strings.Contains(out, "A copy of record") {
+		t.Errorf("of on a copy: %d %q", code, out)
+	}
+
+	// Strip the id: the bookmark still finds the file under its NFD name.
+	exec.Command("xattr", "-c", orig).Run()
+	nfd := filepath.Join(dir, "Rechnung-Müller.pdf")
+	if out, errOut, code := runOf(t, env, nfd); code != 0 || !strings.Contains(out, "binder:   x") ||
+		!strings.Contains(errOut, "found by its bookmark") {
+		t.Errorf("of by bookmark: %d %q %q", code, out, errOut)
+	}
+
+	other := filepath.Join(t.TempDir(), nfc)
+	writeFile(t, other, "someone else's")
+	if _, errOut, code := runOf(t, env, other); code != 1 || !strings.Contains(errOut, "are other files") {
+		t.Errorf("of on a same-named file: %d %q", code, errOut)
+	}
+
+	broken := append(env, "FILEANCHOR=/nonexistent/fileanchor")
+	if _, errOut, code := runOf(t, broken, orig); code != 1 || !strings.Contains(errOut, "Error") {
+		t.Errorf("of without an engine: %d %q", code, errOut)
+	}
+}

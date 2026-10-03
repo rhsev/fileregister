@@ -198,7 +198,7 @@ func cmdRename(args []string) int {
 		// user's own; the new name's tag is the user's if it was already there.
 		keepOld := backend == "tags" && index.IsKeptTag(rec, oldName)
 		if !keepOld && index.XattrBackendRemove(refPath, oldName, backend) == "failed" {
-			fmt.Fprintf(os.Stderr, "  Warning: failed to remove '%s' from %s of %s\n", oldName, layer, filepath.Base(refPath))
+			fmt.Fprintf(os.Stderr, "  Warning: failed to remove '%s' from %s of %s: %s\n", oldName, layer, filepath.Base(refPath), index.LastEngineError())
 			xattrFailed++
 			continue
 		}
@@ -211,7 +211,7 @@ func cmdRename(args []string) int {
 			keptChanges[file][id] = map[string]bool{newName: result == "noop"}
 		}
 		if result == "failed" {
-			fmt.Fprintf(os.Stderr, "  Warning: failed to add '%s' to %s of %s\n", newName, layer, filepath.Base(refPath))
+			fmt.Fprintf(os.Stderr, "  Warning: failed to add '%s' to %s of %s: %s\n", newName, layer, filepath.Base(refPath), index.LastEngineError())
 			xattrFailed++
 		} else {
 			xattrChanges++

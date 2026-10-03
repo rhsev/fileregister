@@ -205,7 +205,7 @@ func removeTarget(nd, binder, targetArg string) int {
 			case "skipped":
 				// none backend — nothing to do
 			case "failed":
-				fmt.Fprintf(os.Stderr, "Warning: failed to update %s on %s\n", layer, filepath.Base(filePath))
+				fmt.Fprintf(os.Stderr, "Warning: failed to update %s on %s: %s\n", layer, filepath.Base(filePath), index.LastEngineError())
 			}
 		}
 

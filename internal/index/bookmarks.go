@@ -121,7 +121,7 @@ func NextFreeID(db map[string]string, id string) string {
 }
 
 // BookmarkGet resolves a single id to a file path, or "" if unresolvable. The
-// error is for a bookmark database that cannot be read.
+// error is for a bookmark database that cannot be read, or a broken engine.
 func BookmarkGet(id string) (string, error) {
 	db, err := LoadDB()
 	if err != nil {
@@ -133,7 +133,7 @@ func BookmarkGet(id string) (string, error) {
 	}
 	resp, err := fileAnchor().request(map[string]any{"op": "resolve", "blob": blob})
 	if err != nil {
-		return "", nil
+		return "", err // the engine is broken — not the same as a gone file
 	}
 	if ok, _ := resp["ok"].(bool); ok {
 		path, _ := resp["path"].(string)

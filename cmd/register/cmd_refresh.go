@@ -143,7 +143,7 @@ func cmdRefresh(args []string) int {
 				noop++
 			case "failed":
 				failed++
-				fmt.Fprintf(os.Stderr, "Warning: xattr failed (%s) for %s\n", backend, filepath.Base(refPath))
+				fmt.Fprintf(os.Stderr, "Warning: xattr failed (%s) for %s: %s\n", backend, filepath.Base(refPath), index.LastEngineError())
 			}
 		}
 	}

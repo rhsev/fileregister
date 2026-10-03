@@ -396,7 +396,7 @@ func cmdAdd(args []string) int {
 				if effBackend == "tags" {
 					layer = "kMDItemUserTags"
 				}
-				fmt.Fprintf(os.Stderr, "  Warning: failed to update %s on %s\n", layer, filepath.Base(path))
+				fmt.Fprintf(os.Stderr, "  Warning: failed to update %s on %s: %s\n", layer, filepath.Base(path), index.LastEngineError())
 			}
 			// The tags backend shares Finder tags with the user. A tag that
 			// was already there when the file joined the binder is the user's:
@@ -411,7 +411,7 @@ func cmdAdd(args []string) int {
 				}
 			}
 			if index.ManagedMark(path) == "failed" {
-				fmt.Fprintf(os.Stderr, "  Warning: failed to set ★ on %s\n", filepath.Base(path))
+				fmt.Fprintf(os.Stderr, "  Warning: failed to set ★ on %s: %s\n", filepath.Base(path), index.LastEngineError())
 			}
 		}
 		if i < len(actions) && actions[i] == "noop" {

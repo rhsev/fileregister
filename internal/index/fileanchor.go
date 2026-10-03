@@ -20,12 +20,36 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 // syncXattr is the cross-device id alias name (custom namespace + the `#S`
 // syncable flag, part of the literal attribute name). fileregister hands it to
 // the otherwise consumer-neutral engine via --sync-name.
 const syncXattr = "com.fileregister.id#S"
+
+// requestTimeout bounds one engine round-trip. The engine never mounts a volume
+// while resolving (fileanchor 1.2), but a Spotlight query or a stalled disk
+// could still block — and register holds its index and bookmark locks for the
+// whole run, so one hung engine would block every other register command.
+var requestTimeout = 30 * time.Second
+
+// lastEngineError is the error text of the most recent metadata op the engine
+// refused, for warnings that otherwise could only say "failed".
+var lastEngineError string
+
+// LastEngineError returns why the most recent refused metadata op failed.
+func LastEngineError() string { return lastEngineError }
+
+// EngineError reports a broken engine — not found, failed to start, or stopped
+// answering — or nil. Commands that read metadata check it before taking an
+// empty answer for "the file carries nothing".
+func EngineError() error {
+	a := fileAnchor()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.err
+}
 
 // anchor is the process-wide fileanchor engine client: a lazily-spawned
 // singleton held open for the whole run.
@@ -138,7 +162,23 @@ func (a *anchor) requestLocked(req map[string]any) (map[string]any, error) {
 	if _, err := a.in.Write(append(line, '\n')); err != nil {
 		return nil, a.poison(fmt.Errorf("fileanchor: write failed: %w", err))
 	}
-	respLine, err := a.out.ReadBytes('\n')
+	type readResult struct {
+		line []byte
+		err  error
+	}
+	got := make(chan readResult, 1)
+	go func() {
+		l, e := a.out.ReadBytes('\n')
+		got <- readResult{l, e}
+	}()
+	var respLine []byte
+	select {
+	case r := <-got:
+		respLine, err = r.line, r.err
+	case <-time.After(requestTimeout):
+		// Killing the engine also ends the pending read.
+		return nil, a.poison(fmt.Errorf("fileanchor: no answer to %v within %s — engine stopped", req["op"], requestTimeout))
+	}
 	if err != nil {
 		if err == io.EOF && len(respLine) == 0 {
 			return nil, a.poison(fmt.Errorf("fileanchor: no response (engine exited?)"))
@@ -208,6 +248,12 @@ func (a *anchor) shutdown() {
 // outcome. On a failed op (ok:false) → "failed", mirroring FileAnchor.symbol.
 func anchorSymbol(resp map[string]any) string {
 	if ok, _ := resp["ok"].(bool); !ok {
+		lastEngineError, _ = resp["error"].(string)
+		if lastEngineError == "" {
+			if err := EngineError(); err != nil {
+				lastEngineError = err.Error()
+			}
+		}
 		return "failed"
 	}
 	switch resp["action"] {
