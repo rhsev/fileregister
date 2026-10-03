@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,11 +30,43 @@ var yamlNumRe = regexp.MustCompile(`^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$`)
 // yamlScalar renders a string as a YAML scalar, single-quoting when a plain
 // scalar would be ambiguous (numbers, keywords, indicator-led, etc.) — close to
 // stable across writes, and always valid YAML.
+//
+// The heuristic keeps the common output stable; what decides is a round trip:
+// anything YAML would not read back as exactly s (YAML 1.2 numbers like
+// 2024_05 or 0x1F, a control character, a line separator) is written
+// double-quoted with escapes. 2024_05 used to read back as the number 202405,
+// so promote never recognized its own block and appended it again.
 func yamlScalar(s string) string {
+	out := s
 	if needsYAMLQuote(s) {
-		return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+		out = "'" + strings.ReplaceAll(s, "'", "''") + "'"
 	}
-	return s
+	if strings.IndexFunc(s, yamlUnsafeRune) < 0 && yamlReadsBack(out, s) {
+		return out
+	}
+	node := yaml.Node{Kind: yaml.ScalarNode, Style: yaml.DoubleQuotedStyle, Value: s}
+	b, err := yaml.Marshal(&node)
+	if err != nil {
+		return out
+	}
+	return strings.TrimSuffix(string(b), "\n")
+}
+
+// yamlUnsafeRune: characters a plain or single-quoted scalar cannot carry
+// reliably — control characters, and the Unicode line/paragraph separators.
+func yamlUnsafeRune(r rune) bool {
+	return unicode.IsControl(r) || r == '\u2028' || r == '\u2029' || r == '\uFEFF'
+}
+
+// yamlReadsBack reports whether repr, as a mapping value, parses to the
+// string s.
+func yamlReadsBack(repr, s string) bool {
+	var m map[string]any
+	if yaml.Unmarshal([]byte("k: "+repr), &m) != nil {
+		return false
+	}
+	got, ok := m["k"].(string)
+	return ok && got == s
 }
 
 func needsYAMLQuote(s string) bool {

@@ -205,6 +205,9 @@ func cmdAnnotate(args []string) int {
 
 var annotateKeyRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
 
+// annotateDateRe: a calendar date, which YAML reads as a date when plain.
+var annotateDateRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
 func validAnnotateKey(k, flag string) bool {
 	if why, reserved := reservedAnnotateKeys[k]; reserved {
 		fmt.Fprintf(os.Stderr, "Error: '%s' is reserved: %s\n", k, why)
@@ -221,12 +224,12 @@ func validAnnotateKey(k, flag string) bool {
 	return true
 }
 
-// annotateValue renders a --set value: numbers and booleans stay plain (the
-// user's `amount=129.50` means a number), everything else goes through the
-// same quoting promote uses. Leading-zero numerals stay strings — YAML would
-// reparse them as something else.
+// annotateValue renders a --set value: numbers, booleans and dates stay plain
+// (the user's `amount=129.50` means a number, `due=2026-08-01` a date),
+// everything else goes through the same quoting promote uses. Leading-zero
+// numerals stay strings — YAML would reparse them as something else.
 func annotateValue(v string) string {
-	if v == "true" || v == "false" {
+	if v == "true" || v == "false" || annotateDateRe.MatchString(v) {
 		return v
 	}
 	if _, err := strconv.ParseFloat(v, 64); err == nil {
