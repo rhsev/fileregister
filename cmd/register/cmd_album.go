@@ -300,7 +300,7 @@ func albumHTML(binder string, entries []albumEntry, css string) string {
 		} else {
 			href := e.media
 			if href == "" {
-				href = e.url
+				href = albumSafeHref(e.url)
 			}
 			label := e.title
 			if label == "" {
@@ -309,9 +309,12 @@ func albumHTML(binder string, entries []albumEntry, css string) string {
 					label = href
 				}
 			}
+			link := albumEsc(label)
+			if href != "" {
+				link = fmt.Sprintf("<a href=\"%s\">%s</a>", albumEsc(href), albumEsc(label))
+			}
 			body = append(body, fmt.Sprintf(
-				"<div class=\"card\">\n  <a href=\"%s\">%s</a>\n  %s\n</div>\n",
-				albumEsc(href), albumEsc(label), cap))
+				"<div class=\"card\">\n  %s\n  %s\n</div>\n", link, cap))
 		}
 	}
 
@@ -602,3 +605,26 @@ func albumSortKey(e albumEntry) [3]string {
 	return [3]string{"1", e.filename, index.AsString(e.rec["id"])}
 }
 
+
+// albumSafeHref returns u for use as a link, or "" when its scheme runs code in
+// the page (javascript:, vbscript:, data:). A URL ref can come from a container
+// someone else made, and the album is also served through the local web view.
+// The scheme is read as a browser reads it: leading spaces and any tab or
+// newline inside are ignored ("java\tscript:" runs too).
+func albumSafeHref(u string) string {
+	cleaned := strings.Map(func(r rune) rune {
+		if r == '\t' || r == '\n' || r == '\r' {
+			return -1
+		}
+		return r
+	}, strings.TrimLeft(u, " \x00\x01\x02\x03\x04\x05\x06\x07\x08\x0b\x0c\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f"))
+	scheme, _, found := strings.Cut(cleaned, ":")
+	if !found {
+		return u
+	}
+	switch strings.ToLower(scheme) {
+	case "javascript", "vbscript", "data":
+		return ""
+	}
+	return u
+}
