@@ -45,7 +45,7 @@ func TestCandidateProblem(t *testing.T) {
 
 	other := filepath.Join(t.TempDir(), "rechnung.pdf")
 	writeFile(t, other, "someone else's")
-	res, err := index.AddMany([]string{other}, nil)
+	res, err := index.AddMany([]string{other}, nil, nil)
 	if err != nil || len(res) != 1 || res[0].ID == "" {
 		t.Fatalf("AddMany: %v %v", res, err)
 	}

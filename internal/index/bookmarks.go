@@ -20,6 +20,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 var (
@@ -231,6 +233,42 @@ func isCopyOf(blob, path string) bool {
 	return !PathsEqual(resolved, path) && FileExists(resolved)
 }
 
+// FileIDsByName maps each file record's filename (NFC) to its ids.
+func FileIDsByName(refs []map[string]any) map[string][]string {
+	out := map[string][]string{}
+	for _, r := range refs {
+		if URLRef(r) {
+			continue
+		}
+		if name := AsString(r["filename"]); name != "" {
+			key := norm.NFC.String(name)
+			out[key] = append(out[key], AsString(r["id"]))
+		}
+	}
+	return out
+}
+
+// idByBookmark finds the registered id of a file that carries none — its id
+// xattr could not be written (a locked or read-only file, a volume without
+// xattrs), or was stripped. Records with the file's name are candidates; the
+// one whose bookmark resolves to this very file is it.
+func idByBookmark(db map[string]string, path string, byName map[string][]string) string {
+	for _, id := range byName[norm.NFC.String(filepath.Base(path))] {
+		blob, ok := db[id]
+		if !ok {
+			continue
+		}
+		resp, err := fileAnchor().request(map[string]any{"op": "resolve", "blob": blob})
+		if err != nil {
+			continue
+		}
+		if resolved, _ := resp["path"].(string); resolved != "" && PathsEqual(resolved, path) {
+			return id
+		}
+	}
+	return ""
+}
+
 // existingIDIn returns the file's own id that has a bookmark in db, or "".
 func existingIDIn(db map[string]string, path string) string {
 	for _, id := range OwnIDs(db, path) {
@@ -273,7 +311,10 @@ func registerIn(db map[string]string, path, id, idMode string) (string, error) {
 	if blob == "" {
 		return "", nil
 	}
-	setDescriptionXattr(path, id, idMode)
+	if why := setDescriptionXattr(path, id, idMode); why != "" {
+		fmt.Fprintf(os.Stderr, "  Warning: could not store id %s on %s (%s) — it is found by its bookmark instead\n",
+			id, filepath.Base(path), why)
+	}
 	SetSyncXattr(path, id)
 	db[id] = blob
 	return id, nil
@@ -322,7 +363,8 @@ type BookmarkResult struct {
 // db save is returned as an error — the caller must NOT record the new ids
 // anywhere (their blobs were never persisted). reserved holds ids taken
 // outside the db (URL refs live only in the index) that fresh ids must avoid.
-func AddMany(paths []string, reserved map[string]bool) ([]BookmarkResult, error) {
+// byName (FileIDsByName) finds a file whose id xattr could never be written.
+func AddMany(paths []string, reserved map[string]bool, byName map[string][]string) ([]BookmarkResult, error) {
 	if err := LockBookmarks(); err != nil {
 		return nil, err
 	}
@@ -335,6 +377,10 @@ func AddMany(paths []string, reserved map[string]bool) ([]BookmarkResult, error)
 	for _, path := range paths {
 		if existing := existingIDIn(db, path); existing != "" {
 			results = append(results, BookmarkResult{Path: path, ID: existing})
+			continue
+		}
+		if known := idByBookmark(db, path, byName); known != "" {
+			results = append(results, BookmarkResult{Path: path, ID: known})
 			continue
 		}
 		id := NextFreeID(db, "")
@@ -382,8 +428,17 @@ func Rebind(id, path string) (string, error) {
 
 // setDescriptionXattr writes id to the kMDItemInformation xattr (space-separated,
 // multi-valued): mode "add" appends it idempotently, "set" makes it the only one.
-func setDescriptionXattr(path, id, mode string) {
-	fileAnchor().request(map[string]any{"op": "set_meta", "path": path, "key": "id", "value": id, "mode": mode})
+// Returns why it failed, or "".
+func setDescriptionXattr(path, id, mode string) string {
+	resp, err := fileAnchor().request(map[string]any{"op": "set_meta", "path": path, "key": "id", "value": id, "mode": mode})
+	if err != nil {
+		return err.Error()
+	}
+	if ok, _ := resp["ok"].(bool); !ok {
+		why, _ := resp["error"].(string)
+		return why
+	}
+	return ""
 }
 
 // SetSyncXattr writes id to the syncable cross-device alias (com.fileregister.id#S),

@@ -292,7 +292,7 @@ func cmdAdd(args []string) int {
 	// indexIDs is passed as reserved: URL-ref ids never enter the bookmark db,
 	// so without it a fresh id could collide with one and fuse two identities.
 	fmt.Fprintf(os.Stderr, "Bookmarking %d file(s)…\n", len(present))
-	bookmarked, dbErr := index.AddMany(present, indexIDs)
+	bookmarked, dbErr := index.AddMany(present, indexIDs, index.FileIDsByName(refs))
 	if dbErr != nil {
 		fmt.Fprintf(os.Stderr, "Error: bookmark db save failed: %v\n", dbErr)
 		return 1

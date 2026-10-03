@@ -165,3 +165,30 @@ func TestAddStopsOnAnUnreadableIndex(t *testing.T) {
 		t.Errorf("add wrote a record despite the unreadable index:\n%s", inbox)
 	}
 }
+
+// A file whose id xattr cannot be written (read-only, locked) must keep one
+// identity: the second add finds it by its bookmark instead of minting anew.
+func TestReadOnlyFileKeepsOneIdentity(t *testing.T) {
+	anchor := engineBin(t)
+	notes := t.TempDir()
+	env := identityEnv(t, notes, anchor)
+	f := filepath.Join(t.TempDir(), "locked.txt")
+	writeFile(t, f, "l")
+	os.Chmod(f, 0444)
+	defer os.Chmod(f, 0644)
+
+	_, errOut, code := runGoAdd(t, env, f, "--binder", "x")
+	if code != 0 {
+		t.Fatalf("add: %d %s", code, errOut)
+	}
+	if !strings.Contains(errOut, "could not store id") {
+		t.Errorf("no warning about the unwritable id: %q", errOut)
+	}
+	if _, e, code := runGoAdd(t, env, f, "--binder", "y"); code != 0 {
+		t.Fatalf("re-add: %d %s", code, e)
+	}
+	recs := inboxByFilename(t, notes)
+	if len(recs) != 1 || binders(recs["locked.txt"]) != "x,y" {
+		t.Errorf("a second identity was minted: %v", recs)
+	}
+}

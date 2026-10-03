@@ -133,7 +133,7 @@ func TestDamagedDBIsNeverOverwritten(t *testing.T) {
 		if _, err := LoadDB(); err == nil {
 			t.Errorf("%s: LoadDB accepted a damaged file", label)
 		}
-		if _, err := AddMany([]string{f}, nil); err == nil {
+		if _, err := AddMany([]string{f}, nil, nil); err == nil {
 			t.Errorf("%s: AddMany went ahead on a damaged database", label)
 		}
 		if _, err := Rebind("111111111", f); err == nil {
