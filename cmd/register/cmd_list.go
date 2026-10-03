@@ -14,12 +14,23 @@ import (
 	"unicode/utf8"
 )
 
+const listUsage = "Usage: register list [<binder>] [--inbox|--curated] [--paths|--json|--print0]"
+
 // cmdList parses flags and dispatches to the all-binders or single-binder view.
 func cmdList(args []string) int {
 	for _, a := range args {
 		if strings.HasPrefix(a, "-") {
 			switch a {
-			case "--inbox", "--curated", "--paths", "--print0", "--json", "-h", "--help", "-v", "--version":
+			case "--inbox", "--curated", "--paths", "--print0", "--json":
+			// -h and --version were listed as known and then ignored, so
+			// `register list --help` printed the binder list: a request for
+			// help silently ran the command instead of answering.
+			case "-h", "--help":
+				fmt.Println(listUsage)
+				return 0
+			case "-v", "--version":
+				fmt.Println("register list " + registerVersion)
+				return 0
 			default:
 				return unknownOption("list", a)
 			}
