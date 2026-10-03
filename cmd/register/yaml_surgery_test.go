@@ -65,3 +65,19 @@ func TestEditsKeepAnIndentedBlockValid(t *testing.T) {
 		t.Errorf("indented block: n=%d parsed=%v\n%s", n, p, out)
 	}
 }
+
+// A `# comment` in a shell block is code, not a heading: replacing the prose
+// must not cut the block in half.
+func TestProseReplaceRespectsEveryCodeFence(t *testing.T) {
+	doc := "### a.pdf\n\nOld prose.\n\n```sh\n# install\nmake\n```\n\n```yaml\ntype: ref\nid: '1'\nbinder: proj\n```\n\n### other section\nkeep\n"
+	out, n, err := annotateReplaceProse(doc, map[string]bool{"1": true}, "proj", "New prose.")
+	if err != nil || n != 1 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	if strings.Count(out, "```")%2 != 0 {
+		t.Errorf("an unbalanced fence remains:\n%s", out)
+	}
+	if !strings.Contains(out, "### other section\nkeep") || !strings.Contains(out, "New prose.") {
+		t.Errorf("result:\n%s", out)
+	}
+}

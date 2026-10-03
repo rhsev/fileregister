@@ -367,6 +367,33 @@ func isSetKey(sets []annotateSet, k string) bool {
 	return false
 }
 
+// codeFenceSpans returns [start, end] line indexes of every fenced code block
+// (``` or ~~~, any info string). An unterminated fence runs to the end.
+func codeFenceSpans(lines []string) [][2]int {
+	var spans [][2]int
+	for i := 0; i < len(lines); i++ {
+		t := strings.TrimSpace(lines[i])
+		if !strings.HasPrefix(t, "```") && !strings.HasPrefix(t, "~~~") {
+			continue
+		}
+		fence := t[:3]
+		j := i + 1
+		for j < len(lines) {
+			c := strings.TrimSpace(lines[j])
+			if strings.HasPrefix(c, fence) && strings.Trim(c, fence[:1]) == "" {
+				break
+			}
+			j++
+		}
+		if j >= len(lines) {
+			j = len(lines) - 1
+		}
+		spans = append(spans, [2]int{i, j})
+		i = j
+	}
+	return spans
+}
+
 // headingLevelOf returns the Markdown heading level of a line (1–6), or 0.
 func headingLevelOf(line string) int {
 	n := 0
@@ -427,13 +454,14 @@ func annotateReplaceProse(content string, keys map[string]bool, binder, prose st
 		i = j
 	}
 
-	// A column-0 `#` line INSIDE a fenced block is a YAML comment, not a
-	// heading — the heading scans must skip fence interiors, or a `# TODO`
-	// line in a matched block would be read as an H1 and split the section
-	// mid-fence, erasing the block on rebuild.
+	// A column-0 `#` line INSIDE any fenced block — a YAML comment, a shell
+	// comment in a ```sh block — is not a heading. The heading scans skip
+	// every fence interior, or such a line would be read as an H1 and split
+	// the section mid-fence, leaving half a code block behind.
+	fences := codeFenceSpans(lines)
 	insideFence := func(i int) bool {
-		for _, s := range spans {
-			if i >= s.start && i <= s.end {
+		for _, f := range fences {
+			if i >= f[0] && i <= f[1] {
 				return true
 			}
 		}
