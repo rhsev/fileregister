@@ -4,6 +4,8 @@ package main
 // comment/place/lat/lon/map); IPTC/EXIF via Spotlight fills the gaps.
 
 import (
+	"net/url"
+	"hash/fnv"
 	"github.com/rhsev/fileregister/internal/index"
 
 	"fmt"
@@ -529,7 +531,11 @@ func cmdAlbum(args []string) int {
 		}
 		base := filepath.Base(e.path)
 		if slug != "" {
-			base = albumAssetSafe(slug + "-" + base)
+			// All milan albums share one flat images/ folder. slug-file alone
+			// is ambiguous — album x with y-z.jpg and album x-y with z.jpg both
+			// made x-y-z.jpg, and one album showed the other's photo — so a
+			// short hash of the binder name keeps each album's files apart.
+			base = albumAssetSafe(slug + "-" + albumTag(binder) + "-" + base)
 		}
 		name := marshalUniqueName(base, takenMedia)
 		if err := copyFile(e.path, filepath.Join(mediaDir, name)); err != nil {
@@ -537,7 +543,7 @@ func cmdAlbum(args []string) int {
 			copyFailed++
 			continue
 		}
-		e.media = mediaPfx + name
+		e.media = mediaPfx + albumURLName(name, milanMode)
 
 		if !e.image {
 			continue
@@ -547,7 +553,7 @@ func cmdAlbum(args []string) int {
 			tbase = "thumb-" + tbase
 		}
 		tname := marshalUniqueName(tbase, takenThumb)
-		e.thumb = thumbPfx + tname // provisional — cleared if the resize fails
+		e.thumb = thumbPfx + albumURLName(tname, milanMode) // provisional — cleared if the resize fails
 		thumbJobs = append(thumbJobs, thumbJob{idx: idx, src: e.path, dest: filepath.Join(thumbDir, tname)})
 	}
 
@@ -632,4 +638,22 @@ func albumSafeHref(u string) string {
 		return ""
 	}
 	return u
+}
+
+// albumTag is a short, stable hash of a binder name for asset file names.
+func albumTag(binder string) string {
+	h := fnv.New32a()
+	h.Write([]byte(binder))
+	return fmt.Sprintf("%08x", h.Sum32())
+}
+
+// albumURLName is a file name as it goes into src/href. A standalone album
+// keeps the original names, and a #, ? or % in one broke its link; milan
+// asset names are already reduced to safe characters, and the milan view
+// looks them up as written.
+func albumURLName(name string, milanMode bool) string {
+	if milanMode {
+		return name
+	}
+	return url.PathEscape(name)
 }

@@ -18,3 +18,19 @@ func TestAlbumSafeHref(t *testing.T) {
 		}
 	}
 }
+
+func TestAlbumAssetNames(t *testing.T) {
+	// milan: album x with y-z.jpg and album x-y with z.jpg must not share a file.
+	a := albumAssetSafe("x" + "-" + albumTag("x") + "-" + "y-z.jpg")
+	b := albumAssetSafe("x-y" + "-" + albumTag("x-y") + "-" + "z.jpg")
+	if a == b {
+		t.Errorf("two albums share %s", a)
+	}
+	// standalone: a # or % in a name must not break the link.
+	if got := albumURLName("a#1 50%.jpg", false); got != "a%231%2050%25.jpg" {
+		t.Errorf("albumURLName = %q", got)
+	}
+	if got := albumURLName("x-y.jpg", true); got != "x-y.jpg" {
+		t.Errorf("milan names are used as written: %q", got)
+	}
+}

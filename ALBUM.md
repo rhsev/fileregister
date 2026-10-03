@@ -102,7 +102,8 @@ the album. `@page` rules make "Save as PDF" produce a printable photo book.
 
 `--milan` renders into the milan notes layout: one shared source folder (default
 `<notes>/collections/albums/milan/`), holding `<binder>.html` per album and all
-assets flat under `images/`. Three configuration steps:
+assets flat under `images/`, named `<binder>-<hash>-<file>` so two albums never
+share a file. Three configuration steps:
 
 ```yaml
 # 1. mi.lan/config.yaml — register the folder as a notes source:
