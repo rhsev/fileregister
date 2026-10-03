@@ -372,6 +372,7 @@ func mdRenameBinder(path, oldName, newName string) (int, error) {
 // block whose binder == oldName — mdTransformFile is ref-only, and a rename
 // must carry the ordering layer along.
 func mdRenameOrderingBinder(path, oldName, newName string) (int, error) {
+	const blockType = "ordering"
 	content, crlf, err := readNote(path)
 	if err != nil {
 		return 0, err
@@ -383,7 +384,7 @@ func mdRenameOrderingBinder(path, oldName, newName string) (int, error) {
 		if yaml.Unmarshal([]byte(body), &parsed) != nil || parsed == nil {
 			return match
 		}
-		if t, _ := parsed["type"].(string); t != "ordering" {
+		if t, _ := parsed["type"].(string); t != blockType {
 			return match
 		}
 		if index.AsString(parsed["binder"]) != oldName {
@@ -682,6 +683,62 @@ func upsertOrderingConfig(path, binder, rule string) (string, error) {
 	if fm := frontmatterLen(content); fm > 0 {
 		out = content[:fm] + "\n" + block + "\n\n" + content[fm:]
 	}
+	if werr := writeNote(path, out, crlf); werr != nil {
+		return "", werr
+	}
+	return "created", nil
+}
+
+// upsertFrontmatterField sets one key in a note's YAML frontmatter, creating
+// the frontmatter when there is none. Returns "created" or "updated".
+//
+// The frontmatter is the note's header, and grubber passes every key in it down
+// into each block of the file. That is what makes it the right place for a field
+// all members share: nobody looks the value up, it arrives with every record.
+// Only top-level scalar keys are touched; the rest of the header is left as it
+// stands, including keys we know nothing about.
+func upsertFrontmatterField(path, key, value string) (string, error) {
+	content, crlf, err := readNote(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+		os.MkdirAll(filepath.Dir(path), 0755)
+		fm := "---\n" + yamlLine(key, value) + "\n---\n"
+		if werr := index.AtomicWrite(path, []byte(fm)); werr != nil {
+			return "", werr
+		}
+		return "created", nil
+	}
+
+	if fmLen := frontmatterLen(content); fmLen > 0 {
+		head := content[:fmLen]
+		lines := strings.Split(strings.TrimSuffix(head, "\n"), "\n")
+		for i, l := range lines {
+			if keyLine(l, key, "") {
+				lines[i] = yamlLine(key, value)
+				out := strings.Join(lines, "\n") + "\n" + content[fmLen:]
+				if out == content {
+					return "updated", nil
+				}
+				if werr := writeNote(path, out, crlf); werr != nil {
+					return "", werr
+				}
+				return "updated", nil
+			}
+		}
+		// No such key yet: insert above the closing fence.
+		closing := len(lines) - 1
+		lines = append(lines[:closing], append([]string{yamlLine(key, value)}, lines[closing:]...)...)
+		out := strings.Join(lines, "\n") + "\n" + content[fmLen:]
+		if werr := writeNote(path, out, crlf); werr != nil {
+			return "", werr
+		}
+		return "created", nil
+	}
+
+	// No frontmatter at all: give the note one.
+	out := "---\n" + yamlLine(key, value) + "\n---\n\n" + content
 	if werr := writeNote(path, out, crlf); werr != nil {
 		return "", werr
 	}

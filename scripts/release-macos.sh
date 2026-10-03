@@ -12,11 +12,15 @@
 # requires FULL Xcode. With only the Command Line Tools we build the host arch.
 # register itself (pure Go) cross-compiles freely; fileanchor is the constraint.
 #
-# Env: FILEANCHOR_VERSION (tag, default 1.1.0), FILEANCHOR_SRC (local checkout)
+# Env: FILEANCHOR_VERSION (tag, default 1.2.0), FILEANCHOR_SRC (local checkout)
 set -eu
 cd "$(dirname "$0")/.."
 
-FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.1.0}"
+# Keep this in step with the engine the README says register is tested against.
+# The bundle carries the engine, so a stale default ships an engine that cannot
+# do what register expects of it — audit withholds its dead verdict then, which
+# is correct but a poor thing to publish.
+FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.2.0}"
 FILEANCHOR_REPO="${FILEANCHOR_REPO:-https://github.com/rhsev/fileanchor.git}"
 ARCH="arm64"
 OUT="$(pwd)/.build/dist"

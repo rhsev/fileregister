@@ -27,6 +27,42 @@ another location, e.g. a dylan path for the LAN): `index.html`, `media/`
 (copies of the originals), `thumbs/` (JPEG via sips, HEIC included). Copy, zip,
 or serve the self-contained folder.
 
+## Naming the album
+
+The heading is the binder name unless the note's frontmatter names the album.
+It is a field in the document header, and every member of the album inherits
+it:
+
+````markdown
+---
+album: Safari, Namibia 2026
+---
+
+### IMG_2041.jpg
+```yaml
+type: ref
+id: '270450536'
+binder: safari
+title: At the waterhole
+```
+````
+
+```sh
+register album safari --title "Safari, Namibia 2026"   # writes or updates the field
+```
+
+Nothing looks the value up. grubber passes every frontmatter key down into each
+block of the file, so the field arrives on every record, and the renderer takes
+it from the members it already has. Which is also why the query works without
+anything further:
+
+```sh
+grubber extract ~/notes -a -f album~Safari    # every member of that album
+```
+
+A binder without the field keeps the binder name as its heading, which is what
+every album showed before.
+
 ## The album fields
 
 A curated block looks like this:
@@ -47,7 +83,7 @@ Private note: exposure is tight — shot with the old Pentax.
 
 | Field | Effect | Fallback when absent |
 |---|---|---|
-| `sort` | Order, pure string sort — use letters with gaps (`b < d < f`, a `c` or `bc` always fits between); numbers sort as strings (`'1' < '10' < '2'`). Ties are broken by id | no key sorts to the end, by filename |
+| `sort` *(not via `annotate`)* | Order, pure string sort — use letters with gaps (`b < d < f`, a `c` or `bc` always fits between); numbers sort as strings (`'1' < '10' < '2'`). Ties are broken by id | no key sorts to the end, by filename |
 | `title` | Image title | IPTC headline, then filename |
 | `comment` | Caption in the album | IPTC description |
 | `place` | Place text | IPTC city/country |
@@ -57,6 +93,13 @@ Private note: exposure is tight — shot with the old Pentax.
 `sort` is the same field as in the ordering model — an album *is* an ordering of
 the binder; `register order move` writes the keys instead of numbering them by
 hand (see [ORDERING.md](ORDERING.md)).
+
+It is the one field in this table that `annotate` will not set: `register
+annotate … --set sort=b` is refused with *'sort' is reserved: ordering key —
+use register order move*. The ordering verb owns the key so that a single move
+writes a single key and the sequence stays consistent; editing it by hand in
+the note works too, since string comparison is the whole contract. Every other
+field above is yours to set with `annotate`.
 
 The cascade is the same everywhere: **curation wins, what the image carries is
 the fallback.** IPTC/EXIF is read (via Spotlight), never written — the original
@@ -78,7 +121,8 @@ works.
 ## Non-images
 
 PDFs and other files in the binder appear as cards among the photos — the entry
-ticket belongs in the album. `title`/`comment`/`sort` work just the same.
+ticket belongs in the album. `title` and `comment` work just the same, and they
+take their place in the order like any other member.
 
 ## Custom styling
 

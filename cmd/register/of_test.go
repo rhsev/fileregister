@@ -36,6 +36,28 @@ func engineBin(t *testing.T) string {
 	return bin
 }
 
+// grubberTestBin finds grubber the way engineBin finds the engine: GRUBBER_BIN,
+// then PATH, then the copy `make grubber` builds. The album reads the Markdown
+// layer through grubber, so without one its checks cannot run — and the CI job
+// builds one and refuses skips, the same contract as the engine.
+func grubberTestBin(t *testing.T) string {
+	t.Helper()
+	if env := os.Getenv("GRUBBER_BIN"); env != "" {
+		return env
+	}
+	if p, err := exec.LookPath("grubber"); err == nil {
+		return p
+	}
+	bin, err := filepath.Abs(filepath.Join("..", "..", ".build", "grubber"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(bin); err != nil {
+		t.Skipf("no grubber: GRUBBER_BIN unset, none on PATH, none at %s — run `make grubber`", bin)
+	}
+	return bin
+}
+
 // stampID writes an id into the file's kMDItemInformation xattr via a one-shot
 // engine invocation, so both sides then read the same stamped identity.
 func stampID(t *testing.T, bin, path, id string) {

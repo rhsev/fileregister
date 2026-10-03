@@ -9,9 +9,13 @@ WORKFLOWS     = add-to-binder binder-of
 # The metadata engine is a separate project. Pin the tag the checks run against;
 # bump it deliberately rather than drifting to whatever main happens to be.
 FILEANCHOR_REPO    ?= https://github.com/rhsev/fileanchor.git
-FILEANCHOR_VERSION ?= 1.1.0
+FILEANCHOR_VERSION ?= 1.2.0
 
-.PHONY: build fileanchor link unlink install uninstall install-services uninstall-services test
+# The Markdown layer is read through grubber, so the album checks need it the
+# same way half the suite needs the engine. Same rule: pin a tag.
+GRUBBER_VERSION ?= v0.18.0
+
+.PHONY: build fileanchor grubber link unlink install uninstall install-services uninstall-services test
 
 build:
 	go build -o $(CURDIR)/$(BIN) ./cmd/register
@@ -24,6 +28,19 @@ fileanchor:
 	@cd $(BUILD_DIR)/fileanchor-src && swift build -c release
 	@install -m 755 $(BUILD_DIR)/fileanchor-src/.build/release/fileanchor $(BUILD_DIR)/fileanchor
 	@echo "→ $(BUILD_DIR)/fileanchor ($(FILEANCHOR_VERSION))"
+
+# Fetch grubber's published release binary for this machine, not a source
+# build. The release assets carry the right version string (a source build of
+# v0.18.0 reports 0.16.0: the tag still has the literal as a const, which
+# -ldflags cannot override), and grubber needs Go 1.27 to build while this repo
+# pins an older one — a download keeps the two toolchains apart.
+GRUBBER_ARCH = $(subst x86_64,amd64,$(shell uname -m))
+grubber:
+	@mkdir -p $(BUILD_DIR)
+	@curl -fsSL -o $(BUILD_DIR)/grubber \
+		https://github.com/rhsev/grubber/releases/download/$(GRUBBER_VERSION)/grubber-macos-$(GRUBBER_ARCH)
+	@chmod 755 $(BUILD_DIR)/grubber
+	@echo "→ $(BUILD_DIR)/grubber ($$($(BUILD_DIR)/grubber --version))"
 
 # `install` copies, and stays that way: this repo is published, and an
 # outsider's clone is not a stable location to point a symlink at. On the

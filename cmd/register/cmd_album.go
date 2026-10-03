@@ -4,9 +4,9 @@ package main
 // comment/place/lat/lon/map); IPTC/EXIF via Spotlight fills the gaps.
 
 import (
-	"net/url"
-	"hash/fnv"
 	"github.com/rhsev/fileregister/internal/index"
+	"hash/fnv"
+	"net/url"
 
 	"fmt"
 	"os"
@@ -275,7 +275,10 @@ func albumCaption(e albumEntry) string {
 	return cap
 }
 
-func albumHTML(binder string, entries []albumEntry, css string) string {
+// heading names the album: the `album` field its members inherited from the
+// note's frontmatter, or the binder name when the frontmatter does not name
+// one.
+func albumHTML(heading string, entries []albumEntry, css string) string {
 	var body, details []string
 	for i, e := range entries {
 		cap := albumCaption(e)
@@ -322,8 +325,8 @@ func albumHTML(binder string, entries []albumEntry, css string) string {
 
 	return "<!DOCTYPE html>\n<html lang=\"de\">\n<head>\n<meta charset=\"utf-8\">\n" +
 		"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n" +
-		"<title>" + albumEsc(binder) + "</title>\n<style>" + css + "</style>\n</head>\n" +
-		"<body class=\"album-page\">\n<div class=\"album\">\n<h1>" + albumEsc(binder) + "</h1>\n" +
+		"<title>" + albumEsc(heading) + "</title>\n<style>" + css + "</style>\n</head>\n" +
+		"<body class=\"album-page\">\n<div class=\"album\">\n<h1>" + albumEsc(heading) + "</h1>\n" +
 		"<div class=\"grid\">\n" + strings.Join(body, "\n") + "\n</div>\n" +
 		strings.Join(details, "\n") + "\n</div>\n</body>\n</html>\n"
 }
@@ -346,7 +349,11 @@ func albumCSSResolve(explicit string) (string, bool) {
 	return albumCSS, true
 }
 
+const albumUsage = "Usage: register album <binder> [--out DIR] [--css FILE] [--milan DIR] [--title TEXT] [--open]"
+
 func cmdAlbum(args []string) int {
+	title := ""
+	titleSet := false
 	out := ""
 	css := ""
 	open := false
@@ -384,10 +391,20 @@ func cmdAlbum(args []string) int {
 				i++
 				milanDir = args[i]
 			}
+		case a == "--title" || strings.HasPrefix(a, "--title="):
+			titleSet = true
+			if strings.HasPrefix(a, "--title=") {
+				title = strings.TrimPrefix(a, "--title=")
+			} else if i+1 < len(args) {
+				i++
+				title = args[i]
+			} else {
+				return unknownOption("album", "--title"+missingValue)
+			}
 		case a == "--open":
 			open = true
 		case a == "-h" || a == "--help":
-			fmt.Println("Usage: register album <binder> [--out DIR] [--open]")
+			fmt.Println(albumUsage)
 			return 0
 		case a == "-v" || a == "--version":
 			fmt.Println("register album " + registerVersion)
@@ -404,13 +421,21 @@ func cmdAlbum(args []string) int {
 	}
 
 	if binder == "" {
-		fmt.Fprintln(os.Stderr, "Usage: register album <binder> [--out DIR] [--open]")
+		fmt.Fprintln(os.Stderr, albumUsage)
 		return 1
 	}
 
 	nd, err := notesDir()
 	if err != nil {
 		return 1
+	}
+	if titleSet {
+		what, werr := upsertFrontmatterField(defaultPromoteTarget(nd, binder), "album", title)
+		if werr != nil {
+			fmt.Fprintf(os.Stderr, "Error: writing the album field failed: %v\n", werr)
+			return 1
+		}
+		fmt.Printf("Album field %s: %q — every member of '%s' inherits it\n", what, title, binder)
 	}
 	allRefs, refsOK := loadRefs(nd)
 	if !refsOK {
@@ -422,15 +447,12 @@ func cmdAlbum(args []string) int {
 		return 1
 	}
 
-	annByID := map[string]map[string]any{}
-	for _, a := range readAnnotations(nd) {
-		if index.AsString(a["binder"]) != binder {
-			continue
-		}
-		id := index.AsString(a["id"])
-		if _, ok := annByID[id]; !ok {
-			annByID[id] = a
-		}
+	// The Markdown layer is grubber's, not ours: curation and the inherited
+	// `album` field arrive in one query instead of a parse of our own.
+	annByID, gerr := grubberRecordsFor(nd, binder)
+	if gerr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", gerr)
+		return 1
 	}
 
 	resolved, rerr := resolveRecordPaths(records)
@@ -495,8 +517,11 @@ func cmdAlbum(args []string) int {
 	metaByPath := albumSpotlightMetaAll(metaPaths)
 
 	var entries []albumEntry
+	var memberOrder []string
 	for _, p := range pending {
-		entries = append(entries, albumEntryOf(p.rec, annByID[index.AsString(p.rec["id"])], p.path, metaByPath[p.path]))
+		id := index.AsString(p.rec["id"])
+		memberOrder = append(memberOrder, id)
+		entries = append(entries, albumEntryOf(p.rec, annByID[id], p.path, metaByPath[p.path]))
 	}
 
 	sort.SliceStable(entries, func(a, b int) bool {
@@ -587,7 +612,7 @@ func cmdAlbum(args []string) int {
 	if !ok {
 		return 1
 	}
-	if err := index.AtomicWrite(htmlPath, []byte(albumHTML(binder, entries, cssText))); err != nil {
+	if err := index.AtomicWrite(htmlPath, []byte(albumHTML(orDefault(albumFieldOf(annByID, memberOrder), binder), entries, cssText))); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", htmlPath, err)
 		return 1
 	}
@@ -615,7 +640,6 @@ func albumSortKey(e albumEntry) [3]string {
 	}
 	return [3]string{"1", e.filename, index.AsString(e.rec["id"])}
 }
-
 
 // albumSafeHref returns u for use as a link, or "" when its scheme runs code in
 // the page (javascript:, vbscript:, data:). A URL ref can come from a container

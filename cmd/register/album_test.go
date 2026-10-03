@@ -52,10 +52,11 @@ func seedAlbumFixture(t *testing.T) string {
 func albumEnv(t *testing.T, notes, anchor string) []string {
 	t.Helper()
 	env := filterEnv(os.Environ(), "GRUBBER_SET")
-	for _, k := range []string{"GRUBBER_NOTES", "HOME", "FILEANCHOR", "REGISTER_BINDER"} {
+	for _, k := range []string{"GRUBBER_NOTES", "HOME", "FILEANCHOR", "REGISTER_BINDER", "GRUBBER_BIN"} {
 		env = filterEnv(env, k)
 	}
-	return append(env, "GRUBBER_NOTES="+notes, "HOME="+t.TempDir(), "FILEANCHOR="+anchor)
+	return append(env, "GRUBBER_NOTES="+notes, "HOME="+t.TempDir(), "FILEANCHOR="+anchor,
+		"GRUBBER_BIN="+grubberTestBin(t))
 }
 
 func TestAlbum(t *testing.T) {

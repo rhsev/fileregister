@@ -21,6 +21,12 @@ jobs:
       - name: Build the fileanchor engine
         run: make fileanchor
 
+      # The album reads the Markdown layer through grubber, so its checks need
+      # one exactly as the engine checks need fileanchor — and they skip without
+      # it, which the step below refuses.
+      - name: Build grubber
+        run: make grubber
+
       - run: go build ./...
       - run: go vet ./...
 
