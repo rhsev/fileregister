@@ -7,5 +7,9 @@ All 2 record(s) are consistent.
 === Direction 2: File → Record (2 binder(s) via mdfind) ===
 
 No ghost xattr entries found.
+
+=== Direction 3: Bookmark → Record (1 entry(ies)) ===
+
+All 1 bookmark(s) are claimed by a record and resolve.
 === stderr ===
 Collecting type:ref records…

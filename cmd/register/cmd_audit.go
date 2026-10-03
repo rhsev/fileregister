@@ -268,6 +268,9 @@ func cmdAudit(args []string) int {
 		}
 	}
 	if len(binderNames) == 0 {
+		if !hasBinderFilter {
+			auditBookmarkDirection(db, checked)
+		}
 		return 0
 	}
 
@@ -306,5 +309,51 @@ func cmdAudit(args []string) int {
 		fmt.Println("")
 		fmt.Printf("%d ghost entry(ies), %d copy(ies) of registered files found.\n", found["ghost"], found["copy"])
 	}
+
+	if !hasBinderFilter {
+		auditBookmarkDirection(db, checked)
+	}
 	return 0
+}
+
+// auditBookmarkDirection prints Direction 3: the identity layer against the
+// index. The judging lives in bookmark_health.go, shared with cleanup.
+func auditBookmarkDirection(db map[string]string, records []map[string]any) {
+	if len(db) == 0 {
+		return
+	}
+	rep, err := classifyBookmarks(db, records)
+	findings, ids := rep.findings, rep.ids
+	fmt.Println("")
+	if err != nil {
+		fmt.Println("=== Direction 3: Bookmark → Record ===")
+		fmt.Println("")
+		fmt.Printf("  Engine error: %v — the identity layer was not checked\n", err)
+		return
+	}
+	fmt.Printf("=== Direction 3: Bookmark → Record (%d entry(ies)) ===\n", len(ids))
+	fmt.Println("")
+	if len(findings) == 0 {
+		fmt.Printf("All %d bookmark(s) are claimed by a record and resolve.\n", len(ids))
+		return
+	}
+	tally := map[string]int{}
+	for _, f := range findings {
+		tally[f.kind]++
+		bookmarkFindingLine(f)
+	}
+	fmt.Println("")
+	fmt.Printf("%d of %d bookmark(s) need attention: %d orphan, %d broken, %d dead, %d malformed, %d unreachable.\n",
+		len(findings), len(ids), tally[bmOrphan], tally[bmBroken], tally[bmDead], tally[bmMalformed], tally[bmUnreachable])
+	if tally[bmBroken] > 0 {
+		fmt.Println("Broken ones are repairable: register repair")
+	}
+	if tally[bmUnreachable] > 0 {
+		if rep.blind {
+			fmt.Println("Unreachable ones were not judged: this fileanchor does not report a failed resolve's")
+			fmt.Println("recorded path, so a gone file cannot be told from an absent volume. Update to 1.2.0.")
+		} else {
+			fmt.Println("Unreachable ones were not judged — mount the volume and run again.")
+		}
+	}
 }
