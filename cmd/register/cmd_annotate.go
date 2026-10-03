@@ -155,12 +155,12 @@ func cmdAnnotate(args []string) int {
 	fieldEdits := 0
 	proseEdits := 0
 	for _, f := range files {
-		data, rerr := os.ReadFile(f)
+		original, crlf, rerr := readNote(f)
 		if rerr != nil {
 			fmt.Fprintf(os.Stderr, "Error: reading %s: %v\n", f, rerr)
 			return 1
 		}
-		content := string(data)
+		content := original
 
 		if len(sets) > 0 || len(unsets) > 0 {
 			edited, n := annotateEditBlocks(content, keys, binder, sets, unsets)
@@ -180,8 +180,8 @@ func cmdAnnotate(args []string) int {
 				proseEdits += n
 			}
 		}
-		if content != string(data) {
-			if werr := index.AtomicWrite(f, []byte(content)); werr != nil {
+		if content != original {
+			if werr := writeNote(f, content, crlf); werr != nil {
 				fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", f, werr)
 				return 1
 			}

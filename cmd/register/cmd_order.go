@@ -461,8 +461,9 @@ func orderWriteOverride(note, binder string, rec map[string]any, field string, v
 	yaml := yamlField("type", "ref") + yamlField("id", id) + yamlField("binder", binder) + yamlField(field, index.AsString(value))
 	block := "### " + header + "\n```yaml\n" + yaml + "```\n"
 	content := block
-	if data, err := os.ReadFile(note); err == nil {
-		content = chomp(string(data)) + "\n\n" + block
+	existingNote, crlf, err := readNote(note)
+	if err == nil {
+		content = chomp(existingNote) + "\n\n" + block
 	} else if os.IsNotExist(err) {
 		os.MkdirAll(filepath.Dir(note), 0755)
 	} else {
@@ -470,7 +471,7 @@ func orderWriteOverride(note, binder string, rec map[string]any, field string, v
 		fmt.Fprintf(os.Stderr, "Error: reading %s failed: %v\n", note, err)
 		return "failed"
 	}
-	if err := index.AtomicWrite(note, []byte(content)); err != nil {
+	if err := writeNote(note, content, crlf); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", note, err)
 		return "failed"
 	}
@@ -551,15 +552,16 @@ func orderWriteOverrides(note, binder string, byID map[string]map[string]any, fi
 	}
 	body := strings.Join(blocks, "\n")
 	content := body
-	if data, err := os.ReadFile(note); err == nil {
-		content = chomp(string(data)) + "\n\n" + body
+	existingNote, crlf, err := readNote(note)
+	if err == nil {
+		content = chomp(existingNote) + "\n\n" + body
 	} else if os.IsNotExist(err) {
 		os.MkdirAll(filepath.Dir(note), 0755)
 	} else {
 		fmt.Fprintf(os.Stderr, "Error: reading %s failed: %v\n", note, err)
 		return false
 	}
-	if err := index.AtomicWrite(note, []byte(content)); err != nil {
+	if err := writeNote(note, content, crlf); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", note, err)
 		return false
 	}

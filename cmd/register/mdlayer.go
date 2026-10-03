@@ -7,7 +7,6 @@ package main
 import (
 	"fmt"
 	"io/fs"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -21,6 +20,10 @@ import (
 // mdYamlBlockRe matches fenced YAML blocks: ```yaml\n…\n``` (multiline, dotall,
 // non-greedy) — the Go equivalent of MdEditor::YAML_BLOCK_RE.
 var mdYamlBlockRe = regexp.MustCompile("(?ms)^```yaml\n(.*?)\n^```")
+
+// importDir: where unmarshal parks what it did not place — a container's notes
+// wait there for the user, and are not part of the notes.
+func importDir(notesDir string) string { return filepath.Join(notesDir, "collections", "import") }
 
 // mdFiles returns the *.md files worth parsing for ref blocks. A ripgrep
 // prefilter narrows a large vault to just the files that actually contain a
@@ -47,8 +50,9 @@ func mdRefFilesRg(notesDir string) ([]string, bool) {
 		return nil, false // rg not installed or a real error → fall back
 	}
 	var files []string
+	parked := importDir(notesDir) + string(filepath.Separator)
 	for _, f := range strings.Split(string(out), "\x00") {
-		if f != "" {
+		if f != "" && !strings.HasPrefix(f, parked) {
 			files = append(files, f)
 		}
 	}
@@ -56,16 +60,17 @@ func mdRefFilesRg(notesDir string) ([]string, bool) {
 }
 
 // mdFilesWalk returns every *.md under notesDir, skipping hidden files and dirs
-// (a recursive *.md walk).
+// and the import staging folder (a recursive *.md walk).
 func mdFilesWalk(notesDir string) []string {
 	var out []string
+	parked := importDir(notesDir)
 	filepath.WalkDir(notesDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		name := d.Name()
 		if d.IsDir() {
-			if path != notesDir && strings.HasPrefix(name, ".") {
+			if path != notesDir && strings.HasPrefix(name, ".") || path == parked {
 				return filepath.SkipDir
 			}
 			return nil
@@ -83,11 +88,11 @@ func mdFilesWalk(notesDir string) []string {
 func annotatedIDs(notesDir string) map[string]bool {
 	ids := map[string]bool{}
 	for _, md := range mdFiles(notesDir) {
-		data, err := os.ReadFile(md)
+		content, _, err := readNote(md)
 		if err != nil {
 			continue
 		}
-		for _, m := range mdYamlBlockRe.FindAllStringSubmatch(string(data), -1) {
+		for _, m := range mdYamlBlockRe.FindAllStringSubmatch(content, -1) {
 			var rec map[string]any
 			if yaml.Unmarshal([]byte(m[1]), &rec) != nil {
 				continue
@@ -109,11 +114,11 @@ func readAnnotations(notesDir string) []map[string]any {
 	sort.Strings(files)
 	var out []map[string]any
 	for _, md := range files {
-		data, err := os.ReadFile(md)
+		content, _, err := readNote(md)
 		if err != nil {
 			continue
 		}
-		for _, m := range mdYamlBlockRe.FindAllStringSubmatch(string(data), -1) {
+		for _, m := range mdYamlBlockRe.FindAllStringSubmatch(content, -1) {
 			var rec map[string]any
 			if yaml.Unmarshal([]byte(m[1]), &rec) != nil {
 				continue

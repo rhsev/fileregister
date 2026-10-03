@@ -95,6 +95,30 @@ func needsYAMLQuote(s string) bool {
 	return false
 }
 
+// readNote reads a Markdown note with its line endings as \n: every editor
+// here matches \n, and a note saved with \r\n (Windows, some sync setups)
+// looked empty — its blocks were invisible, and promote appended duplicates.
+// crlf tells the file's own style, so writeNote can put it back.
+func readNote(path string) (content string, crlf bool, err error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", false, err
+	}
+	s := string(data)
+	if !strings.Contains(s, "\r\n") {
+		return s, false, nil
+	}
+	return strings.ReplaceAll(s, "\r\n", "\n"), true, nil
+}
+
+// writeNote writes a note read by readNote back in its own line endings.
+func writeNote(path, content string, crlf bool) error {
+	if crlf {
+		content = strings.ReplaceAll(content, "\n", "\r\n")
+	}
+	return index.AtomicWrite(path, []byte(content))
+}
+
 // leanAnnotation renders a lean annotation block: H3 = filename (or id), YAML =
 // type/id/binder (the join key). Custom fields + prose are added by the human.
 func leanAnnotation(rec map[string]any, binder string) string {
@@ -111,12 +135,12 @@ func leanAnnotation(rec map[string]any, binder string) string {
 // mdParseBlocks parses every fenced yaml block in one Markdown file — one read
 // serves all block consumers. Nil on read error or unparseable blocks skipped.
 func mdParseBlocks(path string) []map[string]any {
-	data, err := os.ReadFile(path)
+	content, _, err := readNote(path)
 	if err != nil {
 		return nil
 	}
 	var out []map[string]any
-	for _, m := range mdYamlBlockRe.FindAllStringSubmatch(string(data), -1) {
+	for _, m := range mdYamlBlockRe.FindAllStringSubmatch(content, -1) {
 		var rec map[string]any
 		if yaml.Unmarshal([]byte(m[1]), &rec) != nil || rec == nil {
 			continue
@@ -207,15 +231,16 @@ func promoteRecords(records []map[string]any, mdTarget, binder string) (int, int
 		os.MkdirAll(filepath.Dir(mdTarget), 0755)
 		body := strings.Join(blocks, "\n")
 		content := body
-		if data, err := os.ReadFile(mdTarget); err == nil {
-			content = chomp(string(data)) + "\n\n" + body
+		existingNote, crlf, err := readNote(mdTarget)
+		if err == nil {
+			content = chomp(existingNote) + "\n\n" + body
 		} else if !os.IsNotExist(err) {
 			// The note exists but can't be read — appending blind would
 			// replace it with only the new blocks. Refuse.
 			fmt.Fprintf(os.Stderr, "  Error: reading %s failed: %v\n", mdTarget, err)
 			return 0, noop, failed + promoted
 		}
-		if err := index.AtomicWrite(mdTarget, []byte(content)); err != nil {
+		if err := writeNote(mdTarget, content, crlf); err != nil {
 			fmt.Fprintf(os.Stderr, "  Error: writing %s failed: %v\n", mdTarget, err)
 			return 0, noop, failed + promoted
 		}
@@ -275,12 +300,12 @@ func yamlLine(key, value string) string {
 // changed). Writes back only when something changed; returns the change count.
 // A failed write returns the error and counts as zero changes applied.
 func mdTransformFile(path string, fn func(lines []string, parsed map[string]any) (string, bool)) (int, error) {
-	data, err := os.ReadFile(path)
+	content, crlf, err := readNote(path)
 	if err != nil {
 		return 0, err
 	}
 	changes := 0
-	modified := mdYamlBlockRe.ReplaceAllStringFunc(string(data), func(match string) string {
+	modified := mdYamlBlockRe.ReplaceAllStringFunc(content, func(match string) string {
 		body := strings.TrimSuffix(strings.TrimPrefix(match, "```yaml\n"), "\n```")
 		var parsed map[string]any
 		if yaml.Unmarshal([]byte(body), &parsed) != nil || parsed == nil {
@@ -297,7 +322,7 @@ func mdTransformFile(path string, fn func(lines []string, parsed map[string]any)
 		return match
 	})
 	if changes > 0 {
-		if err := index.AtomicWrite(path, []byte(modified)); err != nil {
+		if err := writeNote(path, modified, crlf); err != nil {
 			return 0, err
 		}
 	}
@@ -336,12 +361,12 @@ func mdRenameBinder(path, oldName, newName string) (int, error) {
 // block whose binder == oldName — mdTransformFile is ref-only, and a rename
 // must carry the ordering layer along.
 func mdRenameOrderingBinder(path, oldName, newName string) (int, error) {
-	data, err := os.ReadFile(path)
+	content, crlf, err := readNote(path)
 	if err != nil {
 		return 0, err
 	}
 	changes := 0
-	modified := mdYamlBlockRe.ReplaceAllStringFunc(string(data), func(match string) string {
+	modified := mdYamlBlockRe.ReplaceAllStringFunc(content, func(match string) string {
 		body := strings.TrimSuffix(strings.TrimPrefix(match, "```yaml\n"), "\n```")
 		var parsed map[string]any
 		if yaml.Unmarshal([]byte(body), &parsed) != nil || parsed == nil {
@@ -364,7 +389,7 @@ func mdRenameOrderingBinder(path, oldName, newName string) (int, error) {
 		return "```yaml\n" + strings.Join(lines, "\n") + "\n```"
 	})
 	if changes > 0 {
-		if err := index.AtomicWrite(path, []byte(modified)); err != nil {
+		if err := writeNote(path, modified, crlf); err != nil {
 			return 0, err
 		}
 	}
@@ -485,15 +510,14 @@ func mdFileWriteMany(recs []index.RefRecord, targetPath string) []string {
 		return actions
 	}
 
-	content := ""
-	if data, err := os.ReadFile(targetPath); err == nil {
-		content = string(data)
-	} else if os.IsNotExist(err) {
+	content, crlf, err := readNote(targetPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			// Existing note, unreadable — writing now would clobber it.
+			fmt.Fprintf(os.Stderr, "  Error: reading %s failed: %v\n", targetPath, err)
+			return fail()
+		}
 		os.MkdirAll(filepath.Dir(targetPath), 0755)
-	} else {
-		// Existing note, unreadable — writing now would clobber it.
-		fmt.Fprintf(os.Stderr, "  Error: reading %s failed: %v\n", targetPath, err)
-		return fail()
 	}
 
 	appended := 0
@@ -514,7 +538,7 @@ func mdFileWriteMany(recs []index.RefRecord, targetPath string) []string {
 	if appended == 0 {
 		return actions
 	}
-	if err := index.AtomicWrite(targetPath, []byte(content)); err != nil {
+	if err := writeNote(targetPath, content, crlf); err != nil {
 		fmt.Fprintf(os.Stderr, "  Error: writing %s failed: %v\n", targetPath, err)
 		return fail()
 	}
@@ -533,11 +557,10 @@ var mdDeleteBlockRe = regexp.MustCompile("(?ms)((?:^#{3,4}[ \t][^\n]*\n)\n*)?^``
 // The binder must match exactly: a blank binder matches only blocks that name
 // none, never every block of the id. Returns the count of deleted blocks.
 func mdDeleteBlock(path, id, binder string) (int, error) {
-	data, err := os.ReadFile(path)
+	content, crlf, err := readNote(path)
 	if err != nil {
 		return 0, err
 	}
-	content := string(data)
 	locs := mdDeleteBlockRe.FindAllStringSubmatchIndex(content, -1)
 	if len(locs) == 0 {
 		return 0, nil
@@ -570,7 +593,7 @@ func mdDeleteBlock(path, id, binder string) (int, error) {
 	}
 	b.WriteString(content[last:])
 	if changes > 0 {
-		if err := index.AtomicWrite(path, []byte(b.String())); err != nil {
+		if err := writeNote(path, b.String(), crlf); err != nil {
 			return 0, err
 		}
 	}
@@ -588,7 +611,7 @@ func orderingBlock(binder, rule string) string {
 // "created" or "updated". A legacy kind: line in an existing block is left
 // alone — the field is inert since orderings became absolute-only.
 func upsertOrderingConfig(path, binder, rule string) (string, error) {
-	data, err := os.ReadFile(path)
+	content, crlf, err := readNote(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			// Existing note, unreadable — creating now would clobber it.
@@ -600,7 +623,6 @@ func upsertOrderingConfig(path, binder, rule string) (string, error) {
 		}
 		return "created", nil
 	}
-	content := string(data)
 
 	found := false
 	modified := mdYamlBlockRe.ReplaceAllStringFunc(content, func(match string) string {
@@ -636,7 +658,7 @@ func upsertOrderingConfig(path, binder, rule string) (string, error) {
 
 	if found {
 		if modified != content {
-			if werr := index.AtomicWrite(path, []byte(modified)); werr != nil {
+			if werr := writeNote(path, modified, crlf); werr != nil {
 				return "", werr
 			}
 		}
@@ -649,7 +671,7 @@ func upsertOrderingConfig(path, binder, rule string) (string, error) {
 	if fm := frontmatterLen(content); fm > 0 {
 		out = content[:fm] + "\n" + block + "\n\n" + content[fm:]
 	}
-	if werr := index.AtomicWrite(path, []byte(out)); werr != nil {
+	if werr := writeNote(path, out, crlf); werr != nil {
 		return "", werr
 	}
 	return "created", nil
