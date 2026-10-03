@@ -60,11 +60,16 @@ func cmdRefresh(args []string) int {
 	}
 	fmt.Fprintf(os.Stderr, "Found %d ref record(s). Resolving bookmarks…\n", len(allRefs))
 
-	resolved, rerr := resolveRecordPaths(allRefs)
+	resolutions, rerr := resolveRecords(allRefs)
 	if rerr != nil {
 		fmt.Fprintf(os.Stderr, "Error: fileanchor batch resolve failed: %v\n", rerr)
 		return 1
 	}
+	resolved := map[string]string{}
+	for id, r := range resolutions {
+		resolved[id] = r.Path
+	}
+	renewed := 0
 
 	type brokenEntry struct {
 		binders         []string
@@ -112,6 +117,14 @@ func cmdRefresh(args []string) int {
 			continue
 		}
 
+		// A stale bookmark still resolves, but macOS asks for it to be saved
+		// anew; left alone it degrades until it no longer resolves at all.
+		if resolutions[id].Stale && !dryRun {
+			if _, err := index.Rebind(id, refPath); err == nil {
+				renewed++
+			}
+		}
+
 		// Identity layer for every record (idempotent): syncable id xattr; ★ for
 		// members only (a bookmark, empty binder set, does not get it).
 		if !dryRun {
@@ -156,6 +169,9 @@ func cmdRefresh(args []string) int {
 	fmt.Printf("Refresh complete%s:\n", dr)
 	fmt.Printf("  Refreshed    : %d\n", refreshed)
 	fmt.Printf("  Already ok   : %d\n", noop)
+	if renewed > 0 {
+		fmt.Printf("  Bookmarks renewed (stale): %d\n", renewed)
+	}
 	if skippedNone > 0 {
 		fmt.Printf("  Skipped (none): %d\n", skippedNone)
 	}

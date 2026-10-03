@@ -143,9 +143,11 @@ func BookmarkGet(id string) (string, error) {
 }
 
 // Resolution is one id's bookmark outcome: Path when it resolves, else
-// LastPath — where the file was when it was bookmarked ("" if unknown).
+// LastPath — where the file was when it was bookmarked ("" if unknown). Stale
+// means it resolved but should be saved anew before it stops resolving.
 type Resolution struct {
 	Path, LastPath string
+	Stale          bool
 }
 
 // BatchGet resolves many ids in one shot: id → path, "" for a missing blob or
@@ -193,6 +195,7 @@ func BatchResolve(ids []string) (map[string]Resolution, error) {
 		if p.has && i < len(resps) {
 			if ok, _ := resps[i]["ok"].(bool); ok {
 				r.Path, _ = resps[i]["path"].(string)
+				r.Stale, _ = resps[i]["stale"].(bool)
 			} else {
 				r.LastPath, _ = resps[i]["last_path"].(string)
 			}
