@@ -354,21 +354,26 @@ func cmdAlbum(args []string) int {
 	i := 0
 	for i < len(args) {
 		a := args[i]
-		takeVal := func() string {
+		takeVal := func() (string, bool) {
 			if eq := strings.Index(a, "="); strings.HasPrefix(a, "--") && eq >= 0 {
-				return a[eq+1:]
+				return a[eq+1:], true
 			}
-			if i+1 < len(args) {
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
 				i++
-				return args[i]
+				return args[i], true
 			}
-			return ""
+			return "", false
 		}
+		var ok bool
 		switch {
 		case a == "--out" || strings.HasPrefix(a, "--out="):
-			out = takeVal()
+			if out, ok = takeVal(); !ok {
+				return unknownOption("album", "--out"+missingValue)
+			}
 		case a == "--css" || strings.HasPrefix(a, "--css="):
-			css = takeVal()
+			if css, ok = takeVal(); !ok {
+				return unknownOption("album", "--css"+missingValue)
+			}
 		case a == "--milan" || strings.HasPrefix(a, "--milan="):
 			milanMode = true
 			if strings.HasPrefix(a, "--milan=") {

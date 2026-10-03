@@ -8,9 +8,12 @@ package main
 import "strings"
 
 // parseFlagsMulti splits args into value flags (every occurrence kept, in
-// order), boolean flags, and positional args. A value flag at the end of the
-// line records an empty value, so presence stays detectable. The first
-// unrecognized flag is returned as unknown.
+// order), boolean flags, and positional args. The first unrecognized flag is
+// returned as unknown — or a value flag given no value: at the end of the
+// line, or followed by another --flag, which it used to swallow as its value
+// (`--binder --edit` made a binder named "--edit"). A value that starts with
+// -- can still be given inline (--binder=--x). A bare -- ends the options:
+// everything after it is positional (`rename -- -draft final`).
 func parseFlagsMulti(args []string, valFlags, boolFlags map[string]bool) (map[string][]string, map[string]bool, []string, string) {
 	vals := map[string][]string{}
 	bools := map[string]bool{}
@@ -19,6 +22,10 @@ func parseFlagsMulti(args []string, valFlags, boolFlags map[string]bool) (map[st
 	i := 0
 	for i < len(args) {
 		a := args[i]
+		if a == "--" {
+			pos = append(pos, args[i+1:]...)
+			break
+		}
 		if a == "-h" || a == "--help" {
 			bools["--help"] = true
 			i++
@@ -43,11 +50,13 @@ func parseFlagsMulti(args []string, valFlags, boolFlags map[string]bool) (map[st
 				switch {
 				case hasInline:
 					vals[name] = append(vals[name], inline)
-				case i+1 < len(args):
+				case i+1 < len(args) && !strings.HasPrefix(args[i+1], "--"):
 					i++
 					vals[name] = append(vals[name], args[i])
 				default:
-					vals[name] = append(vals[name], "")
+					if unknown == "" {
+						unknown = name + missingValue
+					}
 				}
 				i++
 				continue
@@ -70,6 +79,9 @@ func parseFlagsMulti(args []string, valFlags, boolFlags map[string]bool) (map[st
 	}
 	return vals, bools, pos, unknown
 }
+
+// missingValue marks an "unknown" that is a value flag without its value.
+const missingValue = " needs a value"
 
 // parseFlags is parseFlagsMulti for single-valued flags: the last occurrence
 // wins.

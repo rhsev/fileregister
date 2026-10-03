@@ -37,7 +37,11 @@ func annotationsForBinder(notesDir, binder string) []map[string]any {
 func cmdRename(args []string) int {
 	var pos []string
 	merge := false
-	for _, a := range args {
+	for i, a := range args {
+		if a == "--" { // the rest are names, even ones starting with -
+			pos = append(pos, args[i+1:]...)
+			break
+		}
 		switch a {
 		case "--merge":
 			merge = true

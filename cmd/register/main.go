@@ -189,6 +189,10 @@ Ordering — presentation layer (binder = set, ordering = sort: keys; ORDERING.m
 // unknownOption reports a mistyped/unrecognized flag and returns exit code 1, so
 // a typo (e.g. --hind for --kind) fails loudly instead of being silently ignored.
 func unknownOption(cmd, opt string) int {
+	if flag, ok := strings.CutSuffix(opt, missingValue); ok {
+		fmt.Fprintf(os.Stderr, "register %s: option '%s' needs a value\n", cmd, flag)
+		return 1
+	}
 	fmt.Fprintf(os.Stderr, "register %s: unknown option '%s'\n", cmd, opt)
 	return 1
 }
