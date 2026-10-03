@@ -99,22 +99,27 @@ func candidateProblem(path, id string, db map[string]string, indexIDs map[string
 
 // repairRecord re-binds the relocated file under its EXISTING id, refreshing the
 // binder xattr + ★. Returns the (unchanged) id, or "" on failure.
-func repairRecord(rec map[string]any, newPath string) string {
+// The second result lists what could not be written on the file; the bookmark
+// is renewed either way, and refresh can fill in the rest later.
+func repairRecord(rec map[string]any, newPath string) (string, []string) {
 	id := index.AsString(rec["id"])
 	binders := nonEmptyBinders(rec)
 	backend := index.XattrBackend(rec)
 
 	newID, err := index.Rebind(id, newPath)
 	if err != nil || newID == "" {
-		return ""
+		return "", nil
 	}
+	var failed []string
 	for _, b := range binders {
-		index.XattrBackendAdd(newPath, b, backend)
+		if index.XattrBackendAdd(newPath, b, backend) == "failed" {
+			failed = append(failed, "binder '"+b+"'")
+		}
 	}
-	if len(binders) > 0 {
-		index.ManagedMark(newPath)
+	if len(binders) > 0 && index.ManagedMark(newPath) == "failed" {
+		failed = append(failed, "the ★ marker")
 	}
-	return id
+	return id, failed
 }
 
 var digitsRe = regexp.MustCompile(`^\d+$`)
@@ -192,6 +197,7 @@ func cmdRepair(args []string) int {
 	type unresolvedT struct{ id, binder, title, noteFile string }
 	var notFound []unresolvedT
 	offline := map[string]int{}
+	partial := 0
 
 	for _, rec := range broken {
 		id := index.AsString(rec["id"])
@@ -265,8 +271,13 @@ func cmdRepair(args []string) int {
 			continue
 		}
 
-		if repairRecord(rec, newPath) != "" {
+		if rid, failed := repairRecord(rec, newPath); rid != "" {
 			fmt.Printf("  Repaired: re-bound id %s (unchanged)\n", id)
+			if len(failed) > 0 {
+				fmt.Printf("  But could not write %s on the file — run 'register refresh' once it is writable\n",
+					strings.Join(failed, ", "))
+				partial++
+			}
 			repaired++
 		} else {
 			fmt.Printf("  Failed to create new bookmark for %s\n", newPath)
@@ -276,6 +287,9 @@ func cmdRepair(args []string) int {
 	}
 
 	fmt.Printf("Repair complete: %d repaired, %d unresolved.\n", repaired, len(notFound))
+	if partial > 0 {
+		fmt.Printf("%d of the repaired file(s) are missing metadata — see above.\n", partial)
+	}
 	for vol, n := range offline {
 		fmt.Printf("%d record(s) on volume '%s', which is not mounted — they resolve again once it is connected.\n", n, vol)
 	}

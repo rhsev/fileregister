@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -55,5 +56,29 @@ func TestCandidateProblem(t *testing.T) {
 	}
 	if got := candidateProblem(other, res[0].ID, db, map[string]bool{}); got != "" {
 		t.Errorf("the record's own file: %q", got)
+	}
+}
+
+// repair renews the bookmark even when the file refuses its metadata, and
+// says what is missing instead of reporting a clean repair.
+func TestRepairRecordReportsWhatItCouldNotWrite(t *testing.T) {
+	anchor := engineBin(t)
+	restore := setEnv(t, identityEnv(t, t.TempDir(), anchor))
+	defer restore()
+	index.ResetEngine()
+	defer index.ResetEngine()
+
+	f := filepath.Join(t.TempDir(), "locked.pdf")
+	writeFile(t, f, "x")
+	os.Chmod(f, 0444)
+	defer os.Chmod(f, 0644)
+
+	rec := map[string]any{"id": "123456789", "binder": []any{"proj"}}
+	id, failed := repairRecord(rec, f)
+	if id != "123456789" {
+		t.Fatalf("the bookmark was not renewed: %q", id)
+	}
+	if len(failed) != 2 {
+		t.Errorf("failed = %v, want the binder and the ★ marker", failed)
 	}
 }
