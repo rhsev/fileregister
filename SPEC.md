@@ -126,7 +126,7 @@ The entry unit: a heading + optional prose + one fenced ```yaml block. Producers
 
 **Reader tolerance is permitted, not required.** Section extractors resolve the *nearest preceding heading of any level* — deliberate, because surrounding same-level context can be worth showing; they MAY be tightened to H3/H4 if that tolerance ever causes trouble. grubber ignores headings entirely: blocks are found by their fences, a heading is not data.
 
-**Blank-line rule.** A blank line is REQUIRED between a structure heading (H1/H2) and a following entry heading — for readability and clean section extraction. (register's block deletion no longer depends on it: the delete regex takes only the single heading line directly above a block, so an adjacent structure heading survives either way.) After H3/H4 no blank line is needed; the block or prose may follow directly.
+**Blank-line rule.** A blank line is REQUIRED between a structure heading (H1/H2) and a following entry heading — for readability and clean section extraction. (register's block deletion no longer depends on it: the delete regex takes only a single H3/H4 line directly above a block as the block's own heading, so a structure heading survives either way.) After H3/H4 no blank line is needed; the block or prose may follow directly.
 
 ### Markdown annotation (optional)
 

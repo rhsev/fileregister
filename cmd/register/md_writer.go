@@ -458,13 +458,15 @@ func mdFileWriteMany(recs []index.RefRecord, targetPath string) []string {
 
 // mdDeleteBlockRe matches an optional heading + blank lines, a ```yaml block, and
 // the trailing blank lines — so deleting a block leaves no gap (MdEditor.delete_block).
-// Exactly ONE heading line: the block's own header. A greedy (^#…\n)+ would also
-// swallow a section title sitting directly above it.
-var mdDeleteBlockRe = regexp.MustCompile("(?ms)((?:^#[^\n]*\n)\n*)?^```yaml\n(.*?)\n^```[ \t]*(?:\n(?:[ \t]*\n)*)?")
+// Exactly ONE heading line, and only an entry heading (H3/H4): H1/H2 are
+// document structure (SPEC), so a section title directly above a block that
+// has no heading of its own stays.
+var mdDeleteBlockRe = regexp.MustCompile("(?ms)((?:^#{3,4}[ \t][^\n]*\n)\n*)?^```yaml\n(.*?)\n^```[ \t]*(?:\n(?:[ \t]*\n)*)?")
 
 // mdDeleteBlock removes the block(s) matching (id, binder) — and their preceding
 // heading + trailing blanks — keeping the rest of the document byte-for-byte.
-// A blank binder matches any. Returns the count of deleted blocks.
+// The binder must match exactly: a blank binder matches only blocks that name
+// none, never every block of the id. Returns the count of deleted blocks.
 func mdDeleteBlock(path, id, binder string) (int, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -489,7 +491,7 @@ func mdDeleteBlock(path, id, binder string) (int, error) {
 		if yaml.Unmarshal([]byte(body), &parsed) == nil && parsed != nil {
 			if t, _ := parsed["type"].(string); t == "ref" &&
 				index.AsString(parsed["id"]) == id &&
-				(binder == "" || index.AsString(parsed["binder"]) == binder) {
+				index.AsString(parsed["binder"]) == binder {
 				del = true
 			}
 		}

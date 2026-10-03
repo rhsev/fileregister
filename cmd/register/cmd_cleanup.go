@@ -107,7 +107,9 @@ func cmdCleanup(args []string) int {
 		item := cleanupItem{rec: r, noteFile: index.AsString(r["_note_file"])}
 		if !indexIDs[id] {
 			unindexed = append(unindexed, item)
-		} else if !memberships[id+"|"+b] {
+		} else if b != "" && !memberships[id+"|"+b] {
+			// A block that names no binder claims no membership, so it
+			// cannot be stale — it is context for the record as a whole.
 			stale = append(stale, item)
 		}
 	}
