@@ -82,3 +82,24 @@ func TestUnmarshalRefusesBinderWithComma(t *testing.T) {
 		t.Fatal("records imported from a refused container")
 	}
 }
+
+// Foo and foo share binder_foo.md on a case-insensitive volume; renaming one
+// must not carry the other's blocks away.
+func TestRenameLeavesASharedNote(t *testing.T) {
+	anchor := engineBin(t)
+	notes := seedInbox(t,
+		`{"type":"ref","id":"1","binder":["Foo"],"url":"https://example.com/1"}`,
+		`{"type":"ref","id":"2","binder":["foo"],"url":"https://example.com/2"}`)
+	col := filepath.Join(notes, "collections")
+	shared := "### one\n```yaml\ntype: ref\nid: '1'\nbinder: Foo\n```\n\n### two\n```yaml\ntype: ref\nid: '2'\nbinder: foo\n```\n"
+	writeFile(t, filepath.Join(col, "binder_foo.md"), shared)
+
+	env := renameEnvHome(t, notes, t.TempDir(), anchor)
+	if _, e, code := runGoRename(t, env, "foo", "bar"); code != 0 {
+		t.Fatalf("rename: %d %s", code, e)
+	}
+	note, err := os.ReadFile(filepath.Join(col, "binder_foo.md"))
+	if err != nil || !strings.Contains(string(note), "binder: Foo") {
+		t.Errorf("Foo's block left with the renamed binder (err %v):\n%s", err, note)
+	}
+}

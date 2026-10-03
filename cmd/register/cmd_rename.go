@@ -133,7 +133,13 @@ func cmdRename(args []string) int {
 		} else if n > 0 {
 			fmt.Printf("  %s: ordering config updated\n", filepath.Base(oldNote))
 		}
-		if index.FileExists(newNote) {
+		if other := noteHoldsOtherBinder(oldNote, oldName, newName); other != "" {
+			// Binder names that differ only in case, or in a / vs -, share
+			// one note file. Moving it would carry the other binder's blocks
+			// and ordering along.
+			fmt.Fprintf(os.Stderr, "  Note: %s also holds binder '%s' — it stays; move the '%s' blocks by hand if you like\n",
+				filepath.Base(oldNote), other, newName)
+		} else if index.FileExists(newNote) {
 			fmt.Fprintf(os.Stderr, "  Note: %s already exists — blocks stay in %s; review by hand\n",
 				filepath.Base(newNote), filepath.Base(oldNote))
 		} else if mvErr := os.Rename(oldNote, newNote); mvErr != nil {
@@ -234,4 +240,16 @@ func cmdRename(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// noteHoldsOtherBinder returns a binder, other than the one being renamed, that
+// has a block in note — or "" when every block belongs to it.
+func noteHoldsOtherBinder(note, oldName, newName string) string {
+	for _, b := range mdParseBlocks(note) {
+		name := index.AsString(b["binder"])
+		if name != "" && name != oldName && name != newName {
+			return name
+		}
+	}
+	return ""
 }
