@@ -103,17 +103,22 @@ func cmdCleanup(args []string) int {
 	var stale, unindexed []cleanupItem
 	for _, r := range annos {
 		id := index.AsString(r["id"])
-		b := index.AsString(r["binder"])
 		if id == "" {
 			continue
 		}
 		item := cleanupItem{rec: r, noteFile: index.AsString(r["_note_file"])}
 		if !indexIDs[id] {
 			unindexed = append(unindexed, item)
-		} else if b != "" && !memberships[id+"|"+b] {
-			// A block that names no binder claims no membership, so it
-			// cannot be stale — it is context for the record as a whole.
-			stale = append(stale, item)
+			continue
+		}
+		// A block that names no binder claims no membership, so it cannot be
+		// stale — it is context for the record as a whole. A list names one
+		// membership per element; any one that is gone makes it stale.
+		for _, nb := range index.NormalizeBinders(r["binder"]) {
+			if !memberships[id+"|"+index.AsString(nb)] {
+				stale = append(stale, item)
+				break
+			}
 		}
 	}
 

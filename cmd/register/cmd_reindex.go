@@ -82,17 +82,39 @@ func cmdReindex(args []string) int {
 
 	// Records present in Markdown but missing from the index. Every block of an
 	// id is kept — one per binder — so JSONLWriteMany folds them into one record
-	// carrying every membership; only exact (id, binder) duplicates drop.
+	// carrying every membership; only exact (id, binder) duplicates drop. A
+	// hand-written `binder: [a, b]` is one membership per element (it used to
+	// become a single binder named "[a b]").
 	seen := map[string]bool{}
 	var missing []map[string]any
 	for _, r := range mdRecs {
 		id := index.AsString(r["id"])
-		key := id + "\x00" + index.AsString(r["binder"])
-		if id == "" || indexed[id] || seen[key] {
+		if id == "" || indexed[id] {
 			continue
 		}
-		seen[key] = true
-		missing = append(missing, r)
+		binders := index.NormalizeBinders(r["binder"])
+		if len(binders) == 0 {
+			binders = []any{""}
+		}
+		for _, b := range binders {
+			name := index.AsString(b)
+			if p := index.BinderNameProblem(name); name != "" && p != "" {
+				fmt.Fprintf(os.Stderr, "  Skipping id %s in %s: binder name '%s' %s — rename it there\n",
+					id, filepath.Base(index.AsString(r["_note_file"])), name, p)
+				continue
+			}
+			key := id + "\x00" + name
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			one := map[string]any{}
+			for k, v := range r {
+				one[k] = v
+			}
+			one["binder"] = name
+			missing = append(missing, one)
+		}
 	}
 
 	if len(missing) == 0 {
