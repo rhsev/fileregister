@@ -2,8 +2,8 @@
 
 > Empirically verified facts about macOS xattr / Spotlight metadata. First
 > verified on macOS 26.4 (2026-06). **Re-verified 2026-09-27 on macOS 15.8 and
-> 27.2** (Mac mini and MacBook): all local findings, and the iCloud Drive
-> transport in both directions (15 → 27, 27 → 15). Resilio and AirDrop were not
+> 27.2** (Mac mini and MacBook): all local findings, and the iCloud Drive and
+> OpenCloud transports in both directions (15 → 27, 27 → 15). Resilio and AirDrop were not
 > re-tested and stand as of 26.4. Several findings are counterintuitive; the
 > tables below are authoritative.
 
@@ -114,6 +114,27 @@ most metadata-faithful transport of the three.
 > reading it requires Full Disk Access for the terminal, or moving the file (via
 > Finder) to `~/`, which is not TCC-protected.
 
+### Cross-device: OpenCloud desktop client (fresh file, read on the receiver)
+
+Classic sync folder (`virtualFilesMode=off`), verified 2026-09-27 in both
+directions between macOS 15.8 and 27.2:
+
+| xattr written on Mac A | arrived on Mac B? |
+|---|---|
+| `com.apple.metadata:_kMDItemUserTags` (★ Finder tag) | **no** |
+| `com.fileregister.id#S` (custom + `#S`) | **no** |
+| `com.fileregister.id` (plain custom) | **no** |
+| `com.apple.metadata:kMDItemInformation` / `#S` | **no** |
+| `com.apple.metadata:kMDItemProjects` | **no** |
+
+**OpenCloud transfers file content only — not a single xattr, not even Finder
+tags.** Worse for the sending Mac: when the file is edited on the other Mac,
+OpenCloud *replaces* the local copy (new inode) and the local xattrs are gone
+too — ★, both ids and the binder cache, within seconds. The bookmark still
+resolves (by path) but reports `stale`; `register refresh` renews it, which
+writes both ids back, and backfills ★ and the binder layer. Until then the
+file has no ★ and no id for Finder, Spotlight or repair's id search.
+
 ### Transport summary
 
 | Transport | ★ | id (`com.fileregister.id#S`) | `kMDItemProjects` |
@@ -121,9 +142,13 @@ most metadata-faithful transport of the three.
 | iCloud Drive | ✅ | ✅ | ✗ |
 | Resilio Sync | ✅ | ✗ | ✗ |
 | AirDrop | ✅ | ✅ | ✅ |
+| OpenCloud | ✗ | ✗ | ✗ |
 
-**★ survives every transport → the cross-device keystone.** The id survives
-iCloud + AirDrop, not Resilio. Reconcile is therefore **transport-agnostic**:
+**★ survives every transport but OpenCloud → the cross-device keystone.** The
+id survives iCloud + AirDrop, not Resilio or OpenCloud. Over OpenCloud only the
+filename (and the separately-synced records) connects a file to its record,
+and a file edited on the other Mac loses its metadata locally as well — run
+`register refresh` after syncing. Reconcile is therefore **transport-agnostic**:
 enumerate via ★, read the id xattr **if present**, else match by filename against
 the (separately-synced) records.
 
