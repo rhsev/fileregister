@@ -22,6 +22,12 @@ const MaxBinderBytes = 255
 // unmarshal); existing binders stay usable, so one with a comma can still be
 // renamed away.
 func BinderNameProblem(name string) string {
+	// The tags backend writes a binder as a Finder tag, and ★ is the tag
+	// fileregister owns as its managed marker: removing such a binder would
+	// strip the marker from files still in other binders.
+	if norm.NFC.String(name) == managedMarker {
+		return "is the managed marker ★"
+	}
 	if strings.Contains(name, ",") {
 		return "contains a comma"
 	}

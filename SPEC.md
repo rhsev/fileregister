@@ -149,7 +149,9 @@ A binder ends up on files as a Finder tag or a `kMDItemProjects` entry, so its
 name follows fileanchor's label rule, which holds for every platform's engine
 (fileanchor's PLATFORMS.md): **no comma** (Linux keeps tags as a
 comma-separated list), no control characters, no leading or trailing
-whitespace, at most 255 bytes. Spaces, colons (`2024:berlin`) and any other
+whitespace, at most 255 bytes. A binder may also not be named `★` alone: that
+is the managed marker, and removing such a binder would strip the marker from
+files still in other binders. Spaces, colons (`2024:berlin`) and any other
 Unicode are fine.
 
 The rule is checked where a name is introduced — `add --binder` (and
