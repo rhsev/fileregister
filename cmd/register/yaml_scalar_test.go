@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -28,6 +30,30 @@ func TestYamlScalarReadsBack(t *testing.T) {
 	for s, want := range map[string]string{"Steuer 2024": "Steuer 2024", "★": "★", "42": "'42'"} {
 		if got := yamlScalar(s); got != want {
 			t.Errorf("yamlScalar(%q) = %s, want %s", s, got, want)
+		}
+	}
+}
+
+func TestMaterializedKeysStayShortAndOrdered(t *testing.T) {
+	for _, n := range []int{1, 3, 17, 600, 5000} {
+		ids := make([]string, n)
+		for i := range ids {
+			ids[i] = strconv.Itoa(i)
+		}
+		keys := materializeKeys(ids)
+		prev := ""
+		for i, id := range ids {
+			k := keys[id]
+			if k <= prev || strings.HasSuffix(k, "0") {
+				t.Fatalf("n=%d: key %d %q after %q", n, i, k, prev)
+			}
+			if len(k) > 3 {
+				t.Fatalf("n=%d: key %q is long", n, k)
+			}
+			if mid := sortKeyBetween(prev, k); !keyInRange(mid, prev, k) {
+				t.Fatalf("n=%d: nothing fits between %q and %q", n, prev, k)
+			}
+			prev = k
 		}
 	}
 }

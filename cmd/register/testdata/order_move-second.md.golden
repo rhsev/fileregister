@@ -10,7 +10,7 @@ rule: name
 type: ref
 id: '2'
 binder: Ord
-sort: i
+sort: '9'
 ```
 
 ### c.pdf
@@ -18,7 +18,7 @@ sort: i
 type: ref
 id: '1'
 binder: Ord
-sort: r
+sort: i
 ```
 
 ### b.pdf
@@ -26,5 +26,5 @@ sort: r
 type: ref
 id: '3'
 binder: Ord
-sort: m
+sort: d
 ```

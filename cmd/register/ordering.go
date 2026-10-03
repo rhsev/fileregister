@@ -61,14 +61,15 @@ func sortKeyBetween(lower, upper string) string {
 			result = append(result, sortDigits[mid])
 			return string(result)
 		}
+		// No digit fits between: keep lower's digit and go above the rest of
+		// lower. Only one digit further (the mid of it and 36) failed when
+		// that digit is z — "0zr" and "101" gave "0z", below the lower bound.
 		result = append(result, sortDigits[da])
-		i++
-		nxt := 0
-		if i < len(a) {
-			nxt = sortVal(a[i])
+		rest := ""
+		if i+1 < len(a) {
+			rest = string(a[i+1:])
 		}
-		result = append(result, sortDigits[(nxt+36)/2])
-		return string(result)
+		return string(result) + sortKeyBetween(rest, "")
 	}
 }
 
@@ -78,15 +79,40 @@ func keyInRange(k, lower, upper string) bool {
 }
 
 // materializeKeys assigns a fresh, evenly spaced key to every id in order.
+// All keys get one width, the smallest that leaves a free slot between
+// neighbours, so the keys stay short: appending each after the last grew them
+// by a character every six members (~100 characters at 600; now 2).
+// No key ends in 0 — nothing fits between "a" and "a0".
 func materializeKeys(ids []string) map[string]string {
 	out := map[string]string{}
-	prev := ""
-	for _, id := range ids {
-		k := sortKeyBetween(prev, "")
-		out[id] = k
-		prev = k
+	n := len(ids)
+	if n == 0 {
+		return out
+	}
+	width, space := 1, 36
+	for space/(n+1) < 2 {
+		width++
+		space *= 36
+	}
+	step := space / (n + 1)
+	for i, id := range ids {
+		v := (i + 1) * step
+		if v%36 == 0 {
+			v++
+		}
+		out[id] = base36Key(v, width)
 	}
 	return out
+}
+
+// base36Key renders v in base 36 with sortDigits, zero-padded to width.
+func base36Key(v, width int) string {
+	b := make([]byte, width)
+	for i := width - 1; i >= 0; i-- {
+		b[i] = sortDigits[v%36]
+		v /= 36
+	}
+	return string(b)
 }
 
 // baseOrder returns member ids in `rule` order (name: by filename, then id).
