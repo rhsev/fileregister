@@ -63,6 +63,19 @@ func writeParse(line string) writeItem {
 	if t, _ := data["type"].(string); t != "ref" {
 		return writeItem{status: writeStatusErr(targetStr, "v1 supports type:ref records only")}
 	}
+	// The stream is one membership per line: binder is a single string. An
+	// array used to be stored as its own text, `["a"]`, as a binder name.
+	if b, ok := data["binder"]; ok && b != nil {
+		if _, isString := b.(string); !isString {
+			return writeItem{status: writeStatusErr(targetStr, "binder must be one string per line (one membership each)")}
+		}
+	}
+	// aka and tags are lists in a record; a single string is one element.
+	for _, k := range []string{"aka", "tags"} {
+		if s, ok := data[k].(string); ok {
+			data[k] = []any{s}
+		}
+	}
 	rec := index.NewRefRecord(data)
 	if !rec.Valid() {
 		return writeItem{status: writeStatusErr(targetStr, "missing required field: id")}
@@ -79,6 +92,24 @@ func writeParse(line string) writeItem {
 		rec:     rec,
 		refPath: index.AsString(data["_ref_path"]),
 	}
+}
+
+// writeIndexProblem says why rec must not be written to target in the index
+// refs, or "": its id is recorded in another file of the index (add updates a
+// record in its own file; a second record would fork the identity), or one of
+// its aka handles belongs to another record.
+func writeIndexProblem(refs []map[string]any, rec index.RefRecord, target string) string {
+	for _, r := range refs {
+		if index.AsString(r["id"]) == rec.ID && !index.PathsEqual(index.AsString(r["_note_file"]), target) {
+			return "id " + rec.ID + " is recorded in " + filepath.Base(index.AsString(r["_note_file"])) + " — write it there"
+		}
+	}
+	for _, h := range index.AsStrings(rec.Aka) {
+		if other := index.ResolveKey(refs, h); other != nil && index.AsString(other["id"]) != rec.ID {
+			return "aka '" + h + "' already resolves to record " + index.AsString(other["id"])
+		}
+	}
+	return ""
 }
 
 func cmdWrite(args []string) int {
@@ -119,6 +150,34 @@ func cmdWrite(args []string) int {
 		items[i] = writeParse(line)
 	}
 
+	// A .jsonl target inside a collections/ folder is part of an index: the
+	// record must not fork an id recorded in another of its files, nor take
+	// an aka another record has. Each index is read once, in full.
+	indexes := map[string][]map[string]any{}
+	for i := range items {
+		it := &items[i]
+		if !it.queued || !it.isJSONL {
+			continue
+		}
+		col := filepath.Dir(it.target)
+		if filepath.Base(col) != "collections" {
+			continue
+		}
+		refs, seen := indexes[col]
+		if !seen {
+			var err error
+			if refs, err = index.ReadAllRefs(filepath.Dir(col)); err != nil {
+				fmt.Fprintln(os.Stderr, "Error:", err)
+				return 1
+			}
+			indexes[col] = refs
+		}
+		if why := writeIndexProblem(refs, it.rec, it.target); why != "" {
+			it.queued = false
+			it.status = writeStatusErr(it.target, why)
+		}
+	}
+
 	// Group queued records by (format, target); within-target input order is
 	// preserved, so per-record actions stay aligned.
 	groups := map[string][]int{}
@@ -153,7 +212,9 @@ func cmdWrite(args []string) int {
 				}
 				continue
 			}
-			ensureSchemaDir(filepath.Dir(target)) // write extends schema-3 JSONL too
+			if dir := filepath.Dir(target); filepath.Base(dir) == "collections" {
+				ensureSchemaDir(dir) // write extends schema-3 JSONL too — only an index's
+			}
 			actions = acts
 		} else {
 			actions = mdFileWriteMany(recs, target)
@@ -163,13 +224,25 @@ func cmdWrite(args []string) int {
 				items[i].status = writeStatusErr(target, "write failed")
 				continue
 			}
-			// xattr membership for _ref_path (idempotent).
+			// Membership on the file for _ref_path (idempotent), as add does it:
+			// through the record's backend, with ★. Only an index write is a
+			// membership — a Markdown block is annotation — and a bookmark
+			// (no binder) has none.
 			xattrStatus := "skipped"
-			if items[i].refPath != "" {
+			rec := items[i].rec
+			if items[i].refPath != "" && items[i].isJSONL && rec.Binder != "" {
 				if !index.FileExists(items[i].refPath) {
 					xattrStatus = "missing"
 				} else {
-					xattrStatus = index.ItemProjectsAdd(items[i].refPath, items[i].rec.Binder)
+					backend := index.XattrBackend(rec.ToH())
+					for _, r := range indexes[filepath.Dir(target)] {
+						if index.AsString(r["id"]) == rec.ID {
+							backend = index.XattrBackend(r) // the stored backend wins, as in add
+							break
+						}
+					}
+					xattrStatus = index.XattrBackendAdd(items[i].refPath, rec.Binder, backend)
+					index.ManagedMark(items[i].refPath)
 				}
 			}
 			items[i].status = writeStatusOK(target, actions[j], xattrStatus)

@@ -505,7 +505,9 @@ Collection lifecycle (add, remove, refresh, audit, repair, rename, cleanup, rein
 
 The `write` subcommand (`register write`) is the record-write helper. It reads JSONL records from stdin and ensures each one exists in its target file, dispatching on the target extension: a YAML block appended to a Markdown note, or one JSON line appended to an JSONL store. `register add` invokes it internally; the other lifecycle subcommands modify records in place via the Markdown editor (`md_writer.go`) or the JSONL editor (`jsonl_editor.go`) — chosen by the record's `_note_file` extension — when more surgical edits (drop a field, rename within a record) are needed.
 
-`register write` also handles the derived `kMDItemProjects` layer as an opt-in side-effect via the `_ref_path` input field. This is the path used by `register add` with `backend=itemprojects` (the default). For `backend=tags`, `register add` invokes `Tags.add` separately after the write call; for `backend=none`, no xattr write occurs.
+`register write` also handles the membership layer as an opt-in side-effect via the `_ref_path` input field, the way `add` does: the binder goes to the file through the record's backend (the stored one for an existing record, else the input's `xattr`; `none` writes nothing), plus the ★ marker. Only a write to an index `.jsonl` is a membership — a Markdown block is annotation — and a record without binder (a bookmark) has none.
+
+A `.jsonl` target inside a `collections/` folder is part of an index, and `write` keeps its rules: a record whose id is recorded in *another* file of the index, or whose aka belongs to another record, is refused (the status line says where). `SCHEMA` is stamped only there. `binder` must be a single string — the stream is one membership per line.
 
 The subcommand was originally a standalone tool named `grubber-write`, conceived as a symmetric counterpart to grubber's extraction engine. It folded into this repository (and into the unified `register` binary) when it became clear that fileregister is its only consumer and that the lifecycle code needed direct MdEditor access for the non-append operations. The `write` subcommand remains useful for its specific job: idempotent append of one ref block per input record.
 
@@ -554,7 +556,7 @@ Required fields:
 
 Optional fields:
 - `filename`, `kind`, `aka`, `tags`, `xattr` — record content
-- `_ref_path` — path to the referenced file. When set and the file exists, `register write` adds the `binder` to that file's `kMDItemProjects` array (idempotent)
+- `_ref_path` — path to the referenced file. When set, the file exists and the target is an index `.jsonl`, `register write` writes the membership to the file through the record's backend and sets ★ (idempotent)
 
 Example:
 ```json
