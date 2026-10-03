@@ -88,6 +88,16 @@ func removeTarget(nd, binder, targetArg string) int {
 		return 1
 	}
 
+	// The bookmark db tells a registered file from a copy of it (OwnIDs).
+	var db map[string]string
+	if !urlMode {
+		var err error
+		if db, err = index.LoadDB(); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			return 1
+		}
+	}
+
 	records := recordsForBinder(mustRefs(nd), binder)
 	if len(records) == 0 {
 		fmt.Fprintf(os.Stderr, "No refs found for binder '%s'\n", binder)
@@ -103,7 +113,7 @@ func removeTarget(nd, binder, targetArg string) int {
 				matching = append(matching, rec)
 			}
 		}
-	} else if fileIDs := index.OfFileIDs(filePath); len(fileIDs) > 0 {
+	} else if fileIDs := index.OwnIDs(db, filePath); len(fileIDs) > 0 {
 		idSet := map[string]bool{}
 		for _, id := range fileIDs {
 			idSet[id] = true
@@ -186,7 +196,7 @@ func removeTarget(nd, binder, targetArg string) int {
 		// `matching`) yet still hold the file in another binder — enumerate the
 		// file's own ids, not just the matched ones. Index re-read post-removal.
 		fileIDs := map[string]bool{}
-		for _, id := range index.OfFileIDs(filePath) {
+		for _, id := range index.OwnIDs(db, filePath) {
 			fileIDs[id] = true
 		}
 		for _, m := range matching { // fallback when the id xattr was stripped

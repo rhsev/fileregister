@@ -186,22 +186,42 @@ func BatchGet(ids []string) (map[string]string, error) {
 	return results, err
 }
 
-// existingIDIn returns the first id in the file's kMDItemInformation xattr that is
-// a key in db, or "" if none.
-func existingIDIn(db map[string]string, path string) string {
-	resp, err := fileAnchor().request(map[string]any{"op": "get_meta", "path": path, "key": "id"})
+// OwnIDs returns the ids stamped on the file that are really its own: the
+// kMDItemInformation ids, else the #S copy (iCloud Drive strips the former),
+// minus any whose bookmark resolves to a different existing file. cp and
+// Finder's Duplicate copy the id xattrs, so a copy carries the original's id,
+// and only the bookmark tells the two apart. An id with no local bookmark, or
+// one that no longer resolves, still counts: that is how a moved file, or one
+// synced from another Mac, is recognized.
+func OwnIDs(db map[string]string, path string) []string {
+	var own []string
+	for _, id := range OfFileIDs(path) {
+		if blob, ok := db[id]; ok && isCopyOf(blob, path) {
+			continue
+		}
+		own = append(own, id)
+	}
+	return own
+}
+
+// isCopyOf reports whether blob resolves to an existing file other than path.
+func isCopyOf(blob, path string) bool {
+	resp, err := fileAnchor().request(map[string]any{"op": "resolve", "blob": blob})
 	if err != nil {
-		return ""
+		return false
 	}
-	if ok, _ := resp["ok"].(bool); !ok {
-		return ""
+	resolved, _ := resp["path"].(string)
+	if ok, _ := resp["ok"].(bool); !ok || resolved == "" {
+		return false
 	}
-	values, _ := resp["values"].([]any)
-	for _, v := range values {
-		if s, ok := v.(string); ok {
-			if _, exists := db[s]; exists {
-				return s
-			}
+	return !PathsEqual(resolved, path) && FileExists(resolved)
+}
+
+// existingIDIn returns the file's own id that has a bookmark in db, or "".
+func existingIDIn(db map[string]string, path string) string {
+	for _, id := range OwnIDs(db, path) {
+		if _, ok := db[id]; ok {
+			return id
 		}
 	}
 	return ""
@@ -214,8 +234,20 @@ func ExistingIDIn(db map[string]string, path string) string {
 
 // RegisterIn mints a bookmark blob for path under id, writes the id xattrs, and
 // stashes the blob in the already-loaded db (caller persists). Returns id, or ""
-// when the engine produced no blob (a soft failure).
+// when the engine produced no blob (a soft failure). The id is added to the
+// file's kMDItemInformation ids; registerFresh replaces them instead.
 func RegisterIn(db map[string]string, path, id string) (string, error) {
+	return registerIn(db, path, id, "add")
+}
+
+// registerFresh is RegisterIn for a file getting a new id. Any ids already on
+// it are not its own (a copy's, or leftovers), and would make an id lookup
+// find it next to the file they belong to.
+func registerFresh(db map[string]string, path, id string) (string, error) {
+	return registerIn(db, path, id, "set")
+}
+
+func registerIn(db map[string]string, path, id, idMode string) (string, error) {
 	resp, err := fileAnchor().request(map[string]any{"op": "save", "path": path})
 	if err != nil {
 		return "", err
@@ -227,7 +259,7 @@ func RegisterIn(db map[string]string, path, id string) (string, error) {
 	if blob == "" {
 		return "", nil
 	}
-	setDescriptionXattr(path, id)
+	setDescriptionXattr(path, id, idMode)
 	SetSyncXattr(path, id)
 	db[id] = blob
 	return id, nil
@@ -250,7 +282,7 @@ func BookmarkAdd(path, id string) (string, error) {
 		}
 	}
 	id = NextFreeID(db, id)
-	newID, err := RegisterIn(db, path, id)
+	newID, err := registerFresh(db, path, id)
 	if err != nil {
 		return "", err
 	}
@@ -295,7 +327,7 @@ func AddMany(paths []string, reserved map[string]bool) ([]BookmarkResult, error)
 		for reserved[id] {
 			id = NextFreeID(db, GenerateID())
 		}
-		if newID, err := RegisterIn(db, path, id); err == nil && newID != "" {
+		if newID, err := registerFresh(db, path, id); err == nil && newID != "" {
 			results = append(results, BookmarkResult{Path: path, ID: id})
 			dirty = true
 		} else {
@@ -334,10 +366,10 @@ func Rebind(id, path string) (string, error) {
 	return id, nil
 }
 
-// setDescriptionXattr appends id to the kMDItemInformation xattr (space-separated,
-// idempotent, multi-valued).
-func setDescriptionXattr(path, id string) {
-	fileAnchor().request(map[string]any{"op": "set_meta", "path": path, "key": "id", "value": id, "mode": "add"})
+// setDescriptionXattr writes id to the kMDItemInformation xattr (space-separated,
+// multi-valued): mode "add" appends it idempotently, "set" makes it the only one.
+func setDescriptionXattr(path, id, mode string) {
+	fileAnchor().request(map[string]any{"op": "set_meta", "path": path, "key": "id", "value": id, "mode": mode})
 }
 
 // SetSyncXattr writes id to the syncable cross-device alias (com.fileregister.id#S),
