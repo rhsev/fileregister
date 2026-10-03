@@ -14,7 +14,7 @@ import (
 
 // registerVersion is the one version string; every subcommand's --version
 // prints it.
-const registerVersion = "1.3.0"
+const registerVersion = "1.4.0"
 
 // ---------------------------------------------------------------------------
 // Resolve the notes directory
