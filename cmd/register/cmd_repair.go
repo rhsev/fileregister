@@ -341,6 +341,11 @@ func cmdRepair(args []string) int {
 		fmt.Println("")
 		fmt.Println("Hint: run with --interactive to provide paths manually.")
 	}
+	// Non-zero while something needs the user, so a monitor can tell. A file
+	// on a volume that is not mounted needs nothing but the volume.
+	if len(notFound) > 0 || partial > 0 {
+		return 1
+	}
 	return 0
 }
 

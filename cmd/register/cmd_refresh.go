@@ -202,5 +202,9 @@ func cmdRefresh(args []string) int {
 		}
 	}
 
+	// Non-zero while something needs the user, so a monitor can tell.
+	if failed > 0 || len(broken) > 0 || len(missing) > 0 {
+		return 1
+	}
 	return 0
 }

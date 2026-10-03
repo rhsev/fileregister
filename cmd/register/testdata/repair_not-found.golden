@@ -1,4 +1,4 @@
-exit: 0
+exit: 1
 === stdout ===
 Found 1 broken bookmark(s).
 

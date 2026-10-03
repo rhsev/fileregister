@@ -1,4 +1,4 @@
-exit: 0
+exit: 1
 === stdout ===
 [dry-run] (itemprojects) doc.txt → Docs
 

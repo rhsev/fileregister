@@ -341,6 +341,8 @@ Pushes index state to macOS metadata. Reads all active `type: ref` records from 
 - `tags` → ensures binder name in `kMDItemUserTags`
 - `none` → skips xattr; no-op
 
+Exit status is 1 when a metadata write failed, a bookmark is broken or a file is missing — anything that needs the user.
+
 Direction is always index → xattr. Records are the source; xattr is the cache. The bookmark blob and `kMDItemInformation` are maintained by `register add` and `register repair`; refresh does not touch them — but it does backfill the regenerable id xattr (`com.fileregister.id#S`) on each resolved file, since that value derives entirely from the record's `id`.
 
 Reports:
@@ -362,6 +364,8 @@ For records with broken bookmarks (typical after cross-volume move or transfer t
    Candidates in the Trash or a backup (`.Trash`, `.Trashes`, Time Machine), and files that are another record's (they carry a registered id of their own), are ignored.
 2. If found: re-bind the bookmark **under the file's existing id** via `Bookmarks.rebind` (a fresh blob stored under the same id), then refresh the id xattrs and the binder xattr layer. The id is the file's **permanent identity** — only the broken blob is renewed, so nothing is propagated to the index or annotations. This happens **without asking only** for a single candidate from stage 1 (the id) on the volume the file was on — a hit by name, or on another volume, is some file that may or may not be this one.
 3. Otherwise: list the candidates; with `--interactive`, prompt to choose (also for a single one)
+
+Exit status is 1 while a record stays unresolved or a repaired file is missing metadata — a monitor can tell. Records on a volume that is not mounted do not count: they need only the volume.
 4. If not found: report; in `--interactive` mode prompt for an explicit path
 
 ### `register audit`
