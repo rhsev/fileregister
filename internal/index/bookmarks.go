@@ -222,15 +222,38 @@ func OwnIDs(db map[string]string, path string) []string {
 
 // isCopyOf reports whether blob resolves to an existing file other than path.
 func isCopyOf(blob, path string) bool {
+	return copyOriginal(blob, path) != ""
+}
+
+// copyOriginal returns the existing file other than path that blob resolves
+// to, or "".
+func copyOriginal(blob, path string) string {
 	resp, err := fileAnchor().request(map[string]any{"op": "resolve", "blob": blob})
 	if err != nil {
-		return false
+		return ""
 	}
 	resolved, _ := resp["path"].(string)
 	if ok, _ := resp["ok"].(bool); !ok || resolved == "" {
-		return false
+		return ""
 	}
-	return !PathsEqual(resolved, path) && FileExists(resolved)
+	if PathsEqual(resolved, path) || !FileExists(resolved) {
+		return ""
+	}
+	return resolved
+}
+
+// CopiedFrom tells whether path is a copy of a registered file: it carries
+// that file's id, whose bookmark resolves to the other file. Returns the id
+// and the original's path, or "", "".
+func CopiedFrom(db map[string]string, path string) (string, string) {
+	for _, id := range OfFileIDs(path) {
+		if blob, ok := db[id]; ok {
+			if orig := copyOriginal(blob, path); orig != "" {
+				return id, orig
+			}
+		}
+	}
+	return "", ""
 }
 
 // FileIDsByName maps each file record's filename (NFC) to its ids.

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/rhsev/fileregister/internal/index"
+
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -190,5 +192,31 @@ func TestReadOnlyFileKeepsOneIdentity(t *testing.T) {
 	recs := inboxByFilename(t, notes)
 	if len(recs) != 1 || binders(recs["locked.txt"]) != "x,y" {
 		t.Errorf("a second identity was minted: %v", recs)
+	}
+}
+
+// audit names a copy as a copy of its registered original.
+func TestCopiedFromNamesTheOriginal(t *testing.T) {
+	anchor := engineBin(t)
+	env := identityEnv(t, t.TempDir(), anchor)
+	dir := t.TempDir()
+	orig, dup := filepath.Join(dir, "a.txt"), filepath.Join(dir, "a Kopie.txt")
+	writeFile(t, orig, "a")
+	if _, e, code := runGoAdd(t, env, orig, "--binder", "x"); code != 0 {
+		t.Fatalf("add: %d %s", code, e)
+	}
+	exec.Command("cp", orig, dup).Run()
+
+	restore := setEnv(t, env)
+	defer restore()
+	index.ResetEngine()
+	defer index.ResetEngine()
+	db, _ := index.LoadDB()
+	id, from := index.CopiedFrom(db, dup)
+	if id == "" || !index.PathsEqual(from, orig) {
+		t.Errorf("CopiedFrom(copy) = %q, %q", id, from)
+	}
+	if id, _ := index.CopiedFrom(db, orig); id != "" {
+		t.Errorf("the original counts as a copy of %s", id)
 	}
 }

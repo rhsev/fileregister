@@ -13,20 +13,35 @@ import (
 )
 
 // ghostReport prints a ghost entry (a file tagged with a binder that the index
-// doesn't record) and returns 1, or 0 if it's a known record.
-func ghostReport(fpath, binderName, layer string, recordIndex map[string]bool) int {
+// doesn't record) and returns "ghost", or "" if it's a known record. A copy of a
+// registered file (cp, Finder's Duplicate, a copied folder) carries the
+// original's metadata; adding it would only register a duplicate, so it is
+// named as a copy instead, and "copy" returned.
+func ghostReport(fpath, binderName, layer string, recordIndex map[string]bool, db map[string]string) string {
 	fpath = strings.TrimSpace(fpath)
 	if fpath == "" {
-		return 0
+		return ""
 	}
 	key := index.PathKey(fpath) + "|" + binderName
 	if recordIndex[key] {
-		return 0
+		return ""
+	}
+	if id, orig := index.CopiedFrom(db, fpath); id != "" {
+		fmt.Printf("  COPY (%s) [%s] %s\n", layer, binderName, filepath.Base(fpath))
+		fmt.Printf("    path: %s\n", fpath)
+		fmt.Printf("    copy of record %s: %s\n", id, orig)
+		fmt.Println("    → nothing to do; it carries the original's metadata. Add it only if it is meant to be a file of its own.")
+		return "copy"
 	}
 	fmt.Printf("  GHOST (%s) [%s] %s\n", layer, binderName, filepath.Base(fpath))
 	fmt.Printf("    path: %s\n", fpath)
-	fmt.Printf("    → run: register add '%s' --binder %s\n", fpath, binderName)
-	return 1
+	fmt.Printf("    → run: register add %s --binder %s\n", shellQuote(fpath), shellQuote(binderName))
+	return "ghost"
+}
+
+// shellQuote quotes s for a command line the user may paste into a shell.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // binderTag renders a record's binder list for a report line; a binderless
@@ -72,6 +87,11 @@ func cmdAudit(args []string) int {
 	fmt.Fprintln(os.Stderr, "Collecting type:ref records…")
 	all, refsOK := loadRefs(nd)
 	if !refsOK {
+		return 1
+	}
+	db, err := index.LoadDB()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		return 1
 	}
 	var active, bookmarks []map[string]any
@@ -270,21 +290,21 @@ func cmdAudit(args []string) int {
 		}
 	}
 
-	ghostCount := 0
+	found := map[string]int{}
 	for _, binderName := range binderNames {
 		for _, f := range index.ByXattrItemProjects(binderName, "") {
-			ghostCount += ghostReport(f, binderName, "itemprojects", recordIndex)
+			found[ghostReport(f, binderName, "itemprojects", recordIndex, db)]++
 		}
 		for _, f := range index.ByXattrTags(binderName, "") {
-			ghostCount += ghostReport(f, binderName, "tags", recordIndex)
+			found[ghostReport(f, binderName, "tags", recordIndex, db)]++
 		}
 	}
 
-	if ghostCount == 0 {
+	if found["ghost"]+found["copy"] == 0 {
 		fmt.Println("No ghost xattr entries found.")
 	} else {
 		fmt.Println("")
-		fmt.Printf("%d ghost entry(ies) found.\n", ghostCount)
+		fmt.Printf("%d ghost entry(ies), %d copy(ies) of registered files found.\n", found["ghost"], found["copy"])
 	}
 	return 0
 }
