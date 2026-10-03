@@ -74,7 +74,6 @@ func loadGrubberConfig(cfgPath string) (*grubberConfig, error) {
 	return &cfg, nil
 }
 
-
 func notesDir() (string, error) {
 	grubberSet := os.Getenv("GRUBBER_SET")
 	if grubberSet != "" {

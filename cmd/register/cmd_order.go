@@ -36,7 +36,6 @@ type orderCtx struct {
 	base, displayed []string
 }
 
-
 func buildOrderContext(binder, noteOpt string) (*orderCtx, bool) {
 	nd, err := notesDir()
 	if err != nil {
