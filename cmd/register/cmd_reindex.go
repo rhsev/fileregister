@@ -117,7 +117,30 @@ func cmdReindex(args []string) int {
 		}
 	}
 
+	// A hand-written block with neither an id nor a known aka cannot be
+	// indexed; say so instead of calling the index complete.
+	var unnamed []string
+	for _, r := range mdRecs {
+		if strings.TrimSpace(index.AsString(r["id"])) == "" {
+			label := strings.Join(index.AsStrings(r["aka"]), ", ")
+			if label == "" {
+				label = "(no id, no aka)"
+			}
+			unnamed = append(unnamed, fmt.Sprintf("%s in %s", label, filepath.Base(index.AsString(r["_note_file"]))))
+		}
+	}
+	if len(unnamed) > 0 {
+		fmt.Fprintf(os.Stderr, "%d block(s) have no id and no aka the index knows — give them an id to index them:\n", len(unnamed))
+		for _, u := range unnamed {
+			fmt.Fprintf(os.Stderr, "  %s\n", u)
+		}
+	}
+
 	if len(missing) == 0 {
+		if len(unnamed) > 0 {
+			fmt.Printf("Nothing to add: %d record(s) indexed; %d block(s) could not be (see above).\n", len(indexed), len(unnamed))
+			return 0
+		}
 		fmt.Printf("Index is complete: %d record(s), nothing to add.\n", len(indexed))
 		return 0
 	}
