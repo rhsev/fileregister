@@ -32,8 +32,11 @@ STAGE="$OUT/fileregister-macos-$ARCH"
 rm -rf "$OUT"
 mkdir -p "$STAGE/libexec"
 
-echo "==> register (Go, $ARCH)"
-CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" go build -o "$STAGE/register" ./cmd/register
+# The version comes from the tag, as in the Makefile: what --version prints is
+# what was tagged, or visibly not (1.4.0-2-g1a2b3c4-dirty).
+VERSION="$(git describe --tags --dirty --always | sed 's/^v//')"
+echo "==> register $VERSION (Go, $ARCH)"
+CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" go build -ldflags="-X main.registerVersion=$VERSION" -o "$STAGE/register" ./cmd/register
 
 echo "==> fileanchor (Swift, $ARCH) @ $FILEANCHOR_VERSION"
 if [ -n "${FILEANCHOR_SRC:-}" ]; then

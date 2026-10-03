@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -13,8 +14,20 @@ import (
 )
 
 // registerVersion is the one version string; every subcommand's --version
-// prints it.
-const registerVersion = "1.4.0"
+// prints it. Builds through the Makefile or the release script stamp it from
+// the tag (-ldflags -X), because a literal here shipped one release behind the
+// tag. `go install …@v1.4.0` passes no flags, so init falls back to the module
+// version Go records in the binary; only a build without either says "dev".
+var registerVersion = "dev"
+
+func init() {
+	if registerVersion != "dev" {
+		return
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		registerVersion = strings.TrimPrefix(bi.Main.Version, "v")
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Resolve the notes directory

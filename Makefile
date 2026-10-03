@@ -15,10 +15,15 @@ FILEANCHOR_VERSION ?= 1.2.0
 # same way half the suite needs the engine. Same rule: pin a tag.
 GRUBBER_VERSION ?= v0.18.0
 
+# Stamp the version from the tag rather than trusting a literal in main.go,
+# which shipped 1.4.0 as 1.3.0. A dirty or untagged tree says so in --version.
+VERSION := $(shell git describe --tags --dirty --always 2>/dev/null | sed 's/^v//')
+LDFLAGS := -X main.registerVersion=$(VERSION)
+
 .PHONY: build fileanchor grubber link unlink install uninstall install-services uninstall-services test
 
 build:
-	go build -o $(CURDIR)/$(BIN) ./cmd/register
+	go build -ldflags="$(LDFLAGS)" -o $(CURDIR)/$(BIN) ./cmd/register
 
 # Build the fileanchor engine from source at the pinned tag. Needs a Swift
 # toolchain (Xcode or the Command Line Tools); macOS arm64, 13 or later.
