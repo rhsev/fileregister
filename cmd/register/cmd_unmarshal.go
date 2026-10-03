@@ -52,6 +52,58 @@ func containedJoin(base, rel string) (string, bool) {
 	return joined, true
 }
 
+// stagedFile returns the staged source for a manifest path, or why it cannot
+// be used. It must be a regular file that really lies inside the extracted
+// container: the containment check above is lexical, and a symlink in the
+// archive (to a host file, or a directory link leading out) would otherwise
+// be followed and the host file imported.
+func stagedFile(inner, rel string) (string, string) {
+	src, ok := containedJoin(inner, rel)
+	if !ok {
+		return src, "file path escapes the container (" + rel + ")"
+	}
+	fi, err := os.Lstat(src)
+	if err != nil {
+		return src, "staged file missing"
+	}
+	if !fi.Mode().IsRegular() {
+		return src, "not a regular file in the container (" + rel + ")"
+	}
+	innerReal, err1 := filepath.EvalSymlinks(inner)
+	real, err2 := filepath.EvalSymlinks(src)
+	if err1 != nil || err2 != nil {
+		return src, "staged file missing"
+	}
+	if r, err := filepath.Rel(innerReal, real); err != nil || r == ".." || strings.HasPrefix(r, ".."+string(filepath.Separator)) {
+		return src, "file path escapes the container (" + rel + ")"
+	}
+	return src, ""
+}
+
+// protectedTarget says why a container may not write target, or "". Inside
+// collections/ a .jsonl would be read as index — bypassing every check add
+// makes — and --force would let a container replace inbox.jsonl, SCHEMA or an
+// annotation note. A symlink target is never written through, anywhere.
+func protectedTarget(target string, inVault bool) string {
+	fi, err := os.Lstat(target)
+	if err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return "a symlink"
+	}
+	if !inVault {
+		return ""
+	}
+	base := strings.ToLower(filepath.Base(target))
+	switch {
+	case strings.HasSuffix(base, ".jsonl"):
+		return "an index file (.jsonl)"
+	case base == "schema" || base == ".register.lock":
+		return "fileregister's own bookkeeping"
+	case err == nil && strings.HasSuffix(base, ".md"):
+		return "an existing annotation note"
+	}
+	return ""
+}
+
 // rejectKeys returns a copy of m without the given keys.
 func rejectKeys(m map[string]any, keys ...string) map[string]any {
 	drop := map[string]bool{}
@@ -113,6 +165,11 @@ func cmdUnmarshal(args []string) int {
 	// Extract into a recognizable import staging folder; conflicts stay here.
 	importDir := filepath.Join(collections, "import")
 	name := containerExtRe.ReplaceAllString(filepath.Base(container), "")
+	// "...tar.gz" leaves "..", ".tar.gz" leaves "": either would make staging
+	// collections/ or import/ itself, which is removed just below.
+	if name == "" || name == "." || name == ".." {
+		name = "container"
+	}
 	staging := filepath.Join(importDir, name)
 	os.RemoveAll(staging)
 	os.MkdirAll(staging, 0755)
@@ -251,11 +308,11 @@ func cmdUnmarshal(args []string) int {
 		// The staged source must stay inside the extracted container — a
 		// manifest `file` of ../../etc/passwd would otherwise read (and later
 		// os.Remove) an arbitrary host file. Checked after cleaning, so
-		// interior `..` can't slip past.
-		src, srcOK := containedJoin(inner, index.AsString(fRel))
-		if !srcOK {
+		// interior `..` can't slip past, and after resolving symlinks.
+		src, why := stagedFile(inner, index.AsString(fRel))
+		if why != "" {
 			parked++
-			reasons = append(reasons, fmt.Sprintf("%s — file path escapes the container (%s)", label, index.AsString(fRel)))
+			reasons = append(reasons, fmt.Sprintf("%s — %s", label, why))
 			continue
 		}
 
@@ -272,14 +329,14 @@ func cmdUnmarshal(args []string) int {
 			continue
 		}
 
+		if why := protectedTarget(target, inVault); why != "" {
+			parked++
+			reasons = append(reasons, fmt.Sprintf("%s — target is %s (%s)", label, why, target))
+			continue
+		}
 		if index.FileExists(target) && !force {
 			parked++
 			reasons = append(reasons, fmt.Sprintf("%s — target exists (%s)", filepath.Base(target), target))
-			continue
-		}
-		if !index.FileExists(src) {
-			parked++
-			reasons = append(reasons, fmt.Sprintf("%s — staged file missing", label))
 			continue
 		}
 
@@ -334,8 +391,14 @@ func cmdUnmarshal(args []string) int {
 	placedNotes := 0
 	var keptNotes, scatteredNotes []string
 	for _, n := range noteLines {
-		src, srcOK := containedJoin(inner, index.AsString(n["file"]))
-		if !srcOK || !index.FileExists(src) {
+		src, why := stagedFile(inner, index.AsString(n["file"]))
+		if why != "" {
+			continue
+		}
+		// A note is Markdown; anything else placed in collections/ could be
+		// read as index (.jsonl) or bookkeeping.
+		if !strings.EqualFold(filepath.Ext(src), ".md") {
+			keptNotes = append(keptNotes, fmt.Sprintf("%s — not a Markdown note (kept staged)", filepath.Base(src)))
 			continue
 		}
 		if _, inVault := containedJoin(jsonlRoot, index.AsString(n["origin"])); !inVault {
