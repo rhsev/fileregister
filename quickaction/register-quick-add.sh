@@ -20,9 +20,10 @@ ENV_FILE="$HOME/.config/fileregister/quickaction.env"
 [[ -n "${GRUBBER_NOTES:-}" ]]  && export GRUBBER_NOTES
 [[ -n "${GRUBBER_CONFIG:-}" ]] && export GRUBBER_CONFIG
 
-# Automator's PATH is minimal. `register` is self-contained, but keep the usual
-# prefixes on PATH so a `fileanchor` installed there still resolves.
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+# Automator's PATH is minimal, and register needs its fileanchor engine: keep
+# ~/bin (where `make link` puts both) and the usual prefixes on PATH. Without
+# ~/bin, `of` found no engine and answered with an error.
+export PATH="$HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 NEW_LABEL="New binder…"
 CACHE_DIR="$HOME/.cache/fileregister"
