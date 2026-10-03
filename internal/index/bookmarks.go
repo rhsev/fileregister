@@ -140,14 +140,30 @@ func BookmarkGet(id string) (string, error) {
 	return "", nil
 }
 
-// BatchGet resolves many ids in one shot through the single persistent engine
-// process. Returns id → path, with "" for a missing blob or an unresolvable one.
-// A resolve request is issued even for a missing blob (empty blob string) so the
-// response stream stays index-aligned with the input. An engine-level failure
-// is returned as the error — responses received before the failure are kept,
-// so callers can tell "engine broken" apart from "file gone".
+// Resolution is one id's bookmark outcome: Path when it resolves, else
+// LastPath — where the file was when it was bookmarked ("" if unknown).
+type Resolution struct {
+	Path, LastPath string
+}
+
+// BatchGet resolves many ids in one shot: id → path, "" for a missing blob or
+// an unresolvable one. See BatchResolve.
 func BatchGet(ids []string) (map[string]string, error) {
-	results := map[string]string{}
+	res, err := BatchResolve(ids)
+	paths := make(map[string]string, len(res))
+	for id, r := range res {
+		paths[id] = r.Path
+	}
+	return paths, err
+}
+
+// BatchResolve resolves many ids through the single persistent engine process.
+// A resolve request is issued even for a missing blob (empty blob string) so
+// the response stream stays index-aligned with the input. An engine-level
+// failure is returned as the error — responses received before the failure are
+// kept, so callers can tell "engine broken" apart from "file gone".
+func BatchResolve(ids []string) (map[string]Resolution, error) {
+	results := map[string]Resolution{}
 	if len(ids) == 0 {
 		return results, nil
 	}
@@ -171,17 +187,15 @@ func BatchGet(ids []string) (map[string]string, error) {
 
 	resps, err := fileAnchor().batch(reqs)
 	for i, p := range pairs {
-		if !p.has {
-			results[p.id] = ""
-			continue
-		}
-		if i < len(resps) {
+		var r Resolution
+		if p.has && i < len(resps) {
 			if ok, _ := resps[i]["ok"].(bool); ok {
-				results[p.id], _ = resps[i]["path"].(string)
-				continue
+				r.Path, _ = resps[i]["path"].(string)
+			} else {
+				r.LastPath, _ = resps[i]["last_path"].(string)
 			}
 		}
-		results[p.id] = ""
+		results[p.id] = r
 	}
 	return results, err
 }

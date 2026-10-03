@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -26,10 +27,15 @@ func repairLabel(rec map[string]any) string {
 
 // locateCandidates finds candidate paths for a relocated file, by reliability:
 // id xattr → filename → xattr-backend + basename. Each stage runs only while
-// nothing has been found. Returns unique candidates.
-func locateCandidates(id, binder, filename, backend string) []string {
-	candidates := index.ByDescriptionID(id)
-	if len(candidates) == 0 && filename != "" {
+// nothing has been found. Returns unique candidates and whether they came
+// from the id stage — the only one that identifies the file, not just a file
+// with the same name.
+func locateCandidates(id, binder, filename, backend string) ([]string, bool) {
+	if c := index.ByDescriptionID(id); len(c) > 0 {
+		return uniqStrings(c, false), true
+	}
+	var candidates []string
+	if filename != "" {
 		candidates = index.ByFilename(filename)
 	}
 	if len(candidates) == 0 && filename != "" {
@@ -39,7 +45,56 @@ func locateCandidates(id, binder, filename, backend string) []string {
 			candidates = index.ByXattrItemProjects(binder, filename)
 		}
 	}
-	return uniqStrings(candidates, false)
+	return uniqStrings(candidates, false), false
+}
+
+// unmountedVolume returns the name of the volume p lies on when that volume
+// is not mounted, or "". A file there is not gone, just not reachable now.
+func unmountedVolume(p string) string {
+	rest, ok := strings.CutPrefix(p, "/Volumes/")
+	if !ok {
+		return ""
+	}
+	name, _, _ := strings.Cut(rest, "/")
+	if name == "" {
+		return ""
+	}
+	if _, err := os.Stat(filepath.Join("/Volumes", name)); err == nil {
+		return ""
+	}
+	return name
+}
+
+// volumeOf is the mount a path lies on as far as its path shows: /Volumes/<name>, or /.
+func volumeOf(p string) string {
+	if rest, ok := strings.CutPrefix(p, "/Volumes/"); ok {
+		name, _, _ := strings.Cut(rest, "/")
+		return "/Volumes/" + name
+	}
+	return "/"
+}
+
+// candidateProblem says why a found file must not be re-bound under id, or "".
+// A copy in the Trash or a backup, and a file that is another record's, carry
+// the same name — or even the same id — as the file that went missing.
+func candidateProblem(path, id string, db map[string]string, indexIDs map[string]bool) string {
+	for _, marker := range []string{"/.Trash/", "/.Trashes/", "/Backups.backupdb/", "/.MobileBackups/"} {
+		if strings.Contains(path, marker) {
+			return "in the Trash or a backup"
+		}
+	}
+	if strings.HasPrefix(path, "/Volumes/.timemachine/") {
+		return "in a Time Machine backup"
+	}
+	for _, own := range index.OwnIDs(db, path) {
+		if own == id {
+			continue
+		}
+		if _, ok := db[own]; ok || indexIDs[own] {
+			return "it is record " + own
+		}
+	}
+	return ""
 }
 
 // repairRecord re-binds the relocated file under its EXISTING id, refreshing the
@@ -95,8 +150,18 @@ func cmdRepair(args []string) int {
 		return 0
 	}
 
+	db, err := index.LoadDB()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
+	indexIDs := map[string]bool{}
+	for _, r := range active {
+		indexIDs[index.AsString(r["id"])] = true
+	}
+
 	fmt.Fprintf(os.Stderr, "Resolving bookmarks for %d record(s)…\n", len(active))
-	resolved, rerr := resolveRecordPaths(active)
+	resolved, rerr := resolveRecords(active)
 	if rerr != nil {
 		// With the engine failing, every record looks broken — repairing now
 		// would re-bind healthy bookmarks to whatever Spotlight finds.
@@ -106,7 +171,7 @@ func cmdRepair(args []string) int {
 
 	var broken []map[string]any
 	for _, r := range active {
-		if index.URLRef(r) || resolved[index.AsString(r["id"])] != "" {
+		if index.URLRef(r) || resolved[index.AsString(r["id"])].Path != "" {
 			continue
 		}
 		broken = append(broken, r)
@@ -123,6 +188,7 @@ func cmdRepair(args []string) int {
 	repaired := 0
 	type unresolvedT struct{ id, binder, title, noteFile string }
 	var notFound []unresolvedT
+	offline := map[string]int{}
 
 	for _, rec := range broken {
 		id := index.AsString(rec["id"])
@@ -132,19 +198,40 @@ func cmdRepair(args []string) int {
 
 		fmt.Printf("Repairing: [%s] %s\n", binderLabel, label)
 
+		// A file on a volume that is not mounted is not missing. Searching
+		// would find a copy elsewhere and bind the record to it for good.
+		lastPath := resolved[id].LastPath
+		if vol := unmountedVolume(lastPath); vol != "" {
+			fmt.Printf("  On volume '%s', which is not mounted — skipped\n\n", vol)
+			offline[vol]++
+			continue
+		}
+
 		firstBinder := ""
 		if len(binders) > 0 {
 			firstBinder = binders[0]
 		}
-		candidates := locateCandidates(id, firstBinder, index.AsString(rec["filename"]), index.XattrBackend(rec))
+		found, byID := locateCandidates(id, firstBinder, index.AsString(rec["filename"]), index.XattrBackend(rec))
+		var candidates []string
+		for _, c := range found {
+			if why := candidateProblem(c, id, db, indexIDs); why != "" {
+				fmt.Printf("  Ignored %s: %s\n", c, why)
+				continue
+			}
+			candidates = append(candidates, c)
+		}
 
+		// Only a single hit by id is taken without asking, and only on the
+		// volume the file was on. A hit by name is some file with that name.
 		newPath := ""
-		if len(candidates) == 1 {
+		sure := byID && len(candidates) == 1 &&
+			(lastPath == "" || volumeOf(lastPath) == volumeOf(candidates[0]))
+		if sure {
 			newPath = candidates[0]
 			fmt.Printf("  Found: %s\n", newPath)
-		} else if len(candidates) > 1 {
+		} else if len(candidates) > 0 {
 			if interactive {
-				fmt.Fprintln(os.Stderr, "  Multiple candidates found:")
+				fmt.Fprintln(os.Stderr, "  Candidates found — please confirm:")
 				for i, c := range candidates {
 					fmt.Fprintf(os.Stderr, "    %d. %s\n", i+1, c)
 				}
@@ -157,7 +244,7 @@ func cmdRepair(args []string) int {
 					}
 				}
 			} else {
-				fmt.Printf("  %d candidates — rerun with --interactive to choose:\n", len(candidates))
+				fmt.Printf("  %d candidate(s) to confirm — rerun with --interactive to choose:\n", len(candidates))
 				for _, c := range candidates {
 					fmt.Printf("    %s\n", c)
 				}
@@ -186,6 +273,9 @@ func cmdRepair(args []string) int {
 	}
 
 	fmt.Printf("Repair complete: %d repaired, %d unresolved.\n", repaired, len(notFound))
+	for vol, n := range offline {
+		fmt.Printf("%d record(s) on volume '%s', which is not mounted — they resolve again once it is connected.\n", n, vol)
+	}
 
 	if len(notFound) > 0 {
 		fmt.Println("")

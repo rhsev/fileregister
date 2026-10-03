@@ -351,12 +351,14 @@ Idempotent. Safe to run repeatedly.
 
 For records with broken bookmarks (typical after cross-volume move or transfer through xattr-unfriendly path):
 
+0. A record whose bookmark recorded a path on a volume that is **not mounted** is skipped, not searched: its file is not missing, and searching would find a copy (a backup, a clone) and bind the record to it for good. fileanchor reports that path (`last_path`) and never mounts a volume while resolving.
 1. Attempt to relocate the file, in this order:
    1. `mdfind 'kMDItemInformation == "*<id>*"'` — backend-agnostic; finds the file by its preserved bookmark-id xattr (most reliable when xattr survived the transfer)
    2. `mdfind 'kMDItemFSName == "<filename>"'` — by the YAML `filename` field; exact on-disk basename match, works even when xattr is gone
    3. `mdfind` on the appropriate xattr layer (`kMDItemProjects` or `kMDItemUserTags` per record) restricted to files whose basename matches `filename`
-2. If found: re-bind the bookmark **under the file's existing id** via `Bookmarks.rebind` (a fresh blob stored under the same id), then refresh the id xattrs and the binder xattr layer. The id is the file's **permanent identity** — only the broken blob is renewed, so nothing is propagated to the index or annotations.
-3. If multiple candidates: list them; with `--interactive`, prompt to choose
+   Candidates in the Trash or a backup (`.Trash`, `.Trashes`, Time Machine), and files that are another record's (they carry a registered id of their own), are ignored.
+2. If found: re-bind the bookmark **under the file's existing id** via `Bookmarks.rebind` (a fresh blob stored under the same id), then refresh the id xattrs and the binder xattr layer. The id is the file's **permanent identity** — only the broken blob is renewed, so nothing is propagated to the index or annotations. This happens **without asking only** for a single candidate from stage 1 (the id) on the volume the file was on — a hit by name, or on another volume, is some file that may or may not be this one.
+3. Otherwise: list the candidates; with `--interactive`, prompt to choose (also for a single one)
 4. If not found: report; in `--interactive` mode prompt for an explicit path
 
 ### `register audit`

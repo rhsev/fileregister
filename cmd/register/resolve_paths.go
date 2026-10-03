@@ -11,6 +11,17 @@ import (
 // engine-level error, if any — partial results are kept, so callers can tell
 // "engine broken" apart from "file gone".
 func resolveRecordPaths(records []map[string]any) (map[string]string, error) {
+	return index.BatchGet(recordFileIDs(records))
+}
+
+// resolveRecords is resolveRecordPaths with the recorded path of each blob that
+// does not resolve (repair tells an unmounted volume from a gone file by it).
+func resolveRecords(records []map[string]any) (map[string]index.Resolution, error) {
+	return index.BatchResolve(recordFileIDs(records))
+}
+
+// recordFileIDs collects the unique ids of the non-URL records.
+func recordFileIDs(records []map[string]any) []string {
 	var ids []string
 	seen := map[string]bool{}
 	for _, r := range records {
@@ -24,5 +35,5 @@ func resolveRecordPaths(records []map[string]any) (map[string]string, error) {
 		seen[id] = true
 		ids = append(ids, id)
 	}
-	return index.BatchGet(ids)
+	return ids
 }
