@@ -242,7 +242,7 @@ The core (`list`, `audit`, `refresh`, `repair`, `marshal`) reads the index direc
 
 - **Editing commands** (`rename`, `cleanup`) also read annotations via `read_annotations`, so a record's `binder` set is updated in both the index and any per-binder annotation blocks. (`remove` deliberately does not: it set-deletes in the index only, and `cleanup` reviews the stale blocks.)
 - **`list --inbox` / `list --curated`** — explicit on-demand filters that consult the Markdown layer to determine annotation status. The default `list` (no flag, no binder) is pure-register and never reads Markdown.
-- **The query layer** — grubber-over-Markdowns, used by matterbase — reads annotations for rich, full-text queries. It is optional and never on the core path.
+- **The query layer** — grubber-over-Markdowns — reads the annotation layer, for matterbase's queries and for `register album`, which renders a binder from its curation. register alone is the index; whenever the Markdown comes into play, grubber reads it. An album needs grubber at runtime for that reason.
 
 A `type: ref` block hand-written into a project note is therefore part of the *annotation* layer; `register reindex` pulls such records into the index so the core sees them too.
 
@@ -277,7 +277,7 @@ CLI) a clean entry point that is guaranteed not to drag the Markdown layer in.
 
 ## CLI
 
-Collections are managed via the unified `register` binary in this repository — a Go CLI dispatching to one `cmd_*.go` per subcommand. Following the same shell-tool conventions as bookmarker and grubber itself (JSONL stdio where applicable, no daemons, no shared state beyond the bookmarks JSON file). This is the canonical interface for collection work. matterbase does not invoke it — collection lifecycle is a shell-level concern. matterbase's only relationship to collections is querying them via standard grubber filters (see [matterbase Touchpoints](#matterbase-touchpoints)).
+Collections are managed via the unified `register` binary in this repository — a Go CLI dispatching to one `cmd_*.go` per subcommand. Following the same shell-tool conventions as grubber itself (JSONL stdio where applicable, no daemons, no shared state beyond the bookmarks JSON file). This is the canonical interface for collection work. matterbase does not invoke it — collection lifecycle is a shell-level concern. matterbase's only relationship to collections is querying them via standard grubber filters (see [matterbase Touchpoints](#matterbase-touchpoints)).
 
 No watchers, no auto-sync. Reconciliation is explicit, invoked when the user wants it.
 
@@ -368,12 +368,37 @@ For records with broken bookmarks (typical after cross-volume move or transfer t
 Exit status is 1 while a record stays unresolved or a repaired file is missing metadata — a monitor can tell. Records on a volume that is not mounted do not count: they need only the volume.
 4. If not found: report; in `--interactive` mode prompt for an explicit path
 
+### The bookmark store is shared
+
+`~/.local/share/bookmarks.json` is a plain map of id → Foundation bookmark
+blob, and it is the one piece of state outside the notes directory. Two rules
+hold for anything that writes it:
+
+- **Keys are minted ids.** Nothing else can ever be looked up, because every
+  reader addresses the store by id. A key of any other shape is dead weight;
+  `register audit` reports it as *malformed*.
+- **Load, modify, save the whole map** under `LockBookmarks`, and never drop a
+  key you did not understand. Every writer saves the map back in full, so
+  discarding an unfamiliar entry on read deletes it on the next write. `LoadDB`
+  therefore loads verbatim and refuses a damaged file rather than treating it
+  as empty.
+
+Tests must not reach it. `bookmarkFile()` reads `HOME` on every call, so a
+`TestMain` in each test package points `HOME` at a throwaway directory for the
+whole run — otherwise any test touching `SaveDB` rewrites the developer's own
+store with its fixture.
+
+It also needs backing up alongside the notes directory: the notes hold
+membership and annotation, this file holds identity. Without it, every id
+resolves to nothing.
+
 ### `register audit`
 
-Read-only consistency report. Two directions:
+Read-only consistency report. Three directions:
 
 - **Record → File**: records whose bookmark does not resolve, or whose target file lacks the expected xattr value in the record's chosen backend (ItemProjects, UserTags, or — for `none` — no check). Binderless bookmarks are included — resolution check only, no xattr expectations.
 - **File → Record**: files in scope that carry a Spotlight tag matching a known binder but no corresponding `type: ref` record. Scans both `kMDItemProjects` and `kMDItemUserTags` to catch ghost entries regardless of backend (e.g. record was deleted, xattr manually edited, `refresh` ran with stale state)
+- **Bookmark → Record**: entries in `~/.local/share/bookmarks.json` judged against the index. Needs fileanchor **1.2.0** for the `last_path` of a failed resolve; without it the dead verdict is withheld and every unresolvable entry is reported as unreachable, because a gone file could not be told from an absent volume. The capability is measured, not read off a version number. The identity layer is the one store the other two directions cannot see into — they start from records, so an entry no record claims is invisible to them, and the store would only grow. One batch resolve covers it; Spotlight is asked only about entries that failed to resolve. Four outcomes: **orphan** (resolves, no record claims the id), **broken** (does not resolve, but a file still carries the id — `register repair` can re-bind it), **dead** (neither, so there is nothing to repair), **malformed** (the key is not a minted id at all, which a foreign writer on the shared store can leave behind). Skipped under `--binder`: the identity layer has no binder, and an orphan has no record to filter by. Judged against *every* ref record including binderless ones — a bookmark held on purpose is a first-class record with no binder.
 
 Two more findings on the record side: a file whose bookmark followed it into the **Trash or a backup** (a bookmark tracks its file wherever it moves), and a **shared file** that several records resolve to — two identities on one file, the trace a bad re-bind leaves. `refresh` marks neither kind (it would re-mark a discarded file, or write the records' ids onto the file in turn).
 
@@ -397,12 +422,12 @@ Note: this does **not** remove the bookmark blob or the record. When the last bi
 ### `register rename <old> <new>`
 
 - Rewrite every record with `binder: <old>` to `<new>` in **both** the index (`read_index` → `JsonlEditor`) and any annotation copies (`read_annotations` → `MdEditor`)
-- Carry the ordering layer along: the `type: ordering` config block is rewritten too, and the canonical note file `collections/binder_<old>.md` is renamed to `binder_<new>.md` (when the new name's note already exists — the `--merge` case — both stay and rename says so)
+- Carry the ordering layer along: the `type: ordering` config block is rewritten too (it names its binder in a field of its own, so a rename that skipped it would leave a block pointing at a binder that no longer exists), and the canonical note file `collections/binder_<old>.md` is renamed to `binder_<new>.md` (when the new name's note already exists — the `--merge` case — both stay and rename says so)
 - For each referenced file (once per `id`, backend taken from the index): remove `<old>` and add `<new>` in the per-record xattr layer (`kMDItemProjects` or `kMDItemUserTags`, or skip for `none`)
 
 Not atomic across many files. A subsequent `register refresh` reconciles any residue.
 
-### `register cleanup [--interactive]`
+### `register cleanup [--interactive] [--prune] [--dry-run]`
 
 Human-judged review of drift between the layers. Reads both stores (`read_index` + `read_annotations`); writes only on user confirmation. It **never deletes a record automatically** — a binderless record is a bookmark, not cruft (Principle 4).
 
@@ -411,12 +436,15 @@ Surfaces, for the user to decide:
 - **Stale context blocks** — a per-binder annotation block whose binder is *not* in the index record's `binder` set (e.g. an annotated block kept by `remove`). Either delete it (the context is obsolete) or re-add the binder (the membership was dropped by mistake).
 - **Unindexed annotations** — a `type: ref` block whose `id` has no index record at all (legacy data, hand-written refs). Usually resolved by `register reindex`, which pulls them into the index; cleanup flags any that should instead be deleted.
 - **Bookmarks for review** — records with an empty `binder` set, listed so the user can prune ones no longer wanted. **Listed, never auto-deleted.**
+- **Unrepairable bookmark entries** — entries in the shared bookmark store that no repair can fix: the file is gone, or the key was never a minted id. The verdicts that are *not* cruft stay out of this section — an orphan that resolves may be held on purpose, a broken one belongs to `repair`, and one whose volume is away or unindexed was never judged. `register audit` shows all five; the judging is one implementation shared by both commands.
+
+`--prune` drops the unrepairable entries without asking and **refuses to run while any entry could not be judged**, naming the volume or the missing engine capability. "Dead" means the blob does not resolve and no file carries the id, which is only true if the question could be asked: an unmounted volume, or a mounted one Spotlight does not index, makes every bookmark on it look dead. The mode trusts a checkable condition, not the system. `--dry-run` says what it would drop.
 
 Duplicates do not appear here: with one record per file and `binder` as a set, duplicate `(id, binder)` registrations are structurally impossible.
 
-This tool is **not** part of matterbase. Its workflow (per-item review with accept/reject) suits a small dedicated TUI or interactive CLI (like `git add -p`'s patch mode). Implementation form to be decided when the drift becomes painful enough to motivate the tool.
+This tool is **not** part of matterbase. Its workflow is a per-item review with accept/reject in the CLI, like `git add -p`'s patch mode.
 
-### `register album <binder> [--out DIR] [--open]`
+### `register album <binder> [--out DIR] [--css FILE] [--milan DIR] [--title TEXT] [--open]`
 
 (User guide: [ALBUM.md](ALBUM.md).)
 
@@ -644,6 +672,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | Annotation | An optional lean Markdown ref block (H3 = filename, YAML = `id` + a single `binder` + custom fields), linked to the index by `id`. One block per `(id, binder)` — the file's context in that binder. Carries custom metadata + prose. Created by `promote` / `add --md`. |
 | Promote | Adding a Markdown annotation for a record via `register promote`. Additive — the index entry stays. |
 | Binder file | A Markdown file in `<notes_dir>/collections/` named `binder_<name>.md`, holding annotations for one binder. The default `register promote` target — and the binder's default ordering file. |
+| Album | An ordering of a bundle, rendered. The album is named by an `album:` field in the note's frontmatter, which grubber passes down into every block of the file: each member carries the name of the album it is in, and nothing looks it up. Absent, the binder name is the heading. No record of its own, because the album's substance is the sequence, which the `sort:` keys already hold. Spec: [ALBUM.md](ALBUM.md). |
 | Ordering | A presentation record putting one binder's members into a sequence: a `type: ordering` config block plus sparse per-member overrides, in the binder file. The binder itself stays a pure set. Spec: [ORDERING.md](ORDERING.md). |
 | Backend | The xattr layer chosen per record via the `xattr:` field: `itemprojects` (default), `tags`, or `none`. |
 | ItemProjects | The macOS `kMDItemProjects` xattr — default backend for membership. Quiet, Spotlight-only. |

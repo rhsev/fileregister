@@ -118,10 +118,10 @@ register <subcommand> [args...]
 | `annotate` | Edit an existing block's fields or note from the command line (`--set`, `--unset`, `--prose`) |
 | `remove` | Take files out of a binder; a record whose binder set runs empty stays as a bookmark |
 | `refresh` | Push record state into macOS metadata |
-| `audit` | Read-only consistency report in both directions |
+| `audit` | Read-only consistency report in three directions: record → file, file → record, and bookmark → record |
 | `repair` | Re-bind a moved file's broken bookmark under its unchanged id, located via Spotlight |
 | `rename` | Rename a binder across all records and xattrs; onto an existing name needs `--merge` |
-| `cleanup` | Review drift between the layers (stale blocks, unindexed annotations, bookmarks) and decide per item |
+| `cleanup` | Review drift between the layers (stale blocks, unindexed annotations, bookmarks, unrepairable bookmark entries) and decide per item; `--prune` drops the unrepairable ones without asking, and refuses while anything could not be judged |
 | `write` | Read JSONL from stdin, write ref records to Markdown or JSONL |
 | `list` | All binders with counts, or the files in one; `--inbox`/`--curated` filter by annotation status, `--paths` (with `--print0` for NUL-separated) and `--json` for piping |
 | `resolve` | Turn an id or `aka` handle into a path; `--record` prints the full record |
@@ -131,7 +131,7 @@ register <subcommand> [args...]
 | `unmarshal` | Unpack a container, mirror files to their origin, recreate records; idempotent, conflicts parked. Origins outside `collections/` need `--scatter` |
 | `reindex` | Rebuild the index from Markdown ref blocks; `--dry-run` to preview |
 | `order` | Arrange a binder for presentation (`set`/`show`/`move`) |
-| `album` | Render a binder as a static HTML album; `--milan` publishes it on the LAN |
+| `album` | Render a binder as a static HTML album (reads the curation through grubber); `--title` names the album in the note's frontmatter, `--css` restyles it, `--milan` publishes it on the LAN |
 
 ### More examples
 
@@ -153,7 +153,7 @@ register list --inbox                        # binders with records nobody annot
 register list project-alpha --paths
 
 register order move project-alpha 482910337 --after 482910901
-register album project-alpha --open
+register album project-alpha --title "Project Alpha, Q1" --open
 
 register marshal --binder project-alpha --out project-alpha.tar.gz
 register unmarshal project-alpha.tar.gz      # on the other machine
@@ -161,6 +161,8 @@ register unmarshal project-alpha.tar.gz      # on the other machine
 register refresh --dry-run
 register audit --binder project-alpha
 register repair --interactive
+register cleanup                             # report drift, change nothing
+register cleanup --prune --dry-run           # what it would drop from the bookmark store
 register reindex --dry-run
 ```
 
@@ -189,7 +191,7 @@ fileanchor engine, so a Linux port is a fileanchor port, not a register one.
 
 ### Companion releases
 
-`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) is needed to use all features: the `register` commands run without it, but the Markdown sidecar layer only makes sense with grubber, which is what queries its fields. This release is tested against **fileanchor 1.1.0** and **grubber v0.16.0**.
+`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads everything above the index: without it, fileregister is the index and nothing more. The core commands — `add`, `list`, `resolve`, `audit`, `repair` and the rest of the lifecycle — run without it; `register album` does not, because it renders a binder from its curation and the Markdown layer is read through grubber. This release is tested against **fileanchor 1.2.0** and **grubber v0.18.0**; `make fileanchor` and `make grubber` build both at those tags.
 
 ### Configuration
 
