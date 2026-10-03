@@ -19,7 +19,7 @@ func cmdList(args []string) int {
 	for _, a := range args {
 		if strings.HasPrefix(a, "-") {
 			switch a {
-			case "--inbox", "--curated", "--paths", "--json", "-h", "--help", "-v", "--version":
+			case "--inbox", "--curated", "--paths", "--print0", "--json", "-h", "--help", "-v", "--version":
 			default:
 				return unknownOption("list", a)
 			}
@@ -34,13 +34,31 @@ func cmdList(args []string) int {
 	}
 	pathsOnly := containsArg(args, "--paths")
 	jsonOnly := containsArg(args, "--json")
+	print0 := containsArg(args, "--print0")
 
-	binder := ""
+	var positional []string
 	for _, a := range args {
 		if !strings.HasPrefix(a, "-") {
-			binder = a
-			break
+			positional = append(positional, a)
 		}
+	}
+	// Other tools read --paths and --json. Without a binder they used to get
+	// the human table, with exit 0; a second name was ignored.
+	if len(positional) > 1 {
+		fmt.Fprintf(os.Stderr, "register list: one binder at a time (got %s)\n", strings.Join(positional, ", "))
+		return 1
+	}
+	binder := ""
+	if len(positional) == 1 {
+		binder = positional[0]
+	}
+	if binder == "" && (pathsOnly || jsonOnly || print0) {
+		fmt.Fprintln(os.Stderr, "register list: --paths, --print0 and --json list one binder: register list <binder> --paths")
+		return 1
+	}
+	if print0 && !pathsOnly {
+		fmt.Fprintln(os.Stderr, "register list: --print0 goes with --paths")
+		return 1
 	}
 
 	dir, err := notesDir()
@@ -49,7 +67,7 @@ func cmdList(args []string) int {
 	}
 
 	if binder != "" {
-		if err := listBinder(dir, binder, pathsOnly, jsonOnly); err != nil {
+		if err := listBinder(dir, binder, pathsOnly, jsonOnly, print0); err != nil {
 			fmt.Fprintln(os.Stderr, "register:", err)
 			return 1
 		}
@@ -146,7 +164,7 @@ func listAllFiltered(notesDir, filter string) error {
 
 // listBinder lists the members of one binder: a table by default, or bare
 // locators (--paths) / neutral JSONL (--json).
-func listBinder(notesDir, binder string, pathsOnly, jsonOnly bool) error {
+func listBinder(notesDir, binder string, pathsOnly, jsonOnly, print0 bool) error {
 	all, err := index.ReadAllRefs(notesDir)
 	if err != nil {
 		return err
@@ -218,16 +236,27 @@ func listBinder(notesDir, binder string, pathsOnly, jsonOnly bool) error {
 	}
 
 	if pathsOnly {
-		broken := 0
+		// One path per line; a path with a newline in it would read as two,
+		// so line mode leaves it out and --print0 (NUL-separated) has it.
+		broken, multiline := 0, 0
 		for _, rec := range records {
-			if loc := locator(rec); loc != "" {
-				fmt.Println(loc)
-			} else {
+			loc := locator(rec)
+			switch {
+			case loc == "":
 				broken++
+			case print0:
+				fmt.Print(loc + "\x00")
+			case strings.ContainsAny(loc, "\n\r"):
+				multiline++
+			default:
+				fmt.Println(loc)
 			}
 		}
 		if broken > 0 {
 			fmt.Fprintf(os.Stderr, "Warning: %d member(s) with broken bookmarks omitted — run register repair\n", broken)
+		}
+		if multiline > 0 {
+			fmt.Fprintf(os.Stderr, "Warning: %d path(s) with a line break omitted — use --paths --print0\n", multiline)
 		}
 		return nil
 	}

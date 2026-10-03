@@ -159,7 +159,7 @@ Register — bookmark index (identity & membership):
   add       --url <URL> [--binder <name>] [--label <name>] [--aka <key>]  (URL ref, e.g. x-devonthink-item://…)
   remove    <file>...|<url> --binder <name>
   list      [<binder>] [--inbox|--curated]  (all binders with counts, or files in one)
-            [<binder> --paths]              (absolute paths only, one per line)
+            [<binder> --paths [--print0]]   (absolute paths only, one per line, or NUL-separated)
             [<binder> --json]               (JSONL per member: id, aka, filename, kind, path)
   resolve   <key>                           (id or aka handle → file path; --record for details)
   of        <file>                          (reverse lookup: file → id, aka, collection(s))

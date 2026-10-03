@@ -123,7 +123,7 @@ register <subcommand> [args...]
 | `rename` | Rename a binder across all records and xattrs; onto an existing name needs `--merge` |
 | `cleanup` | Review drift between the layers (stale blocks, unindexed annotations, bookmarks) and decide per item |
 | `write` | Read JSONL from stdin, write ref records to Markdown or JSONL |
-| `list` | All binders with counts, or the files in one; `--inbox`/`--curated` filter by annotation status, `--paths` and `--json` for piping |
+| `list` | All binders with counts, or the files in one; `--inbox`/`--curated` filter by annotation status, `--paths` (with `--print0` for NUL-separated) and `--json` for piping |
 | `resolve` | Turn an id or `aka` handle into a path; `--record` prints the full record |
 | `of` | Given a file, report its id, `aka` and binders |
 | `aka` | Add or remove a record's `aka` handles later (`--add`, `--remove`) |

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -35,5 +36,31 @@ func TestRenameTakesNamesAfterDoubleDash(t *testing.T) {
 	}
 	if inbox := mustRead(t, notes+"/collections/inbox.jsonl"); !strings.Contains(inbox, `"final"`) {
 		t.Errorf("inbox: %s", inbox)
+	}
+}
+
+// list's machine output is read by other tools: it must never fall back to
+// the human table, and a path with a line break must not split in two.
+func TestListMachineOutput(t *testing.T) {
+	anchor := engineBin(t)
+	notes := t.TempDir()
+	env := identityEnv(t, notes, anchor)
+	f := filepath.Join(t.TempDir(), "two\nlines.txt")
+	writeFile(t, f, "x")
+	if _, e, code := runGoAdd(t, env, f, "--binder", "b"); code != 0 {
+		t.Fatalf("add: %d %s", code, e)
+	}
+	for _, args := range [][]string{{"--json"}, {"--paths"}, {"b", "c", "--paths"}, {"b", "--print0"}} {
+		if out, _, code := runGoList(t, env, args...); code != 1 || out != "" {
+			t.Errorf("list %v: code %d, out %q", args, code, out)
+		}
+	}
+	out, errOut, _ := runGoList(t, env, "b", "--paths")
+	if out != "" || !strings.Contains(errOut, "--print0") {
+		t.Errorf("--paths with a line break: out %q, err %q", out, errOut)
+	}
+	out, _, _ = runGoList(t, env, "b", "--paths", "--print0")
+	if !strings.HasSuffix(out, "\x00") || !strings.Contains(out, "two\nlines.txt") {
+		t.Errorf("--print0: %q", out)
 	}
 }
