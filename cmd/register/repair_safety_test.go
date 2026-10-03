@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rhsev/fileregister/internal/index"
@@ -80,5 +81,41 @@ func TestRepairRecordReportsWhatItCouldNotWrite(t *testing.T) {
 	}
 	if len(failed) != 2 {
 		t.Errorf("failed = %v, want the binder and the ★ marker", failed)
+	}
+}
+
+// A bookmark follows its file into the Trash, and a bad re-bind leaves two
+// records on one file. audit reports both; refresh marks neither.
+func TestAuditAndRefreshNoticeTrashAndSharedFiles(t *testing.T) {
+	anchor := engineBin(t)
+	notes := t.TempDir()
+	env := identityEnv(t, notes, anchor)
+	dir := t.TempDir()
+	a, b, trashed := filepath.Join(dir, "a.txt"), filepath.Join(dir, "b.txt"), filepath.Join(dir, "gone.txt")
+	for _, f := range []string{a, b, trashed} {
+		writeFile(t, f, filepath.Base(f))
+		if _, e, code := runGoAdd(t, env, f, "--binder", "x"); code != 0 {
+			t.Fatalf("add %s: %d %s", f, code, e)
+		}
+	}
+	// gone.txt goes to the Trash; b's record gets bound to a's file.
+	os.MkdirAll(filepath.Join(dir, ".Trash"), 0755)
+	os.Rename(trashed, filepath.Join(dir, ".Trash", "gone.txt"))
+	restore := setEnv(t, env)
+	index.ResetEngine()
+	bID := index.OfFileIDs(b)[0]
+	if _, err := index.Rebind(bID, a); err != nil {
+		t.Fatal(err)
+	}
+	index.ResetEngine()
+	restore()
+
+	out, _, _ := runGoAudit(t, env)
+	if !strings.Contains(out, "IN TRASH OR BACKUP (1)") || !strings.Contains(out, "SHARED FILE (1)") {
+		t.Errorf("audit:\n%s", out)
+	}
+	out, _, _ = runGoRefresh(t, env)
+	if !strings.Contains(out, "1 in the Trash or a backup, 2 on a file shared") {
+		t.Errorf("refresh:\n%s", out)
 	}
 }

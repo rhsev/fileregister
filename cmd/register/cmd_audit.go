@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -122,6 +123,8 @@ func cmdAudit(args []string) int {
 	}
 	var brokenBookmark []brokenT
 	var missingFile []missingFileT
+	var inTrash []missingFileT
+	shared := sharedPaths(checked, resolved)
 	var missingXattr []missingXattrT
 	okCount := 0
 
@@ -149,6 +152,10 @@ func cmdAudit(args []string) int {
 			missingFile = append(missingFile, missingFileT{binders, noteFile, refPath, label})
 			continue
 		}
+		if trashOrBackup(refPath) != "" {
+			inTrash = append(inTrash, missingFileT{binders, noteFile, refPath, label})
+			continue
+		}
 		if len(binders) == 0 || backend == "none" {
 			okCount++
 			continue
@@ -166,7 +173,7 @@ func cmdAudit(args []string) int {
 		}
 	}
 
-	if len(brokenBookmark) == 0 && len(missingFile) == 0 && len(missingXattr) == 0 {
+	if len(brokenBookmark) == 0 && len(missingFile) == 0 && len(missingXattr) == 0 && len(inTrash) == 0 && len(shared) == 0 {
 		fmt.Printf("All %d record(s) are consistent.\n", okCount)
 	} else {
 		if okCount > 0 {
@@ -187,6 +194,30 @@ func cmdAudit(args []string) int {
 			for _, m := range missingFile {
 				fmt.Printf("  [%s] %s\n", binderTag(m.binders), m.label)
 				fmt.Printf("    expected: %s\n", m.refPath)
+			}
+		}
+		if len(inTrash) > 0 {
+			fmt.Println("")
+			fmt.Printf("IN TRASH OR BACKUP (%d) — the bookmark followed the file there:\n", len(inTrash))
+			for _, m := range inTrash {
+				fmt.Printf("  [%s] %s\n", binderTag(m.binders), m.label)
+				fmt.Printf("    file: %s\n", m.refPath)
+				fmt.Println("    → put it back, or remove the record")
+			}
+		}
+		if len(shared) > 0 {
+			fmt.Println("")
+			fmt.Printf("SHARED FILE (%d) — several records resolve to one file:\n", len(shared))
+			paths := make([]string, 0, len(shared))
+			for p := range shared {
+				paths = append(paths, p)
+			}
+			sort.Strings(paths)
+			for _, p := range paths {
+				ids := shared[p]
+				fmt.Printf("  %s\n", p)
+				fmt.Printf("    records: %s\n", strings.Join(ids, ", "))
+				fmt.Println("    → keep one: the others belong to files that are gone or were copies")
 			}
 		}
 		if len(missingXattr) > 0 {

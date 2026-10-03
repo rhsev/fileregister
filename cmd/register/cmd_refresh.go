@@ -76,6 +76,8 @@ func cmdRefresh(args []string) int {
 	}
 	var broken []brokenEntry
 	var missing []missingEntry
+	var skippedTrash, skippedShared []string
+	shared := sharedPaths(allRefs, resolved)
 	refreshed, noop, failed, skippedNone, skippedURL := 0, 0, 0, 0, 0
 
 	for _, rec := range allRefs {
@@ -96,6 +98,17 @@ func cmdRefresh(args []string) int {
 		}
 		if !index.FileExists(refPath) {
 			missing = append(missing, missingEntry{binders, refPath, refLabel(rec)})
+			continue
+		}
+		// A file in the Trash is not re-marked as a member, and a file two
+		// records resolve to would get their ids written in turn — audit
+		// reports both.
+		if trashOrBackup(refPath) != "" {
+			skippedTrash = append(skippedTrash, refLabel(rec))
+			continue
+		}
+		if len(shared[refPath]) > 1 {
+			skippedShared = append(skippedShared, refLabel(rec))
 			continue
 		}
 
@@ -151,6 +164,10 @@ func cmdRefresh(args []string) int {
 	}
 	if failed > 0 {
 		fmt.Printf("  Failed       : %d\n", failed)
+	}
+	if len(skippedTrash)+len(skippedShared) > 0 {
+		fmt.Printf("  Skipped      : %d in the Trash or a backup, %d on a file shared with another record — see 'register audit'\n",
+			len(skippedTrash), len(skippedShared))
 	}
 
 	if len(broken) > 0 {

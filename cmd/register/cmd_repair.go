@@ -74,17 +74,54 @@ func volumeOf(p string) string {
 	return "/"
 }
 
+// trashOrBackup says where path lies when that is the Trash or a backup, or "".
+// A bookmark follows its file into the Trash, and a backup holds copies with
+// the same name and id.
+func trashOrBackup(path string) string {
+	for _, marker := range []string{"/.Trash/", "/.Trashes/"} {
+		if strings.Contains(path, marker) {
+			return "in the Trash"
+		}
+	}
+	if strings.Contains(path, "/Backups.backupdb/") || strings.Contains(path, "/.MobileBackups/") ||
+		strings.HasPrefix(path, "/Volumes/.timemachine/") {
+		return "in a Time Machine backup"
+	}
+	return ""
+}
+
+// sharedPaths maps each resolved path that more than one record resolves to
+// onto those ids — two identities on one file, the trace a bad re-bind leaves.
+func sharedPaths(records []map[string]any, resolved map[string]string) map[string][]string {
+	byKey := map[string][]string{}
+	seen := map[string]bool{}
+	for _, r := range records {
+		id := index.AsString(r["id"])
+		if seen[id] || resolved[id] == "" {
+			continue
+		}
+		seen[id] = true
+		k := index.PathKey(resolved[id])
+		byKey[k] = append(byKey[k], id)
+	}
+	out := map[string][]string{}
+	for _, r := range records {
+		id := index.AsString(r["id"])
+		if p := resolved[id]; p != "" {
+			if ids := byKey[index.PathKey(p)]; len(ids) > 1 {
+				out[p] = ids
+			}
+		}
+	}
+	return out
+}
+
 // candidateProblem says why a found file must not be re-bound under id, or "".
 // A copy in the Trash or a backup, and a file that is another record's, carry
 // the same name — or even the same id — as the file that went missing.
 func candidateProblem(path, id string, db map[string]string, indexIDs map[string]bool) string {
-	for _, marker := range []string{"/.Trash/", "/.Trashes/", "/Backups.backupdb/", "/.MobileBackups/"} {
-		if strings.Contains(path, marker) {
-			return "in the Trash or a backup"
-		}
-	}
-	if strings.HasPrefix(path, "/Volumes/.timemachine/") {
-		return "in a Time Machine backup"
+	if where := trashOrBackup(path); where != "" {
+		return where
 	}
 	for _, own := range index.OwnIDs(db, path) {
 		if own == id {

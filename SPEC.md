@@ -371,6 +371,8 @@ Read-only consistency report. Two directions:
 - **Record → File**: records whose bookmark does not resolve, or whose target file lacks the expected xattr value in the record's chosen backend (ItemProjects, UserTags, or — for `none` — no check). Binderless bookmarks are included — resolution check only, no xattr expectations.
 - **File → Record**: files in scope that carry a Spotlight tag matching a known binder but no corresponding `type: ref` record. Scans both `kMDItemProjects` and `kMDItemUserTags` to catch ghost entries regardless of backend (e.g. record was deleted, xattr manually edited, `refresh` ran with stale state)
 
+Two more findings on the record side: a file whose bookmark followed it into the **Trash or a backup** (a bookmark tracks its file wherever it moves), and a **shared file** that several records resolve to — two identities on one file, the trace a bad re-bind leaves. `refresh` marks neither kind (it would re-mark a discarded file, or write the records' ids onto the file in turn).
+
 Output is plain text. Decisions stay with the user.
 
 ### `register remove <file> --binder <name>`
