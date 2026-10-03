@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -376,6 +377,7 @@ func cmdAdd(args []string) int {
 	// 4. Membership layer per file (binder xattr + ★). Both mark membership, so a
 	//    bookmark add (no binder) writes neither.
 	appended, noop := 0, 0
+	usedBackends := map[string]bool{}
 	keptChanges := map[string]map[string]map[string]bool{} // index file → id → tag → keep
 	noteKept := func(i int, keep bool) {
 		file, id := destOf[i], records[i].ID
@@ -401,6 +403,7 @@ func cmdAdd(args []string) int {
 				}
 				effBackend = stored
 			}
+			usedBackends[effBackend] = true
 			result := index.XattrBackendAdd(path, opts.binder, effBackend)
 			if result == "failed" {
 				layer := "kMDItemProjects"
@@ -458,7 +461,18 @@ func cmdAdd(args []string) int {
 		targetLabel = target
 	}
 	if binderSet {
-		fmt.Printf("Added to '%s' → %s [%s]\n", opts.binder, targetLabel, backend)
+		// The stored backend of an existing record wins over --xattr, so name
+		// what was actually used.
+		shown := backend
+		if len(usedBackends) > 0 {
+			var names []string
+			for b := range usedBackends {
+				names = append(names, b)
+			}
+			sort.Strings(names)
+			shown = strings.Join(names, ", ")
+		}
+		fmt.Printf("Added to '%s' → %s [%s]\n", opts.binder, targetLabel, shown)
 	} else {
 		s := ""
 		if len(records) != 1 {

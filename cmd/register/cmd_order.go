@@ -459,7 +459,7 @@ func orderWriteOverride(note, binder string, rec map[string]any, field string, v
 		header = id
 	}
 	yaml := yamlField("type", "ref") + yamlField("id", id) + yamlField("binder", binder) + yamlField(field, index.AsString(value))
-	block := "### " + header + "\n```yaml\n" + yaml + "```\n"
+	block := "### " + headingText(header) + "\n```yaml\n" + yaml + "```\n"
 	content := block
 	existingNote, crlf, err := readNote(note)
 	if err == nil {
@@ -545,7 +545,7 @@ func orderWriteOverrides(note, binder string, byID map[string]map[string]any, fi
 			header = mid
 		}
 		y := yamlField("type", "ref") + yamlField("id", mid) + yamlField("binder", binder) + yamlField(field, keys[mid])
-		blocks = append(blocks, "### "+header+"\n```yaml\n"+y+"```\n")
+		blocks = append(blocks, "### "+headingText(header)+"\n```yaml\n"+y+"```\n")
 	}
 	if len(blocks) == 0 {
 		return true

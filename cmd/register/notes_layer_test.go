@@ -49,3 +49,9 @@ func TestParkedNotesAreNotAnnotations(t *testing.T) {
 		}
 	}
 }
+
+func TestHeadingTextStaysOneLine(t *testing.T) {
+	if got := headingText("two\nlines .pdf"); got != "two lines .pdf" {
+		t.Errorf("headingText = %q", got)
+	}
+}

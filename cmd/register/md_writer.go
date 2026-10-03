@@ -95,6 +95,17 @@ func needsYAMLQuote(s string) bool {
 	return false
 }
 
+// headingText makes s safe as a one-line heading: a line break in a file name
+// would end the heading and turn the rest of the name into prose.
+func headingText(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+			return ' '
+		}
+		return r
+	}, s)
+}
+
 // readNote reads a Markdown note with its line endings as \n: every editor
 // here matches \n, and a note saved with \r\n (Windows, some sync setups)
 // looked empty — its blocks were invisible, and promote appended duplicates.
@@ -129,7 +140,7 @@ func leanAnnotation(rec map[string]any, binder string) string {
 	yaml := "type: " + yamlScalar("ref") + "\n" +
 		"id: " + yamlScalar(index.AsString(rec["id"])) + "\n" +
 		"binder: " + yamlScalar(binder) + "\n"
-	return "### " + header + "\n```yaml\n" + yaml + "```\n"
+	return "### " + headingText(header) + "\n```yaml\n" + yaml + "```\n"
 }
 
 // mdParseBlocks parses every fenced yaml block in one Markdown file — one read
@@ -422,7 +433,7 @@ func yamlFieldVal(key string, v any) string {
 func mdToMarkdown(r index.RefRecord) string {
 	var b strings.Builder
 	if r.Filename != "" {
-		b.WriteString("### " + r.Filename + "\n")
+		b.WriteString("### " + headingText(r.Filename) + "\n")
 	}
 	b.WriteString("```yaml\n")
 	b.WriteString(yamlField("type", "ref"))
