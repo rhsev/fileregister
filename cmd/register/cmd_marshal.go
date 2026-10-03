@@ -36,6 +36,17 @@ func marshalSanitize(name string) string {
 	return sanitizeBinderName(name)
 }
 
+// marshalDirName is the container's folder and default file name for binder.
+// A binder named ".." (or ".") would make the staging folder the temp dir's
+// parent and the container "...tar.gz"; such names become "binder".
+func marshalDirName(binder string) string {
+	name := marshalSanitize(binder)
+	if name == "" || name == "." || name == ".." {
+		return "binder"
+	}
+	return name
+}
+
 // marshalNameKey folds a name for uniqueness decisions: staging dirs, albums
 // and unpacked containers must stay collision-free on case- and
 // normalization-insensitive filesystems too, so uniqueness is decided on the
@@ -109,7 +120,7 @@ func cmdMarshal(args []string) int {
 	}
 
 	if out == "" {
-		out = marshalSanitize(binder) + ".tar.gz"
+		out = marshalDirName(binder) + ".tar.gz"
 	}
 	if abs, aerr := filepath.Abs(out); aerr == nil {
 		out = abs
@@ -183,7 +194,7 @@ func cmdMarshal(args []string) int {
 	}
 	defer os.RemoveAll(tmp)
 
-	root := filepath.Join(tmp, marshalSanitize(binder))
+	root := filepath.Join(tmp, marshalDirName(binder))
 	filesDir := filepath.Join(root, "files")
 	notesOut := filepath.Join(root, "notes")
 	if err := os.MkdirAll(filesDir, 0755); err != nil {

@@ -34,3 +34,14 @@ func TestAlbumAssetNames(t *testing.T) {
 		t.Errorf("milan names are used as written: %q", got)
 	}
 }
+
+func TestMarshalDirNameStaysInside(t *testing.T) {
+	for _, b := range []string{"..", ".", ""} {
+		if got := marshalDirName(b); got != "binder" {
+			t.Errorf("marshalDirName(%q) = %q", b, got)
+		}
+	}
+	if got := marshalDirName("Reise 2024"); got != "Reise 2024" {
+		t.Errorf("an ordinary name changed: %q", got)
+	}
+}
