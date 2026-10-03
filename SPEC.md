@@ -232,6 +232,8 @@ So `add --md` is `add` followed by `promote` in one step: the index entry plus i
 - **One write target.** `register add` (without `--target`) **always** appends to `collections/inbox.jsonl`. New records have one unambiguous home.
 - **Many read sources.** `read_index` reads every `*.jsonl` in `collections/` and concatenates them. Archives and imports are queryable and editable in place, but new adds never land in them.
 
+Every command reads **all** of them or stops: an index file that cannot be read, or a line that is not exactly one JSON object, is an error naming the file and line. A command working from a partial index would report its missing records as gone, and `add`/`reindex` would mint duplicates of them. In-place rewrites edit only `type: ref` records; blank lines, foreign record types and unparseable lines stay byte for byte.
+
 Editing stays unambiguous regardless of file count: each record's injected `_note_file` names the specific source file, and in-place edits (`remove`, `rename`, `repair`, `cleanup`, `reindex`) rewrite exactly that file.
 
 ### The core read path

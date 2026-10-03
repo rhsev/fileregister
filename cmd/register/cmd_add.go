@@ -196,7 +196,10 @@ func cmdAdd(args []string) int {
 
 	// One index read and one bookmark-db read serve the aka check and the
 	// guard sweep below (add is the hottest daily command).
-	refs := mustRefs(nd)
+	refs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
 	db, err := index.LoadDB()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
@@ -506,7 +509,10 @@ func addURLRecord(opts addOptions, binderSet bool) int {
 	if err != nil {
 		return 1
 	}
-	refs := mustRefs(nd)
+	refs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
 
 	if opts.aka != "" {
 		if clash := index.ResolveKey(refs, opts.aka); clash != nil && index.AsString(clash["url"]) != url {
@@ -633,11 +639,14 @@ func validXattr(v string) bool {
 	return false
 }
 
-// mustRefs reads the index, returning an empty slice on error.
-func mustRefs(notesDir string) []map[string]any {
+// loadRefs reads the whole index. On a read error it says so and returns
+// false: the caller stops, because every command that goes on with a partial
+// index can mint duplicates or report records as missing.
+func loadRefs(notesDir string) ([]map[string]any, bool) {
 	recs, err := index.ReadAllRefs(notesDir)
 	if err != nil {
-		return nil
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return nil, false
 	}
-	return recs
+	return recs, true
 }

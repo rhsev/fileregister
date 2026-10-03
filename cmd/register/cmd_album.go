@@ -402,7 +402,11 @@ func cmdAlbum(args []string) int {
 	if err != nil {
 		return 1
 	}
-	records := recordsForBinder(mustRefs(nd), binder)
+	allRefs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
+	records := recordsForBinder(allRefs, binder)
 	if len(records) == 0 {
 		fmt.Fprintf(os.Stderr, "No records for binder '%s'.\n", binder)
 		return 1

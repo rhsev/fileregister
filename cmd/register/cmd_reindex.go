@@ -37,7 +37,10 @@ func cmdReindex(args []string) int {
 	}
 	indexPath := filepath.Join(nd, "collections", "inbox.jsonl")
 
-	allIndex := mustRefs(nd)
+	allIndex, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
 	indexed := map[string]bool{}
 	for _, r := range allIndex {
 		indexed[index.AsString(r["id"])] = true

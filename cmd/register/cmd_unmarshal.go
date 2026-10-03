@@ -241,7 +241,11 @@ func cmdUnmarshal(args []string) int {
 	// Local URL refs never enter the bookmark db — an imported file ref with
 	// the same id would fuse two identities, so their ids park the entry.
 	localURLByID := map[string]string{}
-	for _, r := range mustRefs(notesDir) {
+	localRefs, refsOK := loadRefs(notesDir)
+	if !refsOK {
+		return 1
+	}
+	for _, r := range localRefs {
 		if index.URLRef(r) {
 			localURLByID[index.AsString(r["id"])] = index.AsString(r["url"])
 		}

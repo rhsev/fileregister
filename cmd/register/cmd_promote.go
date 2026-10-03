@@ -51,7 +51,10 @@ func cmdPromote(args []string) int {
 	}
 
 	// One index read serves the key resolution and the binder filter.
-	refs := mustRefs(nd)
+	refs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
 	if id != "" {
 		raw := id
 		if rec := index.ResolveKey(refs, raw); rec != nil {

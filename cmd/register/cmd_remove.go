@@ -108,7 +108,11 @@ func removeTarget(nd, binder, targetArg string) int {
 		}
 	}
 
-	records := recordsForBinder(mustRefs(nd), binder)
+	allRefs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
+	records := recordsForBinder(allRefs, binder)
 	if len(records) == 0 {
 		fmt.Fprintf(os.Stderr, "No refs found for binder '%s'\n", binder)
 		return 0
@@ -218,7 +222,11 @@ func removeTarget(nd, binder, targetArg string) int {
 			fileIDs[index.AsString(m["id"])] = true
 		}
 		stillMember := false
-		for _, r := range mustRefs(nd) {
+		after, refsOK := loadRefs(nd) // re-read: this removal must be visible
+		if !refsOK {
+			return 1
+		}
+		for _, r := range after {
 			if fileIDs[index.AsString(r["id"])] && len(index.NormalizeBinders(r["binder"])) > 0 {
 				stillMember = true
 				break

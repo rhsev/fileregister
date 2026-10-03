@@ -69,7 +69,10 @@ func cmdAudit(args []string) int {
 	}
 
 	fmt.Fprintln(os.Stderr, "Collecting type:ref records…")
-	all := mustRefs(nd)
+	all, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
 	var active, bookmarks []map[string]any
 	for _, r := range all {
 		binders := nonEmptyBinders(r)

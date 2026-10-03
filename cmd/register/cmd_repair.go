@@ -144,7 +144,10 @@ func cmdRepair(args []string) int {
 	}
 
 	fmt.Fprintln(os.Stderr, "Collecting type:ref records…")
-	active := mustRefs(nd) // repair the bookmark blob for every record, bookmarks included
+	active, refsOK := loadRefs(nd) // repair the bookmark blob for every record, bookmarks included
+	if !refsOK {
+		return 1
+	}
 	if len(active) == 0 {
 		fmt.Println("No ref records found.")
 		return 0

@@ -111,6 +111,9 @@ func ReadIndex(notesDir string) ([]Record, error) {
 
 // ReadAllRefs returns every ref record from collections/*.jsonl, sorted by file
 // then line — the Go equivalent of read_index(notes_dir) with no binder filter.
+// An index file that cannot be read, or a line that is not one JSON object, is
+// an error naming the place: skipping it would hide its records, and add or
+// reindex would then mint duplicates of them.
 func ReadAllRefs(notesDir string) ([]map[string]any, error) {
 	dir := filepath.Join(notesDir, "collections")
 	entries, err := filepath.Glob(filepath.Join(dir, "*.jsonl"))
@@ -123,20 +126,21 @@ func ReadAllRefs(notesDir string) ([]map[string]any, error) {
 	for _, f := range entries {
 		fh, err := os.Open(f)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("cannot read index file %s: %w", f, err)
 		}
 		sc := bufio.NewScanner(fh)
 		sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024) // records can carry long fields
+		n := 0
 		for sc.Scan() {
+			n++
 			line := strings.TrimSpace(sc.Text())
 			if line == "" {
 				continue
 			}
-			dec := json.NewDecoder(strings.NewReader(line))
-			dec.UseNumber()
-			var rec map[string]any
-			if dec.Decode(&rec) != nil {
-				continue
+			rec := ParseJSONObject(line)
+			if rec == nil {
+				fh.Close()
+				return nil, fmt.Errorf("%s:%d is not one JSON record — fix or remove that line", f, n)
 			}
 			if t, _ := rec["type"].(string); t != "ref" {
 				continue
@@ -144,10 +148,11 @@ func ReadAllRefs(notesDir string) ([]map[string]any, error) {
 			rec["_note_file"] = f // provenance; dropped on any re-serialize
 			recs = append(recs, rec)
 		}
-		if err := sc.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: reading %s aborted: %v\n", f, err)
-		}
+		err = sc.Err()
 		fh.Close()
+		if err != nil {
+			return nil, fmt.Errorf("reading %s stopped after line %d: %w", f, n, err)
+		}
 	}
 	return recs, nil
 }
@@ -155,11 +160,14 @@ func ReadAllRefs(notesDir string) ([]map[string]any, error) {
 // ParseJSONObject decodes one JSON object line into a map, numbers preserved as
 // json.Number (so id 100000002 stringifies exactly, not as 1.0000e8). Returns nil
 // on any error or a non-object.
+// Anything after the object makes the line unparseable: two records glued onto
+// one line (cat of a file without a final newline) would otherwise read as
+// the first, and a rewrite would drop the second.
 func ParseJSONObject(line string) map[string]any {
 	dec := json.NewDecoder(strings.NewReader(line))
 	dec.UseNumber()
 	var m map[string]any
-	if dec.Decode(&m) != nil {
+	if dec.Decode(&m) != nil || dec.More() {
 		return nil
 	}
 	return m

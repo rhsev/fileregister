@@ -50,7 +50,10 @@ func cmdRefresh(args []string) int {
 	}
 
 	fmt.Fprintln(os.Stderr, "Collecting type:ref records…")
-	allRefs := mustRefs(nd)
+	allRefs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
 	if len(allRefs) == 0 {
 		fmt.Println("No ref records found.")
 		return 0

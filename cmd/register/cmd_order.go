@@ -51,7 +51,11 @@ func buildOrderContext(binder, noteOpt string) (*orderCtx, bool) {
 		return nil, false
 	}
 
-	records := recordsForBinder(mustRefs(nd), binder)
+	allRefs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return nil, false
+	}
+	records := recordsForBinder(allRefs, binder)
 	if len(records) == 0 {
 		fmt.Fprintf(os.Stderr, "No records for binder '%s'.\n", binder)
 		return nil, false

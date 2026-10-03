@@ -79,7 +79,10 @@ func cmdRename(args []string) int {
 	fmt.Fprintf(os.Stderr, "Collecting refs for binder '%s'…\n", oldName)
 	// A record's binder lives in the index (jsonl) and in any annotation copies
 	// (markdown). Update both; jsonl records come first so they win on dedup.
-	refs := mustRefs(nd)
+	refs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
 	records := append(recordsForBinder(refs, oldName), annotationsForBinder(nd, oldName)...)
 	if len(records) == 0 {
 		fmt.Printf("No refs found for binder '%s'\n", oldName)

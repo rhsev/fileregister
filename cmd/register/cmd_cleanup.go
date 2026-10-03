@@ -84,7 +84,10 @@ func cmdCleanup(args []string) int {
 	}
 
 	fmt.Fprintln(os.Stderr, "Collecting index records and annotations…")
-	refs := mustRefs(nd)
+	refs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
 	annos := readAnnotations(nd)
 
 	indexIDs := map[string]bool{}

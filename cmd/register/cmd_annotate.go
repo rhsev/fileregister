@@ -117,7 +117,11 @@ func cmdAnnotate(args []string) int {
 	// Resolve the user key against the index; blocks are matched over id ∪ aka,
 	// like every other block lookup (hand-written blocks may carry an aka in
 	// their id: slot).
-	rec := index.ResolveKey(mustRefs(nd), key)
+	allRefs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
+	rec := index.ResolveKey(allRefs, key)
 	if rec == nil {
 		fmt.Fprintf(os.Stderr, "Error: '%s' does not match any record id or aka\n", key)
 		return 1

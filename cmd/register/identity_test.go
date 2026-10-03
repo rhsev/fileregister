@@ -144,3 +144,24 @@ func TestAddFindsTheIdThroughSyncCopy(t *testing.T) {
 		t.Errorf("#S was overwritten: %v, want %s", got, id)
 	}
 }
+
+// An index file add cannot read hides records; going on would mint a second
+// id for a file that already has one there.
+func TestAddStopsOnAnUnreadableIndex(t *testing.T) {
+	anchor := engineBin(t)
+	notes := seedInbox(t, `{"type":"ref","id":"1","binder":["keep"],"url":"https://example.com/"}`)
+	archive := filepath.Join(notes, "collections", "archive.jsonl")
+	writeFile(t, archive, `{"type":"ref","id":"2","binder":["x"],"filename":"a.txt"}`+"\n")
+	os.Chmod(archive, 0)
+	defer os.Chmod(archive, 0644)
+
+	f := filepath.Join(t.TempDir(), "a.txt")
+	writeFile(t, f, "a")
+	_, errOut, code := runGoAdd(t, identityEnv(t, notes, anchor), f, "--binder", "x")
+	if code != 1 || !strings.Contains(errOut, "archive.jsonl") {
+		t.Fatalf("add went ahead: code %d, stderr %q", code, errOut)
+	}
+	if inbox := mustRead(t, filepath.Join(notes, "collections", "inbox.jsonl")); strings.Contains(inbox, "a.txt") {
+		t.Errorf("add wrote a record despite the unreadable index:\n%s", inbox)
+	}
+}

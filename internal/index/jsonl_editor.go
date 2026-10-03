@@ -32,13 +32,20 @@ func JSONLRewrite(path string, fn func(rec map[string]any) (map[string]any, bool
 	}
 	var out []string
 	changes := 0
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
+	lines := strings.Split(string(data), "\n")
+	if n := len(lines); n > 0 && lines[n-1] == "" {
+		lines = lines[:n-1] // artifact of the trailing newline
+	}
+	for _, line := range lines {
+		// Blank lines, lines that are not one JSON object, and records of a
+		// foreign type are kept verbatim: only ref records are edited here.
 		rec := ParseJSONObject(line)
 		if rec == nil {
-			out = append(out, line) // non-object → keep verbatim
+			out = append(out, line)
+			continue
+		}
+		if t, _ := rec["type"].(string); t != "ref" {
+			out = append(out, line)
 			continue
 		}
 		result, changed := fn(rec)

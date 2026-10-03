@@ -63,7 +63,10 @@ func cmdAka(args []string) int {
 	if err != nil {
 		return 1
 	}
-	refs := mustRefs(nd)
+	refs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return 1
+	}
 	rec := index.ResolveKey(refs, key)
 	if rec == nil {
 		fmt.Fprintf(os.Stderr, "Error: '%s' does not match any record id or aka\n", key)
@@ -312,7 +315,11 @@ func anyIn(xs, set []string) bool {
 // record keeps its fields (the index only backfills an absent aka on a new
 // membership), so the handle needs the identity verb instead.
 func warnAkaNotApplied(nd, handle, id string) {
-	if rec := index.ResolveKey(mustRefs(nd), handle); rec != nil && index.AsString(rec["id"]) == id {
+	refs, refsOK := loadRefs(nd)
+	if !refsOK {
+		return
+	}
+	if rec := index.ResolveKey(refs, handle); rec != nil && index.AsString(rec["id"]) == id {
 		return
 	}
 	fmt.Fprintf(os.Stderr, "  Note: record %s already existed — --aka '%s' not applied; use: register aka %s --add %s\n",
