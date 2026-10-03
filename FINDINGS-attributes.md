@@ -1,8 +1,11 @@
 # Findings: macOS file attributes (for fileregister)
 
-> Empirically verified facts about macOS xattr / Spotlight metadata. Verified on
-> macOS 26.4 (2026-06). Several are counterintuitive; the tables below are
-> authoritative.
+> Empirically verified facts about macOS xattr / Spotlight metadata. First
+> verified on macOS 26.4 (2026-06). **Re-verified 2026-09-27 on macOS 15.8 and
+> 27.2** (Mac mini and MacBook): all local findings, and the iCloud Drive
+> transport in both directions (15 → 27, 27 → 15). Resilio and AirDrop were not
+> re-tested and stand as of 26.4. Several findings are counterintuitive; the
+> tables below are authoritative.
 
 ## Storage name ≠ Spotlight key
 
@@ -37,9 +40,20 @@ system-special-cased.
 |---|---|---|---|---|---|---|
 | `com.apple.metadata:_kMDItemUserTags` | `kMDItemUserTags` | Finder Tags — ★ marker, optional binder tags | binary plist array | **yes** | yes | **yes** |
 | `com.apple.metadata:kMDItemProjects` | `kMDItemProjects` | quiet binder cache (default backend) | binary plist array (per-element Spotlight match) | no | yes | no |
-| `com.apple.metadata:kMDItemInformation` | `kMDItemInformation` | bookmark id (local mdfind repair) | space-separated string | no | yes (local) | **no** |
+| `com.apple.metadata:kMDItemInformation` | `kMDItemInformation` | bookmark id (local mdfind repair) | space-separated string, **as a binary-plist string** (see below) | no | yes (local) | **no** |
 | `com.apple.metadata:kMDItemInformation#S` | — | bookmark id + sync flag — **does NOT sync** (Apple `kMDItem*` prefix blocked regardless of `#S`) | string | no | no | **no** |
 | `com.fileregister.id#S` | — | bookmark id, cross-device — **syncs** (custom namespace + `#S`) | string | no | no | **yes — verified** |
+
+### Spotlight reads `com.apple.metadata:*` as property lists
+
+Spotlight parses the value of every `com.apple.metadata:*` xattr as a property
+list. A **raw** string works only by accident: a single token like `123456789`
+is a valid old-style ASCII plist string. Two space-separated ids,
+`"123456789 987654321"`, are not — Spotlight then drops the whole value
+(`mdls` shows `(null)`), and the file is found by **neither** id. The same text
+stored as a binary-plist string is indexed and found by each token. fileanchor
+therefore stores the id list as a binary plist (since 1.2.0). Verified on
+macOS 15.8 and 27.2.
 
 ## iCloud Drive
 
@@ -61,8 +75,14 @@ system-special-cased.
 |---|---|
 | `com.apple.metadata:_kMDItemUserTags` (★ Finder tag) | **yes** |
 | `com.fileregister.id#S` (custom namespace + `#S`) | **yes** |
+| `com.fileregister.id` (custom namespace, no flag) | **no** |
 | `com.apple.metadata:kMDItemInformation#S` (Apple key + `#S`) | **no** |
+| `com.apple.metadata:kMDItemInformation` (Apple key, no flag) | **no** |
 | `com.apple.metadata:kMDItemProjects` (Apple key, no flag) | **no** |
+
+Re-verified 2026-09-27 in both directions between macOS 15.8 and 27.2, with
+identical results. The receiver also gets `com.apple.FinderInfo`. A custom
+name needs the `#S` to travel; without it iCloud drops it like the Apple keys.
 
 **`#S` scope:** `#S` syncs a **custom-namespace** xattr
 (`com.fileregister.*`) but **not** a `com.apple.metadata:kMDItem*` name — that
@@ -109,6 +129,12 @@ the (separately-synced) records.
 
 **Test discipline:**
 
+- Each Mac writes into its **own** folder name. If both create the same new
+  folder before either has synced, iCloud keeps one and renames the other
+  (`… 2`); a reader waiting at a fixed path then waits forever.
+- A dormant iCloud Drive may schedule the upload and never run it
+  (`brctl status`: `sync-up-scheduled`, attempts 0). Restarting the daemon
+  (`killall bird`) got it going.
 - A same-Mac "Remove Download → re-download" is **not** a sync test: the local
   placeholder keeps all xattrs, so everything survives spuriously. A valid test
   reads on a **different device**.
