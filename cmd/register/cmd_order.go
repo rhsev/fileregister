@@ -426,13 +426,14 @@ func orderWriteOverride(note, binder string, rec map[string]any, field string, v
 			}
 			found = true
 			var newLines []string
+			ind := blockIndent(lines)
 			for _, l := range lines {
-				if !keyLine(l, field) {
+				if !keyLine(l, field, ind) {
 					newLines = append(newLines, l)
 				}
 			}
 			if value != nil {
-				newLines = append(newLines, yamlLine(field, index.AsString(value)))
+				newLines = append(newLines, ind+yamlLine(field, index.AsString(value)))
 			}
 			return "```yaml\n" + strings.Join(newLines, "\n") + "\n```", true
 		})
@@ -510,12 +511,13 @@ func orderWriteOverrides(note, binder string, byID map[string]map[string]any, fi
 			}
 			written[mid] = true
 			var newLines []string
+			ind := blockIndent(lines)
 			for _, l := range lines {
-				if !keyLine(l, field) {
+				if !keyLine(l, field, ind) {
 					newLines = append(newLines, l)
 				}
 			}
-			newLines = append(newLines, yamlLine(field, keys[mid]))
+			newLines = append(newLines, ind+yamlLine(field, keys[mid]))
 			return "```yaml\n" + strings.Join(newLines, "\n") + "\n```", true
 		})
 		if terr != nil {

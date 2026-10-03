@@ -192,13 +192,44 @@ func promoteRecords(records []map[string]any, mdTarget, binder string) (int, int
 
 // keyLine reports whether a line is a top-level YAML key line (\A\s*key\s*:),
 // as tolerant as the parser so edits don't silently no-op on hand-formatted blocks.
-func keyLine(line, key string) bool {
-	s := strings.TrimLeft(line, " \t")
+// keyLine reports whether line opens the top-level key `key` of a block whose
+// top-level keys sit at indent (blockIndent). A deeper-indented line belongs
+// to the value above it — a `place:` inside a multi-line comment is prose, and
+// matching it used to replace or delete that prose.
+func keyLine(line, key, indent string) bool {
+	if !opensKey(line, indent) {
+		return false
+	}
+	s := line[len(indent):]
 	if !strings.HasPrefix(s, key) {
 		return false
 	}
 	s = strings.TrimLeft(s[len(key):], " \t")
 	return strings.HasPrefix(s, ":")
+}
+
+// opensKey reports whether line starts a new top-level entry at indent: not
+// deeper, not a sequence item of the key above, not blank.
+func opensKey(line, indent string) bool {
+	if !strings.HasPrefix(line, indent) || len(line) == len(indent) {
+		return false
+	}
+	c := line[len(indent)]
+	return c != ' ' && c != '\t' && c != '-'
+}
+
+// blockIndent returns the indentation of a block's top-level keys: the leading
+// whitespace of its first content line. fileregister writes column 0, but YAML
+// lets a hand-written root mapping sit indented.
+func blockIndent(lines []string) string {
+	for _, l := range lines {
+		t := strings.TrimLeft(l, " \t")
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		return l[:len(l)-len(t)]
+	}
+	return ""
 }
 
 // yamlLine renders one "key: value" YAML line (MdEditor.yaml_line).
@@ -247,17 +278,17 @@ func mdRenameBinder(path, oldName, newName string) (int, error) {
 			return "", false
 		}
 		out := make([]string, len(lines))
+		ind := blockIndent(lines)
 		for i, l := range lines {
-			if keyLine(l, "binder") {
-				out[i] = yamlLine("binder", newName)
+			if keyLine(l, "binder", ind) {
+				out[i] = ind + yamlLine("binder", newName)
 			} else {
 				out[i] = l
 			}
 		}
 		body := strings.Join(out, "\n")
-		// keyLine is indentation-tolerant, so a binder: nested inside a custom
-		// sub-mapping matches too — verify the surgery still parses to the
-		// renamed record before accepting it.
+		// Verify the surgery still parses to the renamed record before
+		// accepting it (a binder: key with a multi-line value, say).
 		var check map[string]any
 		if yaml.Unmarshal([]byte(body), &check) != nil || index.AsString(check["binder"]) != newName {
 			fmt.Fprintf(os.Stderr, "  Warning: block for id %s in %s left unrenamed (nested binder: key) — edit by hand\n",
@@ -290,9 +321,10 @@ func mdRenameOrderingBinder(path, oldName, newName string) (int, error) {
 			return match
 		}
 		lines := strings.Split(body, "\n")
+		ind := blockIndent(lines)
 		for i, l := range lines {
-			if keyLine(l, "binder") {
-				lines[i] = yamlLine("binder", newName)
+			if keyLine(l, "binder", ind) {
+				lines[i] = ind + yamlLine("binder", newName)
 			}
 		}
 		changes++
@@ -555,10 +587,11 @@ func upsertOrderingConfig(path, binder, rule string) (string, error) {
 			return match
 		}
 		lines := strings.Split(body, "\n")
+		ind := blockIndent(lines)
 		replaced := false
 		for i, l := range lines {
-			if keyLine(l, "rule") {
-				lines[i] = yamlLine("rule", rule)
+			if keyLine(l, "rule", ind) {
+				lines[i] = ind + yamlLine("rule", rule)
 				replaced = true
 			}
 		}

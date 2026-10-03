@@ -17,6 +17,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -233,10 +234,6 @@ func annotateValue(v string) string {
 	return yamlScalar(v)
 }
 
-// yamlKeyLineRe: a line opening a new top-level mapping key (as tolerant as
-// keyLine) — used to know where a removed key's block-sequence items end.
-var yamlKeyLineRe = regexp.MustCompile(`^[ \t]*[^ \t#-][^:]*:`)
-
 // annotateEditBlocks applies set/unset to every matching (id ∪ aka, binder)
 // ref block, preserving unrelated lines byte-identically. Returns the edited
 // content and the count of changed blocks.
@@ -256,22 +253,23 @@ func annotateEditBlocks(content string, keys map[string]bool, binder string, set
 		}
 
 		lines := strings.Split(body, "\n")
+		ind := blockIndent(lines)
 		var out []string
 		replaced := map[string]bool{}
 		skip := false
 		for _, l := range lines {
-			// A removed/replaced key swallows its block-sequence items up to
-			// the next key line.
+			// A removed/replaced key swallows its value lines (a sequence, a
+			// multi-line scalar) up to the next top-level key.
 			if skip {
-				if !yamlKeyLineRe.MatchString(l) {
+				if !opensKey(l, ind) {
 					continue
 				}
 				skip = false
 			}
 			handled := false
 			for _, s := range sets {
-				if keyLine(l, s.key) {
-					out = append(out, s.key+": "+annotateValue(s.value))
+				if keyLine(l, s.key, ind) {
+					out = append(out, ind+s.key+": "+annotateValue(s.value))
 					replaced[s.key] = true
 					skip = true
 					handled = true
@@ -282,7 +280,7 @@ func annotateEditBlocks(content string, keys map[string]bool, binder string, set
 				continue
 			}
 			for _, k := range unsets {
-				if keyLine(l, k) {
+				if keyLine(l, k, ind) {
 					skip = true
 					handled = true
 					break
@@ -295,17 +293,71 @@ func annotateEditBlocks(content string, keys map[string]bool, binder string, set
 		}
 		for _, s := range sets {
 			if !replaced[s.key] {
-				out = append(out, s.key+": "+annotateValue(s.value))
+				out = append(out, ind+s.key+": "+annotateValue(s.value))
 			}
 		}
 
-		repl := "```yaml\n" + strings.Join(out, "\n") + "\n```"
+		// Verify the surgery touched only the keys asked for; otherwise leave
+		// the block as it was (an unusual layout is better edited by hand).
+		newBody := strings.Join(out, "\n")
+		if !annotateOnlyTargetsChanged(parsed, newBody, sets, unsets) {
+			fmt.Fprintf(os.Stderr, "  Warning: block for id %s left unchanged (unusual layout) — edit by hand\n",
+				index.AsString(parsed["id"]))
+			return match
+		}
+		repl := "```yaml\n" + newBody + "\n```"
 		if repl != match {
 			changed++
 		}
 		return repl
 	})
 	return edited, changed
+}
+
+// annotateOnlyTargetsChanged re-parses an edited block and checks that every
+// key not being set or unset kept its value, unset keys are gone and set keys
+// are present.
+func annotateOnlyTargetsChanged(before map[string]any, newBody string, sets []annotateSet, unsets []string) bool {
+	var after map[string]any
+	if yaml.Unmarshal([]byte(newBody), &after) != nil || after == nil {
+		return false
+	}
+	touched := map[string]bool{}
+	for _, s := range sets {
+		touched[s.key] = true
+		if _, ok := after[s.key]; !ok {
+			return false
+		}
+	}
+	for _, k := range unsets {
+		touched[k] = true
+		if _, ok := after[k]; ok && !isSetKey(sets, k) {
+			return false
+		}
+	}
+	for k, v := range before {
+		if touched[k] {
+			continue
+		}
+		if !reflect.DeepEqual(after[k], v) {
+			return false
+		}
+	}
+	for k := range after {
+		if _, ok := before[k]; !ok && !touched[k] {
+			return false
+		}
+	}
+	return true
+}
+
+func isSetKey(sets []annotateSet, k string) bool {
+	for _, s := range sets {
+		if s.key == k {
+			return true
+		}
+	}
+	return false
 }
 
 // headingLevelOf returns the Markdown heading level of a line (1–6), or 0.

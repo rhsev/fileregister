@@ -240,23 +240,26 @@ func mdStripAka(path, id string, current, handles []string) (int, error) {
 		}
 
 		var out []string
+		ind := blockIndent(lines)
 		skip, idDone := false, !setID
 		for _, l := range lines {
-			// The aka: key swallows its block-sequence items up to the next key line.
+			// The aka: key swallows its value lines up to the next top-level key.
 			if skip {
-				if !yamlKeyLineRe.MatchString(l) {
+				if !opensKey(l, ind) {
 					continue
 				}
 				skip = false
 			}
 			switch {
-			case keyLine(l, "aka"):
+			case keyLine(l, "aka", ind):
 				if len(keep) > 0 {
-					out = append(out, strings.Split(strings.TrimSuffix(yamlFieldVal("aka", keep), "\n"), "\n")...)
+					for _, al := range strings.Split(strings.TrimSuffix(yamlFieldVal("aka", keep), "\n"), "\n") {
+						out = append(out, ind+al)
+					}
 				}
 				skip = true
-			case setID && keyLine(l, "id") && l == strings.TrimLeft(l, " \t"):
-				out = append(out, yamlLine("id", id))
+			case setID && keyLine(l, "id", ind):
+				out = append(out, ind+yamlLine("id", id))
 				idDone = true
 			default:
 				out = append(out, l)
@@ -266,16 +269,16 @@ func mdStripAka(path, id string, current, handles []string) (int, error) {
 			// aka-only block: the id goes right after type:, where promote puts it.
 			at := 0
 			for i, l := range out {
-				if keyLine(l, "type") {
+				if keyLine(l, "type", ind) {
 					at = i + 1
 					break
 				}
 			}
-			out = append(out[:at], append([]string{yamlLine("id", id)}, out[at:]...)...)
+			out = append(out[:at], append([]string{ind + yamlLine("id", id)}, out[at:]...)...)
 		}
 		body := strings.Join(out, "\n")
-		// keyLine is indentation-tolerant — verify the surgery still parses to
-		// the intended id and reduced list before accepting it.
+		// Verify the surgery still parses to the intended id and reduced list
+		// before accepting it.
 		var check map[string]any
 		if yaml.Unmarshal([]byte(body), &check) != nil || index.AsString(check["id"]) != wantID ||
 			strings.Join(index.AsStrings(check["aka"]), "\x00") != strings.Join(index.AsStrings(keep), "\x00") {
