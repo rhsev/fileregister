@@ -196,6 +196,17 @@ func cmdAdd(args []string) int {
 
 	// One index read and one bookmark-db read serve the aka check and the
 	// guard sweep below (add is the hottest daily command).
+	// Hold both locks for the whole command, bookmarks first — the order
+	// every writer takes them in: the id and aka checks below read the
+	// index, and a concurrent add must not slip in between check and write.
+	if err := index.LockBookmarks(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
+	if err := index.LockIndexDir(filepath.Join(nd, "collections")); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
 	refs, refsOK := loadRefs(nd)
 	if !refsOK {
 		return 1
@@ -507,6 +518,17 @@ func addURLRecord(opts addOptions, binderSet bool) int {
 	}
 	nd, err := notesDir()
 	if err != nil {
+		return 1
+	}
+	// Hold both locks for the whole command, bookmarks first — the order
+	// every writer takes them in: the id and aka checks below read the
+	// index, and a concurrent add must not slip in between check and write.
+	if err := index.LockBookmarks(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
+	if err := index.LockIndexDir(filepath.Join(nd, "collections")); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		return 1
 	}
 	refs, refsOK := loadRefs(nd)

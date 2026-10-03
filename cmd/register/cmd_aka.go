@@ -63,6 +63,12 @@ func cmdAka(args []string) int {
 	if err != nil {
 		return 1
 	}
+	// The aka checks below read the index; hold its lock from here, so a
+	// concurrent aka or add cannot take a handle between check and write.
+	if err := index.LockIndexDir(filepath.Join(nd, "collections")); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
 	refs, refsOK := loadRefs(nd)
 	if !refsOK {
 		return 1
