@@ -71,7 +71,11 @@ func cmdResolve(args []string) int {
 	if u := index.RefURL(rec); u != "" {
 		path = u
 	} else {
-		path = index.BookmarkGet(index.AsString(rec["id"]))
+		var err error
+		if path, err = index.BookmarkGet(index.AsString(rec["id"])); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			return 1
+		}
 	}
 
 	if record {

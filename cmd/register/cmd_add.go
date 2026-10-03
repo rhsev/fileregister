@@ -197,7 +197,11 @@ func cmdAdd(args []string) int {
 	// One index read and one bookmark-db read serve the aka check and the
 	// guard sweep below (add is the hottest daily command).
 	refs := mustRefs(nd)
-	db := index.LoadDB()
+	db, err := index.LoadDB()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
 
 	// aka uniqueness across the index (a clash with the file's OWN record is fine).
 	if opts.aka != "" {
@@ -511,7 +515,11 @@ func addURLRecord(opts addOptions, binderSet bool) int {
 	if existingURL != nil {
 		id = index.AsString(existingURL["id"])
 	} else {
-		db := index.LoadDB()
+		db, err := index.LoadDB()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			return 1
+		}
 		ids := map[string]bool{}
 		for _, r := range refs {
 			ids[index.AsString(r["id"])] = true

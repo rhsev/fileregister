@@ -11,7 +11,9 @@ package index
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -33,18 +35,27 @@ func bookmarkFile() string {
 	return filepath.Join(home, ".local", "share", "bookmarks.json")
 }
 
-// LoadDB reads the id→blob map. A missing or corrupt file yields an empty map,
-// a corrupt file reads as an empty database rather than a fatal error.
-func LoadDB() map[string]string {
-	data, err := os.ReadFile(bookmarkFile())
+// LoadDB reads the id→blob map. Only a missing file is an empty database. A
+// file that cannot be read or parsed is an error: every writer saves the whole
+// map back, so reading a damaged file as empty would wipe every bookmark on
+// the next save.
+func LoadDB() (map[string]string, error) {
+	path := bookmarkFile()
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return map[string]string{}, nil
+	}
 	if err != nil {
-		return map[string]string{}
+		return nil, fmt.Errorf("cannot read the bookmark database %s: %w", path, err)
 	}
 	var db map[string]string
-	if err := json.Unmarshal(data, &db); err != nil || db == nil {
-		return map[string]string{}
+	if err := json.Unmarshal(data, &db); err != nil {
+		return nil, fmt.Errorf("the bookmark database %s is damaged (%v); restore it from a backup — register will not overwrite it", path, err)
 	}
-	return db
+	if db == nil {
+		db = map[string]string{}
+	}
+	return db, nil
 }
 
 // SaveDB writes the map as pretty JSON. Keys are sorted, which also gives
@@ -107,22 +118,26 @@ func NextFreeID(db map[string]string, id string) string {
 	}
 }
 
-// BookmarkGet resolves a single id to a file path, or "" if unresolvable.
-func BookmarkGet(id string) string {
-	db := LoadDB()
+// BookmarkGet resolves a single id to a file path, or "" if unresolvable. The
+// error is for a bookmark database that cannot be read.
+func BookmarkGet(id string) (string, error) {
+	db, err := LoadDB()
+	if err != nil {
+		return "", err
+	}
 	blob, ok := db[id]
 	if !ok {
-		return ""
+		return "", nil
 	}
 	resp, err := fileAnchor().request(map[string]any{"op": "resolve", "blob": blob})
 	if err != nil {
-		return ""
+		return "", nil
 	}
 	if ok, _ := resp["ok"].(bool); ok {
 		path, _ := resp["path"].(string)
-		return path
+		return path, nil
 	}
-	return ""
+	return "", nil
 }
 
 // BatchGet resolves many ids in one shot through the single persistent engine
@@ -136,7 +151,10 @@ func BatchGet(ids []string) (map[string]string, error) {
 	if len(ids) == 0 {
 		return results, nil
 	}
-	db := LoadDB()
+	db, err := LoadDB()
+	if err != nil {
+		return results, err
+	}
 
 	type pair struct {
 		id   string
@@ -189,11 +207,6 @@ func existingIDIn(db map[string]string, path string) string {
 	return ""
 }
 
-// FindExistingID loads the db and looks up an id already carried by the file.
-func FindExistingID(path string) string {
-	return existingIDIn(LoadDB(), path)
-}
-
 // ExistingIDIn is existingIDIn for callers that already hold a loaded db.
 func ExistingIDIn(db map[string]string, path string) string {
 	return existingIDIn(db, path)
@@ -224,15 +237,18 @@ func RegisterIn(db map[string]string, path, id string) (string, error) {
 // file already carries one. Idempotent. An explicit id (repair flows) bypasses
 // the existence check. Returns "" on a save failure.
 func BookmarkAdd(path, id string) (string, error) {
-	if id == "" {
-		if existing := FindExistingID(path); existing != "" {
-			return existing, nil
-		}
-	}
 	if err := LockBookmarks(); err != nil {
 		return "", err
 	}
-	db := LoadDB()
+	db, err := LoadDB()
+	if err != nil {
+		return "", err
+	}
+	if id == "" {
+		if existing := existingIDIn(db, path); existing != "" {
+			return existing, nil
+		}
+	}
 	id = NextFreeID(db, id)
 	newID, err := RegisterIn(db, path, id)
 	if err != nil {
@@ -264,7 +280,10 @@ func AddMany(paths []string, reserved map[string]bool) ([]BookmarkResult, error)
 	if err := LockBookmarks(); err != nil {
 		return nil, err
 	}
-	db := LoadDB()
+	db, err := LoadDB()
+	if err != nil {
+		return nil, err
+	}
 	results := make([]BookmarkResult, 0, len(paths))
 	dirty := false
 	for _, path := range paths {
@@ -298,7 +317,10 @@ func Rebind(id, path string) (string, error) {
 	if err := LockBookmarks(); err != nil {
 		return "", err
 	}
-	db := LoadDB()
+	db, err := LoadDB()
+	if err != nil {
+		return "", err
+	}
 	newID, err := RegisterIn(db, path, id)
 	if err != nil {
 		return "", err

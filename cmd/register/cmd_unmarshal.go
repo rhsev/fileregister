@@ -169,7 +169,11 @@ func cmdUnmarshal(args []string) int {
 		fmt.Fprintln(os.Stderr, "register:", lerr)
 		return 1
 	}
-	db := index.LoadDB() // one load: the snapshot AND the working DB for this run
+	db, err := index.LoadDB() // one load: the snapshot AND the working DB for this run
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
 	dbDirty := false
 	imported := 0
 	parked := 0

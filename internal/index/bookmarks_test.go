@@ -79,7 +79,7 @@ func TestBookmarkAddGetRoundtrip(t *testing.T) {
 	}
 
 	// resolve back to the same path.
-	if got := BookmarkGet(id); got != real {
+	if got, _ := BookmarkGet(id); got != real {
 		t.Errorf("BookmarkGet(%s) = %q, want %q", id, got, real)
 	}
 
@@ -102,5 +102,51 @@ func TestBookmarkAddGetRoundtrip(t *testing.T) {
 	}
 	if res["000000001"] != "" {
 		t.Errorf("BatchGet[unknown] = %q, want empty", res["000000001"])
+	}
+}
+
+// TestDamagedDBIsNeverOverwritten: every writer saves the whole map back, so a
+// bookmarks.json that cannot be parsed must stop them — reading it as empty
+// used to wipe every stored bookmark on the next add.
+func TestDamagedDBIsNeverOverwritten(t *testing.T) {
+	useEngine(t)
+	t.Setenv("HOME", t.TempDir())
+	defer fileAnchor().shutdown()
+
+	dbPath := bookmarkFile()
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	f := filepath.Join(t.TempDir(), "doc.pdf")
+	if err := os.WriteFile(f, []byte("pdf"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	for label, content := range map[string]string{
+		"truncated":        `{"111111111":"Ym9vayAAAA`,
+		"sync conflict":    "{\"111111111\":\"Ym9vaw==\"}\n<<<<<<< conflict\n",
+		"non-string value": `{"111111111":42}`,
+	} {
+		if err := os.WriteFile(dbPath, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadDB(); err == nil {
+			t.Errorf("%s: LoadDB accepted a damaged file", label)
+		}
+		if _, err := AddMany([]string{f}, nil); err == nil {
+			t.Errorf("%s: AddMany went ahead on a damaged database", label)
+		}
+		if _, err := Rebind("111111111", f); err == nil {
+			t.Errorf("%s: Rebind went ahead on a damaged database", label)
+		}
+		if got, _ := os.ReadFile(dbPath); string(got) != content {
+			t.Errorf("%s: the damaged file was overwritten:\n%s", label, got)
+		}
+	}
+
+	// A missing file is an empty database, not an error.
+	os.Remove(dbPath)
+	if db, err := LoadDB(); err != nil || len(db) != 0 {
+		t.Errorf("missing file: LoadDB = %v, %v; want empty, nil", db, err)
 	}
 }
