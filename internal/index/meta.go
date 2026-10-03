@@ -187,3 +187,20 @@ func XattrBackendIncludes(path, binder, backend string) bool {
 	}
 	return false
 }
+
+// KeptTags returns a record's kept_tags: binder names whose Finder tag was on
+// the file before fileregister set it. The tags backend never removes those —
+// they are the user's own tags, which only happen to match a binder.
+func KeptTags(rec map[string]any) []string {
+	return AsStrings(rec["kept_tags"])
+}
+
+// IsKeptTag reports whether tag is one of the record's kept_tags.
+func IsKeptTag(rec map[string]any, tag string) bool {
+	for _, t := range KeptTags(rec) {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}

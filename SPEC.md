@@ -78,6 +78,7 @@ Fields:
 | `url` | optional | Locator alternative to the bookmark: the record references a URL (e.g. `x-devonthink-item://…`) instead of a file. Mutually exclusive with the bookmark identity — see [URL refs](#url-refs). |
 | `aka` | optional | Array of human-chosen handles that also resolve to this record (resolution matches `id` ∪ `aka`). For referencing a file by name — e.g. behind a `milan://` URL via `register resolve`. Must be unique across the index. |
 | `tags` | optional | Free-form annotation labels local to this ref (e.g. `[draft, v2]`). Not synchronized to macOS Spotlight metadata. |
+| `kept_tags` | optional | Set by register, never by hand. Binder names whose Finder tag was already on the file when it joined that binder with the `tags` backend: the user's own tags, which only happen to match a binder. `remove` and `rename` never take them off the file, and `audit` does not report them as ghosts. Absent means every binder tag on the file is register's. |
 | `xattr` | optional | xattr backend for this **file**: `itemprojects` (default), `tags`, or `none`. One choice per record; determines which macOS metadata field caches the binder names — see [macOS metadata layer](#macos-metadata-layer-derived). |
 
 `binder` is the only field synchronized with the macOS Spotlight metadata layer. The optional `tags:` array is reserved for record-level annotations — labels that distinguish files from each other (status, version, importance) without affecting Spotlight. Use it only when something more specific than `kind` needs to be expressed.
@@ -206,7 +207,7 @@ The id layers (`kMDItemInformation` plus the syncable `com.fileregister.id#S`) a
 | Backend | xattr field | Where visible | Trade-off |
 |---|---|---|---|
 | `itemprojects` (default) | `kMDItemProjects` | Spotlight only (`mdfind`) | Quiet; no clash with Finder Tag workflows; not surfaced on iOS |
-| `tags` | `kMDItemUserTags` | Finder chips, iOS Files sidebar, Spotlight | Visible cross-device via iCloud Drive; mingles with user's other Finder Tags |
+| `tags` | `kMDItemUserTags` | Finder chips, iOS Files sidebar, Spotlight | Visible cross-device via iCloud Drive; mingles with user's other Finder Tags — a tag of the same name the user had set before is recorded in `kept_tags` and never removed |
 | `none` | (no xattr) | (none) | Markdown-only; no Spotlight cache; minimal residue |
 
 The choice is **per file** (one backend per record), not per binder. All of a file's binder names are cached through the same backend. Use cases vary: photo files benefit from `tags` (Finder Cover Flow, iOS visibility); documents work well with `itemprojects` (quiet Spotlight cache); archival material may need `none` (Markdown-only). A file's backend can be changed later — `register audit` surfaces any stale entries left in the old layer.

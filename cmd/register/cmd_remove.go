@@ -74,6 +74,16 @@ func cmdRemove(args []string) int {
 }
 
 // removeTarget removes one file (or URL) from the binder; returns the exit code.
+// anyKeptTag reports whether any of the records keeps tag as the user's own.
+func anyKeptTag(recs []map[string]any, tag string) bool {
+	for _, r := range recs {
+		if index.IsKeptTag(r, tag) {
+			return true
+		}
+	}
+	return false
+}
+
 func removeTarget(nd, binder, targetArg string) int {
 	urlMode := urlRe.MatchString(targetArg)
 	filePath := ""
@@ -173,6 +183,11 @@ func removeTarget(nd, binder, targetArg string) int {
 	// URL refs carry no xattr layer and no ★ — the set-delete is everything.
 	if !urlMode {
 		for _, backend := range backendsUsed {
+			// A tag the user had set before the file joined the binder stays.
+			if backend == "tags" && anyKeptTag(matching, binder) {
+				fmt.Printf("kMDItemUserTags: '%s' is your own tag (kept)\n", binder)
+				continue
+			}
 			result := index.XattrBackendRemove(filePath, binder, backend)
 			layer := "kMDItemProjects"
 			if backend == "tags" {

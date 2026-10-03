@@ -250,9 +250,11 @@ func cmdAdd(args []string) int {
 	indexIDs := map[string]bool{}
 	backendByID := map[string]string{}
 	noteFileByID := map[string]string{}
+	recByID := map[string]map[string]any{}
 	for _, r := range refs {
 		id := index.AsString(r["id"])
 		indexIDs[id] = true
+		recByID[id] = r
 		backendByID[id] = index.XattrBackend(r)
 		if nf := index.AsString(r["_note_file"]); strings.HasSuffix(strings.ToLower(nf), ".jsonl") {
 			noteFileByID[id] = nf
@@ -319,6 +321,7 @@ func cmdAdd(args []string) int {
 	// explicit --target nor the default inbox forks a second record for an id
 	// that lives elsewhere.
 	actions := make([]string, len(records))
+	destOf := make([]string, len(records))
 	if len(records) > 0 {
 		type destGroup struct {
 			dest string
@@ -341,6 +344,7 @@ func cmdAdd(args []string) int {
 			}
 			groups[gi].idxs = append(groups[gi].idxs, i)
 			groups[gi].recs = append(groups[gi].recs, rec)
+			destOf[i] = dest
 		}
 		for _, g := range groups {
 			acts, werr := index.JSONLWriteMany(g.recs, g.dest)
@@ -358,6 +362,17 @@ func cmdAdd(args []string) int {
 	// 4. Membership layer per file (binder xattr + ★). Both mark membership, so a
 	//    bookmark add (no binder) writes neither.
 	appended, noop := 0, 0
+	keptChanges := map[string]map[string]map[string]bool{} // index file → id → tag → keep
+	noteKept := func(i int, keep bool) {
+		file, id := destOf[i], records[i].ID
+		if keptChanges[file] == nil {
+			keptChanges[file] = map[string]map[string]bool{}
+		}
+		if keptChanges[file][id] == nil {
+			keptChanges[file][id] = map[string]bool{}
+		}
+		keptChanges[file][id][opts.binder] = keep
+	}
 	for i := range records {
 		if binderSet {
 			path := pathByIdx[i]
@@ -372,12 +387,25 @@ func cmdAdd(args []string) int {
 				}
 				effBackend = stored
 			}
-			if index.XattrBackendAdd(path, opts.binder, effBackend) == "failed" {
+			result := index.XattrBackendAdd(path, opts.binder, effBackend)
+			if result == "failed" {
 				layer := "kMDItemProjects"
 				if effBackend == "tags" {
 					layer = "kMDItemUserTags"
 				}
 				fmt.Fprintf(os.Stderr, "  Warning: failed to update %s on %s\n", layer, filepath.Base(path))
+			}
+			// The tags backend shares Finder tags with the user. A tag that
+			// was already there when the file joined the binder is the user's:
+			// remember it, so remove never takes it (SPEC: kept_tags).
+			if effBackend == "tags" {
+				isNew := i < len(actions) && actions[i] != "noop"
+				switch {
+				case result == "noop" && isNew:
+					noteKept(i, true)
+				case result == "added" && index.IsKeptTag(recByID[records[i].ID], opts.binder):
+					noteKept(i, false)
+				}
 			}
 			if index.ManagedMark(path) == "failed" {
 				fmt.Fprintf(os.Stderr, "  Warning: failed to set ★ on %s\n", filepath.Base(path))
@@ -387,6 +415,12 @@ func cmdAdd(args []string) int {
 			noop++
 		} else {
 			appended++
+		}
+	}
+
+	for file, changes := range keptChanges {
+		if _, err := index.JSONLSetKeptTags(file, changes); err != nil {
+			fmt.Fprintf(os.Stderr, "  Warning: recording kept tags in %s failed: %v\n", filepath.Base(file), err)
 		}
 	}
 

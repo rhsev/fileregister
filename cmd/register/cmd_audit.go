@@ -230,6 +230,10 @@ func cmdAudit(args []string) int {
 		for _, b := range index.AsStrings(rec["binder"]) {
 			recordIndex[index.PathKey(rp)+"|"+b] = true
 		}
+		// A kept tag is the user's own, not a leftover of a membership.
+		for _, t := range index.KeptTags(rec) {
+			recordIndex[index.PathKey(rp)+"|"+t] = true
+		}
 	}
 
 	ghostCount := 0

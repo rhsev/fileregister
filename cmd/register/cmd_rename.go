@@ -152,6 +152,7 @@ func cmdRename(args []string) int {
 	xattrChanges := 0
 	xattrFailed := 0
 	seenIDs := map[string]bool{}
+	keptChanges := map[string]map[string]map[string]bool{} // index file → id → tag → keep
 	for _, rec := range records {
 		id := index.AsString(rec["id"])
 		if seenIDs[id] {
@@ -184,17 +185,34 @@ func cmdRename(args []string) int {
 			continue
 		}
 
-		if index.XattrBackendRemove(refPath, oldName, backend) == "failed" {
+		// With the tags backend, the old name's tag stays if it was the
+		// user's own; the new name's tag is the user's if it was already there.
+		keepOld := backend == "tags" && index.IsKeptTag(rec, oldName)
+		if !keepOld && index.XattrBackendRemove(refPath, oldName, backend) == "failed" {
 			fmt.Fprintf(os.Stderr, "  Warning: failed to remove '%s' from %s of %s\n", oldName, layer, filepath.Base(refPath))
 			xattrFailed++
 			continue
 		}
-		if index.XattrBackendAdd(refPath, newName, backend) == "failed" {
+		result := index.XattrBackendAdd(refPath, newName, backend)
+		if file := index.AsString(rec["_note_file"]); backend == "tags" && strings.HasSuffix(strings.ToLower(file), ".jsonl") &&
+			(result == "noop" || index.IsKeptTag(rec, newName)) {
+			if keptChanges[file] == nil {
+				keptChanges[file] = map[string]map[string]bool{}
+			}
+			keptChanges[file][id] = map[string]bool{newName: result == "noop"}
+		}
+		if result == "failed" {
 			fmt.Fprintf(os.Stderr, "  Warning: failed to add '%s' to %s of %s\n", newName, layer, filepath.Base(refPath))
 			xattrFailed++
 		} else {
 			xattrChanges++
 			fmt.Printf("  %s updated: %s\n", layer, filepath.Base(refPath))
+		}
+	}
+
+	for file, changes := range keptChanges {
+		if _, err := index.JSONLSetKeptTags(file, changes); err != nil {
+			fmt.Fprintf(os.Stderr, "  Warning: recording kept tags in %s failed: %v\n", filepath.Base(file), err)
 		}
 	}
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 
@@ -187,4 +188,53 @@ func PathsEqual(a, b string) bool {
 		return false
 	}
 	return realOrExpanded(a) == realOrExpanded(b)
+}
+
+// JSONLSetKeptTags updates the kept_tags of records in path: changes maps
+// id → tag → true (the tag was already the user's: keep it) or false
+// (fileregister set it itself: release it). One rewrite for the file.
+func JSONLSetKeptTags(path string, changes map[string]map[string]bool) (int, error) {
+	return JSONLRewrite(path, func(rec map[string]any) (map[string]any, bool) {
+		ch, ok := changes[AsString(rec["id"])]
+		if !ok {
+			return rec, false
+		}
+		kept := KeptTags(rec)
+		var next []any
+		seen := map[string]bool{}
+		for _, t := range kept {
+			if keep, touched := ch[t]; touched && !keep {
+				continue
+			}
+			seen[t] = true
+			next = append(next, t)
+		}
+		added := make([]string, 0, len(ch))
+		for t, keep := range ch {
+			if keep && !seen[t] {
+				added = append(added, t)
+			}
+		}
+		sort.Strings(added)
+		for _, t := range added {
+			next = append(next, t)
+		}
+		if len(next) == len(kept) {
+			same := true
+			for i, t := range next {
+				if t != kept[i] {
+					same = false
+				}
+			}
+			if same {
+				return rec, false
+			}
+		}
+		if len(next) == 0 {
+			delete(rec, "kept_tags")
+		} else {
+			rec["kept_tags"] = next
+		}
+		return rec, true
+	})
 }
