@@ -6,7 +6,8 @@ package index
 
 import (
 	"path/filepath"
-	"strings"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // locatorQuery runs a Spotlight selector through the engine, returning absolute paths.
@@ -28,16 +29,18 @@ func locatorQuery(by, value string) []string {
 	return out
 }
 
-// restrictByFilename keeps only files whose basename matches (case-insensitive).
+// restrictByFilename keeps only files whose basename matches — NFC and
+// case-folded as the volume compares names: the recorded filename is as typed
+// (usually precomposed), a path from Spotlight is often decomposed.
 // An empty filename returns all paths.
 func restrictByFilename(paths []string, filename string) []string {
 	if filename == "" {
 		return paths
 	}
-	base := strings.ToLower(filename)
+	base := foldCase(norm.NFC.String(filename))
 	var out []string
 	for _, p := range paths {
-		if strings.ToLower(filepath.Base(p)) == base {
+		if foldCase(norm.NFC.String(filepath.Base(p))) == base {
 			out = append(out, p)
 		}
 	}

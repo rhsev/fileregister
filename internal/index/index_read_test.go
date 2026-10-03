@@ -59,3 +59,11 @@ func TestRewriteKeepsWhatItDoesNotEdit(t *testing.T) {
 		t.Errorf("rewrite:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+func TestRestrictByFilenameNormalizes(t *testing.T) {
+	paths := []string{"/v/Rechnung-Müller.PDF", "/v/other.pdf"}
+	got := restrictByFilename(paths, "Rechnung-Müller.pdf")
+	if len(got) != 1 || got[0] != paths[0] {
+		t.Errorf("got %v", got)
+	}
+}
