@@ -33,10 +33,13 @@ func AtomicWrite(path string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	// Keep an existing file's permissions; 0644 only for a fresh file.
+	// Keep an existing file's permissions and extended attributes (Finder
+	// tags, comment); 0644 only for a fresh file. A hard link to the old file
+	// keeps the old content: replacing the file is what makes the write safe.
 	mode := os.FileMode(0644)
 	if st, serr := os.Stat(path); serr == nil {
 		mode = st.Mode().Perm()
+		copyXattrs(path, tmp.Name())
 	}
 	if err := os.Chmod(tmp.Name(), mode); err != nil {
 		return err
