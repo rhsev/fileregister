@@ -461,7 +461,10 @@ in the annotation blocks, grubber-readable like everything else:
 | `map` | Per-image map switch for the detail view. Without the field the map appears automatically when the photo carries GPS data; `map: false` suppresses it. |
 | `place`, `lat`, `lon` | Curated location: display text and coordinates. Fallback is the IPTC/EXIF data **inside** the image (read via Spotlight) — durable in the file itself, but lost to EXIF-stripping transports and unreadable without Spotlight. The YAML fields preserve the location independently; the image file is never written to. |
 
-The album title is the binder name. Location and date come from Spotlight's
+The album heading is the binder name unless the members' note names the album
+in its frontmatter: an `album` field, which grubber passes down to every block of
+the file. `--title TEXT` writes it to `collections/binder_<name>.md`, `--title ""`
+removes it (and a header left empty). Location and date come from Spotlight's
 IPTC/EXIF index (`mdls` — City/Country/creation date). Markdown **prose** under a
 block is private working notes and is never rendered. Non-image members (a PDF
 ticket, a map) render as link cards. Thumbnails go through `sips` (JPEG,

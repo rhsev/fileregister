@@ -716,7 +716,8 @@ func upsertFrontmatterField(path, key, value string) (string, error) {
 		lines := strings.Split(strings.TrimSuffix(head, "\n"), "\n")
 		for i, l := range lines {
 			if keyLine(l, key, "") {
-				lines[i] = yamlLine(key, value)
+				end := frontmatterKeyEnd(lines, i, len(lines)-1)
+				lines = append(lines[:i], append([]string{yamlLine(key, value)}, lines[end:]...)...)
 				out := strings.Join(lines, "\n") + "\n" + content[fmLen:]
 				if out == content {
 					return "updated", nil
@@ -743,6 +744,62 @@ func upsertFrontmatterField(path, key, value string) (string, error) {
 		return "", werr
 	}
 	return "created", nil
+}
+
+// removeFrontmatterField drops one key from a note's frontmatter, and the
+// frontmatter with it when nothing else is left. Returns "removed", or "absent"
+// when there was nothing to drop (no note, no header, no such key); the file is
+// then left untouched.
+func removeFrontmatterField(path, key string) (string, error) {
+	content, crlf, err := readNote(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "absent", nil
+		}
+		return "", err
+	}
+	fmLen := frontmatterLen(content)
+	if fmLen == 0 {
+		return "absent", nil
+	}
+	lines := strings.Split(strings.TrimSuffix(content[:fmLen], "\n"), "\n")
+	closing := len(lines) - 1
+	for i := 1; i < closing; i++ {
+		if !keyLine(lines[i], key, "") {
+			continue
+		}
+		lines = append(lines[:i], lines[frontmatterKeyEnd(lines, i, closing):]...)
+		body := content[fmLen:]
+		out := strings.Join(lines, "\n") + "\n" + body
+		if strings.TrimSpace(strings.Join(lines[1:len(lines)-1], "")) == "" {
+			// Nothing left in the header: drop it, and the blank line that
+			// upsertFrontmatterField puts between header and body.
+			out = strings.TrimPrefix(body, "\n")
+		}
+		if werr := writeNote(path, out, crlf); werr != nil {
+			return "", werr
+		}
+		return "removed", nil
+	}
+	return "absent", nil
+}
+
+// frontmatterKeyEnd returns the index just past the key on line i and its
+// value's continuation lines (indented, sequence items, blank lines between
+// them), so that replacing or removing a key never leaves half of a multi-line
+// value behind as broken YAML. closing is the index of the closing fence.
+func frontmatterKeyEnd(lines []string, i, closing int) int {
+	end := i + 1
+	for j := i + 1; j < closing; j++ {
+		if strings.TrimSpace(lines[j]) == "" {
+			continue
+		}
+		if opensKey(lines[j], "") {
+			break
+		}
+		end = j + 1
+	}
+	return end
 }
 
 // frontmatterLen returns the byte length of a leading YAML frontmatter

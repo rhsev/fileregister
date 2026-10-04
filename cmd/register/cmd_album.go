@@ -429,7 +429,17 @@ func cmdAlbum(args []string) int {
 	if err != nil {
 		return 1
 	}
-	if titleSet {
+	// An empty --title takes the name away again rather than writing album: '',
+	// which would leave a field that names nothing.
+	clearTitle := titleSet && strings.TrimSpace(title) == ""
+	cleared := ""
+	if clearTitle {
+		var werr error
+		if cleared, werr = removeFrontmatterField(defaultPromoteTarget(nd, binder), "album"); werr != nil {
+			fmt.Fprintf(os.Stderr, "Error: removing the album field failed: %v\n", werr)
+			return 1
+		}
+	} else if titleSet {
 		what, werr := upsertFrontmatterField(defaultPromoteTarget(nd, binder), "album", title)
 		if werr != nil {
 			fmt.Fprintf(os.Stderr, "Error: writing the album field failed: %v\n", werr)
@@ -612,7 +622,20 @@ func cmdAlbum(args []string) int {
 	if !ok {
 		return 1
 	}
-	if err := index.AtomicWrite(htmlPath, []byte(albumHTML(orDefault(albumFieldOf(annByID, memberOrder), binder), entries, cssText))); err != nil {
+	heading, headingNote := albumFieldOf(annByID, memberOrder)
+	if clearTitle {
+		// Say what the heading is now, not what was attempted: a note put
+		// together by hand can still name the album after ours stopped.
+		switch {
+		case heading != "":
+			fmt.Fprintf(os.Stderr, "note: the album is still named %q by the frontmatter of %s\n", heading, headingNote)
+		case cleared == "removed":
+			fmt.Println("Album field removed — the heading is the binder name again")
+		default:
+			fmt.Println("No album field to remove — the heading is the binder name")
+		}
+	}
+	if err := index.AtomicWrite(htmlPath, []byte(albumHTML(orDefault(heading, binder), entries, cssText))); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", htmlPath, err)
 		return 1
 	}
