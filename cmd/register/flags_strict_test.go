@@ -50,10 +50,14 @@ func TestListMachineOutput(t *testing.T) {
 	if _, e, code := runGoAdd(t, env, f, "--binder", "b"); code != 0 {
 		t.Fatalf("add: %d %s", code, e)
 	}
-	for _, args := range [][]string{{"--json"}, {"--paths"}, {"b", "c", "--paths"}, {"b", "--print0"}} {
+	for _, args := range [][]string{{"--paths"}, {"--print0"}, {"b", "c", "--paths"}, {"b", "--print0"}} {
 		if out, _, code := runGoList(t, env, args...); code != 1 || out != "" {
 			t.Errorf("list %v: code %d, out %q", args, code, out)
 		}
+	}
+	// Without a binder, --json lists the binders — as JSONL, not the table.
+	if out, _, code := runGoList(t, env, "--json"); code != 0 || out != `{"name":"b","count":1}`+"\n" {
+		t.Errorf("list --json: code %d, out %q", code, out)
 	}
 	out, errOut, _ := runGoList(t, env, "b", "--paths")
 	if out != "" || !strings.Contains(errOut, "--print0") {

@@ -156,7 +156,7 @@ func notesDir() (string, error) {
 // 1-arg entry point; the body lives in listAllFiltered
 // (cmd_list.go), shared with the --inbox/--curated variants.
 func listAll(notesDir string) error {
-	return listAllFiltered(notesDir, "")
+	return listAllFiltered(notesDir, "", false)
 }
 
 // ---------------------------------------------------------------------------

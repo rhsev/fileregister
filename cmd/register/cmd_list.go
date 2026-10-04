@@ -63,8 +63,10 @@ func cmdList(args []string) int {
 	if len(positional) == 1 {
 		binder = positional[0]
 	}
-	if binder == "" && (pathsOnly || jsonOnly || print0) {
-		fmt.Fprintln(os.Stderr, "register list: --paths, --print0 and --json list one binder: register list <binder> --paths")
+	// Without a binder, --json lists the binders themselves; paths only
+	// exist per binder.
+	if binder == "" && (pathsOnly || print0) {
+		fmt.Fprintln(os.Stderr, "register list: --paths and --print0 list one binder: register list <binder> --paths")
 		return 1
 	}
 	if print0 && !pathsOnly {
@@ -84,7 +86,7 @@ func cmdList(args []string) int {
 		}
 		return 0
 	}
-	if err := listAllFiltered(dir, filter); err != nil {
+	if err := listAllFiltered(dir, filter, jsonOnly); err != nil {
 		fmt.Fprintln(os.Stderr, "register:", err)
 		return 1
 	}
@@ -102,7 +104,12 @@ func containsArg(args []string, flag string) bool {
 
 // listAllFiltered lists all binders with counts. filter "" is the pure-register
 // view; "inbox"/"curated" restrict to records without / with a Markdown annotation.
-func listAllFiltered(notesDir, filter string) error {
+// jsonOnly prints one {"name","count"} line per binder instead of the table —
+// and nothing at all for an empty set, where the table prints a sentence a
+// consumer would otherwise have to recognize. The key is "name", not "binder":
+// everywhere else "binder" is a record's membership, a list, and this line
+// describes the binder itself.
+func listAllFiltered(notesDir, filter string, jsonOnly bool) error {
 	active, err := index.ReadIndex(notesDir)
 	if err != nil {
 		return err
@@ -131,7 +138,9 @@ func listAllFiltered(notesDir, filter string) error {
 	}
 
 	if len(active) == 0 {
-		fmt.Printf("No active binders found%s.\n", label)
+		if !jsonOnly {
+			fmt.Printf("No active binders found%s.\n", label)
+		}
 		return nil
 	}
 
@@ -154,6 +163,13 @@ func listAllFiltered(notesDir, filter string) error {
 	sort.Slice(sorted, func(i, j int) bool {
 		return strings.ToLower(sorted[i].name) < strings.ToLower(sorted[j].name)
 	})
+
+	if jsonOnly {
+		for _, e := range sorted {
+			fmt.Println("{" + jsonPair("name", e.name) + "," + jsonPair("count", e.count) + "}")
+		}
+		return nil
+	}
 
 	// Column width is measured in runes, not bytes, so non-ASCII names align.
 	maxLen := 0

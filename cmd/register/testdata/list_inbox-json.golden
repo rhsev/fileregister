@@ -1,0 +1,7 @@
+exit: 0
+=== stdout ===
+{"name":"Archive","count":1}
+{"name":"Documents","count":2}
+{"name":"Photos","count":2}
+{"name":"videos","count":2}
+=== stderr ===

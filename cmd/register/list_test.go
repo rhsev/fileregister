@@ -64,6 +64,9 @@ func TestListAll(t *testing.T) {
 	assertList(t, "all", env)
 	assertList(t, "inbox", env, "--inbox")
 	assertList(t, "curated", env, "--curated")
+	assertList(t, "all-json", env, "--json")
+	assertList(t, "inbox-json", env, "--inbox", "--json")
+	assertList(t, "curated-json", env, "--curated", "--json")
 
 	// empty index → "No active binders found." with matching label per filter.
 	empty := t.TempDir()
@@ -72,6 +75,7 @@ func TestListAll(t *testing.T) {
 	assertList(t, "empty-all", eenv)
 	assertList(t, "empty-inbox", eenv, "--inbox")
 	assertList(t, "empty-curated", eenv, "--curated")
+	assertList(t, "empty-json", eenv, "--json") // no sentence, no lines, exit 0
 }
 
 // makeMixFixture builds one binder "Mix" with two url refs and one file ref whose
