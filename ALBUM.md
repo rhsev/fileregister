@@ -18,8 +18,8 @@ register promote --binder safari --edit
 
 # 3. Fill in the album fields per block in the note (see below)
 
-# 4. Render and look at it
-register album safari --open
+# 4. Name it, render it, look at it (the name stays in the note)
+register album safari --title "Safari, Namibia 2026" --open
 ```
 
 The result lands in `<notes>/collections/albums/safari/` (`--out DIR` picks
@@ -49,16 +49,24 @@ title: At the waterhole
 
 ```sh
 register album safari --title "Safari, Namibia 2026"   # writes or updates the field
+register album safari --title ""                       # removes it again
 ```
 
 Nothing looks the value up. grubber passes every frontmatter key down into each
 block of the file, so the field arrives on every record, and the renderer takes
-it from the members it already has. Which is also why the query works without
-anything further:
+it from the members it already has. The same makes the album searchable:
 
 ```sh
-grubber extract ~/notes -a -f album~Safari    # every member of that album
+grubber extract ~/notes -a -f album~Safari -f type=ref   # every member of that album
 ```
+
+`type=ref` keeps the rest out: the note's ordering block inherits the field
+too, and so does any other note with an `album` key in its header.
+
+The name belongs to the note, not to the binder: keep one binder per note, or
+every binder in it shares the name. `--title` writes to the binder's own note,
+`collections/binder_safari.md`, where `promote` puts its blocks, so this only
+comes up with notes put together by hand.
 
 A binder without the field keeps the binder name as its heading, which is what
 every album showed before.
