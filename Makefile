@@ -18,6 +18,11 @@ GRUBBER_VERSION ?= v0.18.0
 # Stamp the version from the tag rather than trusting a literal in main.go,
 # which shipped 1.4.0 as 1.3.0. A dirty or untagged tree says so in --version.
 VERSION := $(shell git describe --tags --dirty --always 2>/dev/null | sed 's/^v//')
+# Outside a checkout (a source tarball) describe says nothing, and an empty
+# -X would stamp an empty version; fall back to the variable's own default.
+ifeq ($(VERSION),)
+VERSION := dev
+endif
 LDFLAGS := -X main.registerVersion=$(VERSION)
 
 .PHONY: build fileanchor grubber link unlink install uninstall install-services uninstall-services test

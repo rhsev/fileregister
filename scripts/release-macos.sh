@@ -29,12 +29,15 @@ GRUBBER_VERSION="${GRUBBER_VERSION:-v0.18.0}"
 ARCH="arm64"
 OUT="$(pwd)/.build/dist"
 STAGE="$OUT/fileregister-macos-$ARCH"
-rm -rf "$OUT"
-mkdir -p "$STAGE/libexec"
-
 # The version comes from the tag, as in the Makefile: what --version prints is
 # what was tagged, or visibly not (1.4.0-2-g1a2b3c4-dirty).
 VERSION="$(git describe --tags --dirty --always | sed 's/^v//')"
+# A release without a version is worse than no release: stop, before the
+# previous bundle is cleared, rather than ship a binary whose --version is empty.
+[ -n "$VERSION" ] || { echo "release-macos.sh: no version from git describe — run it in a checkout" >&2; exit 1; }
+rm -rf "$OUT"
+mkdir -p "$STAGE/libexec"
+
 echo "==> register $VERSION (Go, $ARCH)"
 CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" go build -ldflags="-X main.registerVersion=$VERSION" -o "$STAGE/register" ./cmd/register
 
