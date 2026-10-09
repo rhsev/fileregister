@@ -242,7 +242,7 @@ The core (`list`, `audit`, `refresh`, `repair`, `marshal`) reads the index direc
 
 - **Editing commands** (`rename`, `cleanup`) also read annotations via `read_annotations`, so a record's `binder` set is updated in both the index and any per-binder annotation blocks. (`remove` deliberately does not: it set-deletes in the index only, and `cleanup` reviews the stale blocks.)
 - **`list --inbox` / `list --curated`** — explicit on-demand filters that consult the Markdown layer to determine annotation status. The default `list` (no flag, no binder) is pure-register and never reads Markdown.
-- **The query layer** — grubber-over-Markdowns — reads the annotation layer, for matterbase's queries and for `register album`, which renders a binder from its curation. register alone is the index; whenever the Markdown comes into play, grubber reads it. An album needs grubber at runtime for that reason.
+- **The query layer** — grubber-over-Markdowns — reads the annotation layer, for matterbase's queries and for `register album`, which joins a binder's curation into its lines. register alone is the index; whenever the Markdown comes into play, grubber reads it. An album needs grubber at runtime for that reason.
 
 A `type: ref` block hand-written into a project note is therefore part of the *annotation* layer; `register reindex` pulls such records into the index so the core sees them too.
 
@@ -444,34 +444,32 @@ Duplicates do not appear here: with one record per file and `binder` as a set, d
 
 This tool is **not** part of matterbase. Its workflow is a per-item review with accept/reject in the CLI, like `git add -p`'s patch mode.
 
-### `register album <binder> [--out DIR] [--css FILE] [--milan DIR] [--title TEXT] [--open]`
+### `register album <binder> [--title TEXT]`
 
 (User guide: [ALBUM.md](ALBUM.md).)
 
-Renders a binder as a **static, self-contained HTML photo album** (folder with
-`index.html`, `media/`, `thumbs/`) — copy it, zip it, or serve it in the LAN
-(dylan). The album layer is pure render: the curated data lives as YAML fields
-in the annotation blocks, grubber-readable like everything else:
+Prints the binder as an **album: its members in order, as JSON lines**, and
+writes nothing (but the name, with `--title`). Each line is the member's
+`register list <binder> --json` line, built by the same function, plus:
 
-| Field | Meaning |
+| Key | Content |
 |---|---|
-| `sort` | Order key, plain string sort (`"1" < "10" < "2" < "a"` — computer order). Records without it follow, by filename. |
-| `title` | Entry title. Fallback: IPTC headline (via Spotlight), then filename. |
-| `comment` | Caption shown in the album. Fallback: IPTC description. |
-| `map` | Per-image map switch for the detail view. Without the field the map appears automatically when the photo carries GPS data; `map: false` suppresses it. |
-| `place`, `lat`, `lon` | Curated location: display text and coordinates. Fallback is the IPTC/EXIF data **inside** the image (read via Spotlight) — durable in the file itself, but lost to EXIF-stripping transports and unreadable without Spotlight. The YAML fields preserve the location independently; the image file is never written to. |
+| `position` | 1-based, in the order `register order show` resolves (`sort:` keys first, then the rule, `name`). One source of order: the album cannot disagree with the ordering it is made of. |
+| `fields` | The member's block as grubber returns it (`--no-fill`), frontmatter inherited, minus `type`, `id`, `binder`, `sort` and grubber's `_`-prefixed keys. Open set; omitted when empty. |
+| `file` | What the file carries: `size`, `modified` (file system); `type`, `title`, `comment`, `place`, `date`, `lat`, `lon`, `camera`, `width`, `height`, `pages`, `duration` (Spotlight, `mdls`, one call per file on a worker pool). Keys that mean what a field means take its name, so the shown value is `file` overlaid with `fields`. A `title` that only repeats the file name (Spotlight's default for images) is dropped. Omitted for URL refs and broken members. |
 
-The album heading is the binder name unless the members' note names the album
-in its frontmatter: an `album` field, which grubber passes down to every block of
-the file. `--title TEXT` writes it to `collections/binder_<name>.md`, `--title ""`
-removes it (and a header left empty). Location and date come from Spotlight's
-IPTC/EXIF index (`mdls` — City/Country/creation date). Markdown **prose** under a
-block is private working notes and is never rendered. Non-image members (a PDF
-ticket, a map) render as link cards. Thumbnails go through `sips` (JPEG,
-browser-safe even for HEIC originals). It is a renderer, not a photo manager:
-editing the album means editing the annotation note.
+Absent values are omitted, never `""`/`null`. Broken members keep their line and
+position with `"broken":true`, as in `list --json`. The album name is the `album`
+frontmatter field, arriving in every line's `fields`; `--title TEXT` writes it to
+`collections/binder_<name>.md`, `--title ""` removes it (and a header left
+empty). Messages go to stderr; stdout is only the lines. Unknown binder: exit 1,
+as `order show`.
 
-The detail view (a CSS-only `:target` overlay, no JavaScript) and the stable CSS-class contract for custom stylesheets are documented in [ALBUM.md](ALBUM.md).
+Rendering is not fileregister's: 1.x's HTML renderer (`--out`, `--css`,
+`--milan`, `--open`, thumbnails via `sips`) is gone, and those flags are refused
+with a sentence saying so. Why `album` exists beside `list`: `list` reads the
+index only and stays fast; `album` is the one command that joins index, Markdown
+layer and Spotlight.
 
 ### `register reindex [--dry-run]`
 
@@ -639,7 +637,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 - **register remove is a set-delete**: it removes the named binder from the index record's `binder` set; annotation blocks are left untouched (`register cleanup` reviews the now-stale ones). It never removes the record — an emptied set is a bookmark. Re-adding is a set-insert on the same record (one batched index append); there is no reclaim and no duplicate to avoid.
 - **JSONL edits are parse/mutate/serialize**: the JSONL editor mirrors the Markdown editor's surface (read all refs, update id, delete block, rename/add/remove binder) but operates on whole JSON lines rather than block regex, so index mutations are robust by construction. The record's `_note_file` extension picks which editor runs. Injected provenance fields (`_note_file`, `_mtime`) are stripped before a line is rewritten, so they never persist into the store. When multiple `*.jsonl` files exist, edits group records by `_note_file` and rewrite only the file each record came from.
 - **Path identity is filesystem truth**: whether two paths name the same file is decided by the filesystem where possible — existing files compare by device:inode (`os.SameFile`), which is exact on case-sensitive APFS and Linux alike and immune to Unicode form and symlinks, because the `stat` lookup applies the filesystem's own rules. Only two nonexistent paths fall back to string comparison (NFC-normalized everywhere; case-folded on macOS only). Used by `remove`'s path fallback and `audit`'s ghost keys.
-- **Container and album names are form-folded for uniqueness**: payload, note and media names are allocated unique on a lower-cased, NFC-normalized key, so staging dirs and unpacked containers stay collision-free on case- and normalization-insensitive filesystems — regardless of the filesystem the container was built on. Basenames colliding only in case or Unicode form get a `-N` suffix instead of silently overwriting each other.
+- **Container names are form-folded for uniqueness**: payload and note names are allocated unique on a lower-cased, NFC-normalized key, so staging dirs and unpacked containers stay collision-free on case- and normalization-insensitive filesystems — regardless of the filesystem the container was built on. Basenames colliding only in case or Unicode form get a `-N` suffix instead of silently overwriting each other.
 - **unmarshal confines manifest paths**: a container's `file` and `origin` are manifest strings, not tar members, so tar's own traversal defense doesn't cover them. Both are joined and then re-checked *after* `filepath.Clean` (interior `..` collapses first): the staged `file` must stay inside the extracted container, and the `origin` write target must stay inside `collections/` unless `--scatter` is given. A foreign container therefore can't read/delete host files or write above the vault — the threat `--scatter` exists to gate.
 - **kMDItemInformation is multi-valued**: multiple bookmark IDs are space-separated in this string field, which fileanchor stores as a binary plist — Spotlight parses `com.apple.metadata:*` values as plists, and a raw `"id1 id2"` is not indexed at all ([FINDINGS-attributes.md](FINDINGS-attributes.md)). `register repair`'s most reliable file-location strategy is an id Spotlight lookup (engine `query by:id`) — backend-agnostic, since the id xattr carries the bookmark ID regardless of which xattr layer the binder lives in.
 - **The locator is the portability seam for file discovery**: `repair` does not query Spotlight directly; its lookups go through the locator (`locator.go`), which calls the engine's `query {by, value}` op (covering id, filename, and the groups/tags xattr layers). On Linux the engine grows a second implementation of the same op (e.g. `plocate`, `locate`, or the index) — no other code changes. The finder strategy is injectable in tests, so the ordering/fallback can be unit-tested without a live engine.
@@ -675,7 +673,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | Annotation | An optional lean Markdown ref block (H3 = filename, YAML = `id` + a single `binder` + custom fields), linked to the index by `id`. One block per `(id, binder)` — the file's context in that binder. Carries custom metadata + prose. Created by `promote` / `add --md`. |
 | Promote | Adding a Markdown annotation for a record via `register promote`. Additive — the index entry stays. |
 | Binder file | A Markdown file in `<notes_dir>/collections/` named `binder_<name>.md`, holding annotations for one binder. The default `register promote` target — and the binder's default ordering file. |
-| Album | An ordering of a bundle, rendered. The album is named by an `album:` field in the note's frontmatter, which grubber passes down into every block of the file: each member carries the name of the album it is in, and nothing looks it up. Absent, the binder name is the heading. No record of its own, because the album's substance is the sequence, which the `sort:` keys already hold. Spec: [ALBUM.md](ALBUM.md). |
+| Album | An ordering of a bundle, as data: each member's `list --json` line plus position, fields and file metadata. The album is named by an `album:` field in the note's frontmatter, which grubber passes down into every block of the file: each member carries the name of the album it is in, and nothing looks it up. Absent, the binder name stands in. No record of its own, because the album's substance is the sequence, which the `sort:` keys already hold. Spec: [ALBUM.md](ALBUM.md). |
 | Ordering | A presentation record putting one binder's members into a sequence: a `type: ordering` config block plus sparse per-member overrides, in the binder file. The binder itself stays a pure set. Spec: [ORDERING.md](ORDERING.md). |
 | Backend | The xattr layer chosen per record via the `xattr:` field: `itemprojects` (default), `tags`, or `none`. |
 | ItemProjects | The macOS `kMDItemProjects` xattr — default backend for membership. Quiet, Spotlight-only. |
@@ -700,5 +698,5 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | `resolve` | Forward lookup: a key (`id` or `aka`) → the file's path. `--record` prints id/binder/filename/aka/path. |
 | `aka` | Add or remove a record's `aka` handles in the index, uniqueness-checked; guarded against Markdown blocks that reach the record only through the handle. |
 | `of` | Reverse lookup: a file → its `id`, `aka`, and collection membership. Reads the `id` stamped on the file (so it survives rename); falls back to a filename match, else reports the file as unmanaged. |
-| `album` | Renders a binder as a static, self-contained HTML album (`sort`/`title`/`comment` from the annotation YAML, IPTC via Spotlight as fallback). An album *is* an `absolute` ordering. |
+| `album` | Prints a binder in order as JSON lines: `list --json` plus `position`, `fields` (annotation YAML via grubber) and `file` (Spotlight). An album *is* an `absolute` ordering. |
 | `order` | Arranges a binder's members for presentation: `set` (config), `show` (resolved order), `move` (one member, one override write). Orderings are absolute-only — materialized `sort:` keys. Membership stays untouched. See [ORDERING.md](ORDERING.md). |

@@ -4,7 +4,7 @@ package main
 //
 // register alone is the index: identity, membership, bookmarks. Everything above
 // that — captions, places, ordering keys, the album a file belongs to — lives in
-// the Markdown layer, and that layer belongs to grubber. So the album renderer
+// the Markdown layer, and that layer belongs to grubber. So `register album`
 // asks grubber instead of parsing notes itself, which also means an inherited
 // frontmatter field arrives without anyone having to look it up.
 
@@ -47,13 +47,15 @@ func grubberBin() (string, error) {
 //
 // Fields a record carries beyond the index: the curation (title, comment, place,
 // lat/lon, map, sort) and whatever the note's frontmatter passes down, which is
-// how a member learns which album it is in.
+// how a member learns which album it is in. --no-fill keeps each record to what
+// its block says; without it grubber pads every record with every key any
+// block has, as null.
 func grubberRecordsFor(notesDir, binder string) (map[string]map[string]any, error) {
 	bin, err := grubberBin()
 	if err != nil {
 		return nil, err
 	}
-	out, err := exec.Command(bin, "extract", notesDir, "-a", "-f", "binder="+binder).Output()
+	out, err := exec.Command(bin, "extract", notesDir, "-a", "--no-fill", "-f", "binder="+binder).Output()
 	if err != nil {
 		return nil, fmt.Errorf("grubber failed for binder %q: %w%s", binder, err, grubberStderr(err))
 	}

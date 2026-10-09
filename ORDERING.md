@@ -81,8 +81,8 @@ binder's canonical note.
 
 ## Album
 
-An album *is* an ordering: `register album` reads the same `sort:` keys
-directly (keyed first, then filename order). See [ALBUM.md](ALBUM.md).
+An album *is* an ordering: `register album` prints the members in the order
+`order show` resolves, as `position` on each line. See [ALBUM.md](ALBUM.md).
 
 ## Multiple orderings
 

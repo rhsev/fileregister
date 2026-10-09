@@ -1,9 +1,7 @@
 package main
 
 // flags — the one table-driven argument parser. Commands declare their value
-// and boolean flags; -h/--help and -v/--version are built in. cmd_album keeps
-// a hand-rolled loop on purpose: its --milan takes an OPTIONAL value, which
-// the table model doesn't express.
+// and boolean flags; -h/--help and -v/--version are built in.
 
 import "strings"
 

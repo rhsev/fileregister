@@ -191,7 +191,7 @@ Annotation — Markdown info layer:
             (edit an existing block: custom fields + prose; id/type/binder/aka/sort refused)
   write                         (read JSONL from stdin, write records)
   cleanup   [--interactive]
-  album     <binder> [--out DIR] [--milan [DIR]] [--open]   (static HTML album from the binder)
+  album     <binder> [--title TEXT]   (the binder in order as JSON lines: list --json + position, fields, file)
 
 Ordering — presentation layer (binder = set, ordering = sort: keys; ORDERING.md):
   order set     <binder> [--rule name]

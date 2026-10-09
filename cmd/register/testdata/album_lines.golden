@@ -1,0 +1,6 @@
+exit: 0
+=== stdout ===
+{"id":"2","binder":["Alb"],"filename":"two & three.md","kind":"web","url":"https://example.com/x?a=1&b=2","position":1,"fields":{"album":"Alben-Test","comment":"Ein <Test>","my_own":7,"title":"Erstes"}}
+{"id":"3","binder":["Alb"],"filename":"gone.jpg","kind":"image","broken":true,"position":2}
+{"id":"1","binder":["Alb"],"filename":"one.pdf","kind":"pdf","aka":["eins"],"url":"x-devonthink-item://A","position":3,"fields":{"album":"Alben-Test"}}
+=== stderr ===

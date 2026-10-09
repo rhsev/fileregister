@@ -236,28 +236,7 @@ func listBinder(notesDir, binder string, pathsOnly, jsonOnly, print0 bool) error
 
 	if jsonOnly {
 		for _, rec := range records {
-			loc := locator(rec)
-			parts := []string{
-				jsonPair("id", index.AsString(rec["id"])),
-				jsonPair("binder", index.AsStrings(rec["binder"])),
-				jsonPair("filename", index.AsString(rec["filename"])),
-				jsonPair("kind", index.AsString(rec["kind"])),
-			}
-			if akas := uniqStrings(index.AkaList(rec), true); len(akas) > 0 {
-				parts = append(parts, jsonPair("aka", akas))
-			}
-			// A broken bookmark stays visible to machine consumers — dropping
-			// the line would be indistinguishable from "not a member".
-			if loc == "" {
-				parts = append(parts, `"broken":true`)
-			} else {
-				locKey := "path"
-				if index.URLRef(rec) {
-					locKey = "url"
-				}
-				parts = append(parts, jsonPair(locKey, loc))
-			}
-			fmt.Println("{" + strings.Join(parts, ",") + "}")
+			fmt.Println("{" + strings.Join(memberJSONParts(rec, locator(rec)), ",") + "}")
 		}
 		return nil
 	}
@@ -313,6 +292,33 @@ func listBinder(notesDir, binder string, pathsOnly, jsonOnly, print0 bool) error
 
 // jsonPair renders "key":value with HTML escaping off, so the byte form matches
 // the wire form consumers expect (<, >, & and non-ASCII left intact).
+// memberJSONParts is one member as `list <binder> --json` prints it, as the
+// key:value pairs in order: id, binder, filename, kind, aka, then path or url,
+// or broken. `register album` prints the same pairs and appends its own, so
+// the two lines cannot drift apart. loc is the resolved path or the URL, ""
+// when the bookmark does not resolve.
+func memberJSONParts(rec map[string]any, loc string) []string {
+	parts := []string{
+		jsonPair("id", index.AsString(rec["id"])),
+		jsonPair("binder", index.AsStrings(rec["binder"])),
+		jsonPair("filename", index.AsString(rec["filename"])),
+		jsonPair("kind", index.AsString(rec["kind"])),
+	}
+	if akas := uniqStrings(index.AkaList(rec), true); len(akas) > 0 {
+		parts = append(parts, jsonPair("aka", akas))
+	}
+	// A broken bookmark stays visible to machine consumers — dropping the
+	// line would be indistinguishable from "not a member".
+	if loc == "" {
+		return append(parts, `"broken":true`)
+	}
+	locKey := "path"
+	if index.URLRef(rec) {
+		locKey = "url"
+	}
+	return append(parts, jsonPair(locKey, loc))
+}
+
 func jsonPair(key string, val any) string {
 	return index.JSONVal(key) + ":" + index.JSONVal(val)
 }

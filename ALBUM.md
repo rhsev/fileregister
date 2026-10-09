@@ -1,37 +1,61 @@
-# Photo albums with fileregister
+# Albums
 
-An album is a rendered binder: membership lives in the index, the narrative
-(title, comments, order, place) as YAML fields in the annotation note —
-grubber-readable like everything else. `register album` turns that into a
-static, self-contained HTML folder. No catalog, no daemon: editing an album
-means editing Markdown.
+An album is a binder with an order: its members in sequence, with what the
+note says about each of them and what each file says about itself. It is not
+only for photos: a report, a reading list, the pages of a guide are albums
+too. `register album` prints one as data, and nothing else. Whoever wants a
+gallery, a printed report or a web page builds it from that data, with
+whatever tool and look suits the purpose.
+
+```sh
+register album safari                  # the album, one JSON line per member
+```
+
+An album line is the member's `register list safari --json` line plus three
+keys: `position`, `fields` and `file`. `list` stays fast because it reads only
+the index; `album` is the one command that joins the index, the Markdown layer
+(through grubber) and the files themselves (through Spotlight).
 
 ## Quick start
 
 ```sh
-# 1. Put images (and anything else) into a binder
+# 1. Put files into a binder
 register add ~/photos/namibia/*.jpg --binder safari
 register add ~/documents/entry-ticket.pdf --binder safari
 
-# 2. Create the annotation scaffold and open it
-register promote --binder safari --edit
+# 2. Create the annotation note and say something about the members
+register promote --binder safari
+register annotate safari waterhole --set title="At the waterhole" --set place="Etosha National Park, Namibia"
 
-# 3. Fill in the album fields per block in the note (see below)
-
-# 4. Name it, render it, look at it (the name stays in the note)
-register album safari --title "Safari, Namibia 2026" --open
+# 3. Put them in order, and name the album (the name stays in the note)
+register order move safari waterhole --to 1
+register album safari --title "Safari, Namibia 2026"
 ```
 
-The result lands in `<notes>/collections/albums/safari/` (`--out DIR` picks
-another location, e.g. a dylan path for the LAN): `index.html`, `media/`
-(copies of the originals), `thumbs/` (JPEG via sips, HEIC included). Copy, zip,
-or serve the self-contained folder.
+## The line
+
+```json
+{"id":"210322647","binder":["safari"],"filename":"waterhole.png","kind":"image","aka":["waterhole"],"path":"/Users/me/photos/namibia/waterhole.png","position":1,"fields":{"album":"Safari, Namibia 2026","title":"At the waterhole","place":"Etosha National Park, Namibia"},"file":{"date":"2026-10-03T07:12:00Z","lat":-18.85,"lon":16.32,"size":2481152,"modified":"2026-10-03T19:40:11Z","type":"public.jpeg","width":4000,"height":3000}}
+```
+
+| Key | From | Meaning |
+|---|---|---|
+| `id` … `path`/`url` | the index | exactly as in `list <binder> --json`: `id`, `binder` (the member's binders, a list), `filename`, `kind`, `aka`, then `path` for a file, `url` for a URL ref, or `"broken": true` when the bookmark does not resolve |
+| `position` | the ordering | 1-based, the order `register order show` resolves |
+| `fields` | the note, via grubber | everything the member's block says, and everything the note's frontmatter hands down to it |
+| `file` | the file | what the file carries: file system and Spotlight |
+
+Keys without a value are left out rather than written as `""` or `null`. A
+reader ignores keys it does not know; new keys may appear, and existing ones
+keep their name and meaning.
+
+A member whose bookmark does not resolve keeps its line and its position, with
+`"broken": true` instead of a path, as in `list --json`: dropping it would be
+indistinguishable from "not a member". `register repair` fixes it.
 
 ## Naming the album
 
-The heading is the binder name unless the note's frontmatter names the album.
-It is a field in the document header, and every member of the album inherits
-it:
+The name is a field in the note's frontmatter, and every member inherits it:
 
 ````markdown
 ---
@@ -53,8 +77,10 @@ register album safari --title ""                       # removes it again
 ```
 
 Nothing looks the value up. grubber passes every frontmatter key down into each
-block of the file, so the field arrives on every record, and the renderer takes
-it from the members it already has. The same makes the album searchable:
+block of the file, so it arrives in every line's `fields`, and so does any
+other key the frontmatter carries (a period, an author, a client). A reader
+takes the album's name from any line, and the binder name when there is none.
+The same inheritance makes the album searchable:
 
 ```sh
 grubber extract ~/notes -a -f album~Safari -f type=ref   # every member of that album
@@ -68,147 +94,72 @@ every binder in it shares the name. `--title` writes to the binder's own note,
 `collections/binder_safari.md`, where `promote` puts its blocks, so this only
 comes up with notes put together by hand.
 
-A binder without the field keeps the binder name as its heading, which is what
-every album showed before.
+## Fields
 
-## The album fields
+`fields` is the member's block minus what the line already has (`type`, `id`,
+`binder`; `sort` is what `position` is made of). The set is open: any key you
+put in a block arrives as it stands, so a report can carry `amount` or `due`
+and a reading list `status`. These names are a convention between you and
+whatever reads the album; fileregister gives none of them a meaning:
 
-A curated block looks like this:
+| Field | Usual meaning |
+|---|---|
+| `title` | the member's title |
+| `comment` | a caption or description |
+| `place` | where it was taken or where it belongs |
+| `lat`, `lon` | coordinates |
+| `date` | when |
+| `map` | `false` where a reader should not show a map |
 
-````markdown
-### IMG_2041.jpg
-```yaml
-type: ref
-id: '270450536'
-binder: safari
-sort: b
-title: At the waterhole
-comment: Early morning, before the heat came. The elephants were already there.
-place: Etosha National Park, Namibia
-```
-Private note: exposure is tight — shot with the old Pentax.
-````
+`register annotate` sets them (`--set`, `--unset`). Prose below a block is
+working notes; it does not reach the line.
 
-| Field | Effect | Fallback when absent |
-|---|---|---|
-| `sort` *(not via `annotate`)* | Order, pure string sort — use letters with gaps (`b < d < f`, a `c` or `bc` always fits between); numbers sort as strings (`'1' < '10' < '2'`). Ties are broken by id | no key sorts to the end, by filename |
-| `title` | Image title | IPTC headline, then filename |
-| `comment` | Caption in the album | IPTC description |
-| `place` | Place text | IPTC city/country |
-| `lat`, `lon` | Coordinates for the map | EXIF GPS in the image |
-| `map` | `map: false` suppresses the map for this image | the map appears as soon as coordinates exist |
+## File
 
-`sort` is the same field as in the ordering model — an album *is* an ordering of
-the binder; `register order move` writes the keys instead of numbering them by
-hand (see [ORDERING.md](ORDERING.md)).
+`file` is what the file says about itself, read, never written:
 
-It is the one field in this table that `annotate` will not set: `register
-annotate … --set sort=b` is refused with *'sort' is reserved: ordering key —
-use register order move*. The ordering verb owns the key so that a single move
-writes a single key and the sequence stays consistent; editing it by hand in
-the note works too, since string comparison is the whole contract. Every other
-field above is yours to set with `annotate`.
+| Key | Source |
+|---|---|
+| `size`, `modified` | the file system |
+| `type` | the content type (UTI), e.g. `public.jpeg`, `com.adobe.pdf` |
+| `title`, `comment` | IPTC headline and description; a document's title |
+| `place` | IPTC city and country |
+| `date` | when the content was created (EXIF for photos) |
+| `lat`, `lon` | EXIF GPS |
+| `camera` | make and model |
+| `width`, `height` | pixels, for images and video |
+| `pages` | for PDFs |
+| `duration` | seconds, for audio and video |
 
-The cascade is the same everywhere: **curation wins, what the image carries is
-the fallback.** IPTC/EXIF is read (via Spotlight), never written — the original
-stays untouched. `lat`/`lon` are worth it when EXIF was stripped, or when the
-place should be preserved independently of the file.
-
-**Prose below the block is private** (working notes) and never reaches the HTML.
-
-## Detail view
-
-Clicking an image opens the overlay (pure CSS, no JavaScript): image on the
-left, metadata top right (title, comment, place · date, camera), map bottom
-right as an OpenStreetMap embed. The × closes and jumps back to the thumbnail;
-the browser's back button works too.
-
-The map is the album's only internet dependency; offline, everything else still
-works.
-
-## Non-images
-
-PDFs and other files in the binder appear as cards among the photos — the entry
-ticket belongs in the album. `title` and `comment` work just the same, and they
-take their place in the order like any other member.
-
-## Custom styling
+Where a key means what a field means, it has the field's name. So the value a
+reader shows is `file` overlaid with `fields`: the curation wins, the file is
+the fallback, and one line of code does it:
 
 ```sh
-register album safari --css my-style.css            # per call
-cp my-style.css ~/.config/fileregister/album.css    # for every album
+register album safari | jq -c '{position, shown: ((.file // {}) + (.fields // {}))}'
 ```
 
-A custom stylesheet replaces the built-in one entirely. Starting points: the
-`albumCSS` constant in `cmd/register/cmd_album.go`, or the bundled
-`album-styles/link-board.css` (a compact, linkding-like list look for binders of
-URL refs). The markup is the stable contract — everything lives inside an
-`.album` wrapper, so rules address `.album h1`, `.album .grid`,
-`.album figure`/`figcaption`, `.meta`, `.card`, and `.detail` with
-`.detail-media`, `.detail-info`, `.detail-map`, `.detail-close`. Page chrome
-(background, margins) belongs on `body.album-page` — only the standalone
-document carries that class, so nothing leaks into a host page when Stage embeds
-the album. `@page` rules make "Save as PDF" produce a printable photo book.
+A reader that wants only what was curated reads `fields` and ignores `file`.
 
-## milan & dylan: albums on the LAN
+## Order
 
-`--milan` renders into the milan notes layout: one shared source folder (default
-`<notes>/collections/albums/milan/`), holding `<binder>.html` per album and all
-assets flat under `images/`, named `<binder>-<hash>-<file>` so two albums never
-share a file. Three configuration steps:
+`position` is the order `register order show safari` prints: members with a
+`sort` key first, in key order, then the rest by file name. `register order
+move` writes the keys; see [ORDERING.md](ORDERING.md).
 
-```yaml
-# 1. mi.lan/config.yaml — register the folder as a notes source:
-milan:
-  notes:
-    - id: alben
-      path: /path/to/notes/collections/albums/milan
+## Rendering
 
-# 2. dy.lan/config/stage.yaml — a button on the Stage:
-    - title: "Albums"
-      buttons:
-        - id: alben
-          label: "📷 Photo albums"
-          type: notes
-          source: alben
-```
+fileregister ships no renderer. The line carries the resolved `path` of each
+file, so a renderer can copy, scale or link the files as it sees fit, and
+`fields` and `file` give it everything to say about them.
 
-```sh
-# 3. Render (once per album, again after changes):
-register album safari --milan
-```
-
-The Stage button then lists every album; a click renders it in the browser —
-detail view and map included.
-
-**Direct link without Stage:** `quickaction/milan-album.rb` (symlink it to
-`mi.lan/scripts/custom/album.rb`) turns every album into a URL:
-
-```
-http://localhost:8080/album/safari          # show (renders on first call)
-http://localhost:8080/album/safari/fresh    # re-render first, then show
-http://mi.lan/<agent>/stream/album/safari/fresh   # re-render without the 5s timeout
-```
-
-The script serves the finished HTML with asset paths rewritten onto the notes
-route — one link, and the album appears. (Needs milan's HTML sniffing for script
-output, mi.lan June 2026 or later.)
-
-## Sharing and searching
-
-- **LAN:** point `--out` at a dylan path, done.
-- **Handing it on:** zip the album folder — or `register marshal --binder safari`
-  for the full container (originals + note + manifest).
-- **Searching:** matterbase/grubber read the album fields like any ref block:
-  `grubber extract ~/notes --blocks-only -f type=ref -f binder=safari` plus
-  full text finds the image by its comment, not by `IMG_2041`.
+Versions up to 1.4 rendered HTML themselves (`--out`, `--css`, `--milan`,
+`--open`). Those flags are gone; `register album` says so when given one.
 
 ## Limits
 
-- IPTC/EXIF fallbacks need Spotlight: freshly copied files may not be indexed
-  yet, in which case the curated fields are the reliable source.
-- HEIC: thumbnails are always JPEG; the linked original may show nothing outside
-  Safari.
-- Very large albums stay smooth thanks to `content-visibility` — but a curated
-  album with a four-digit image count is usually a sign that it is really
-  several albums.
+- `file` needs Spotlight for everything but `size` and `modified`: a file on a
+  volume Spotlight does not index, or one copied a moment ago, may carry less.
+  The curated `fields` do not depend on it.
+- Each file costs one `mdls` call; they run in parallel, but a four-digit album
+  takes a moment. `list --json` is the fast way when only membership matters.

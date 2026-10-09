@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,31 +76,50 @@ func TestAlbumTitleSetAndClear(t *testing.T) {
 	anchor := engineBin(t)
 	n := seedAlbumFixture(t)
 	note := filepath.Join(n, "collections", "binder_Alb.md")
-	out := filepath.Join(t.TempDir(), "alb")
 	env := albumEnv(t, n, anchor)
 
-	if _, se, code := runGoAlbum(t, env, "Alb", "--title", "Safari, Namibia 2026", "--out", out); code != 0 {
+	// albumNames returns the album field of every line that has fields.
+	albumNames := func(out string) []any {
+		var names []any
+		for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+			var m map[string]any
+			if err := json.Unmarshal([]byte(l), &m); err != nil {
+				t.Fatalf("stdout is not JSON lines: %q", l)
+			}
+			if f, ok := m["fields"].(map[string]any); ok {
+				names = append(names, f["album"])
+			}
+		}
+		return names
+	}
+
+	so, se, code := runGoAlbum(t, env, "Alb", "--title", "Safari, Namibia 2026")
+	if code != 0 {
 		t.Fatalf("set: exit %d: %s", code, se)
 	}
 	if !strings.Contains(mustRead(t, note), "album: Safari, Namibia 2026") {
 		t.Fatalf("field not written:\n%s", mustRead(t, note))
 	}
-	if !strings.Contains(mustRead(t, filepath.Join(out, "index.html")), "<h1>Safari, Namibia 2026</h1>") {
-		t.Errorf("heading does not carry the name")
+	for _, name := range albumNames(so) {
+		if name != "Safari, Namibia 2026" {
+			t.Errorf("a member did not inherit the name: %v", name)
+		}
 	}
 
-	so, se, code := runGoAlbum(t, env, "Alb", "--title", "", "--out", out)
+	so, se, code = runGoAlbum(t, env, "Alb", "--title", "")
 	if code != 0 {
 		t.Fatalf("clear: exit %d: %s", code, se)
 	}
-	if !strings.Contains(so, "Album field removed") {
-		t.Errorf("clear: stdout %q", so)
+	if !strings.Contains(se, "Album field removed") {
+		t.Errorf("clear: stderr %q", se)
 	}
 	if got := mustRead(t, note); strings.Contains(got, "album:") || strings.HasPrefix(got, "---") {
 		t.Errorf("field or empty header left behind:\n%s", got)
 	}
-	if !strings.Contains(mustRead(t, filepath.Join(out, "index.html")), "<h1>Alb</h1>") {
-		t.Errorf("heading did not fall back to the binder name")
+	for _, name := range albumNames(so) {
+		if name != nil {
+			t.Errorf("a member still carries a name: %v", name)
+		}
 	}
 }
 
@@ -114,7 +134,7 @@ func TestAlbumKeepsGrubberStderr(t *testing.T) {
 	}
 	env := append(filterEnv(albumEnv(t, n, anchor), "GRUBBER_BIN"), "GRUBBER_BIN="+stub)
 
-	_, se, code := runGoAlbum(t, env, "Alb", "--out", filepath.Join(t.TempDir(), "alb"))
+	_, se, code := runGoAlbum(t, env, "Alb")
 	if code == 0 {
 		t.Fatal("album succeeded with a failing grubber")
 	}

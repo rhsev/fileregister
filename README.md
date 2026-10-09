@@ -77,10 +77,11 @@ what is it part of?" from the id on the file, so renaming does not break it.
 `sort:` keys you can reorder them, edited with `register order move`. See
 [ORDERING.md](ORDERING.md).
 
-**Render a binder as a photo album.** `register album <binder> --open` produces
-a static HTML folder with thumbnails, captions and a map per image, no
-JavaScript. Captions are just fields in the note. With `--milan` the album is
-published on the LAN. See [ALBUM.md](ALBUM.md).
+**A binder as an album, as data.** `register album <binder>` prints the members
+in order, one JSON line each: the `list --json` line plus its position, the
+fields from the note and what the file itself carries (date, place,
+coordinates, size). A gallery, a report or a web page is built from that by
+whatever reads it; fileregister ships no renderer. See [ALBUM.md](ALBUM.md).
 
 **Rebuild a binder on another machine.** `register marshal` packs files, notes
 and a manifest into a tar.gz; `register unmarshal` unpacks it on the other
@@ -131,7 +132,7 @@ register <subcommand> [args...]
 | `unmarshal` | Unpack a container, mirror files to their origin, recreate records; idempotent, conflicts parked. Origins outside `collections/` need `--scatter` |
 | `reindex` | Rebuild the index from Markdown ref blocks; `--dry-run` to preview |
 | `order` | Arrange a binder for presentation (`set`/`show`/`move`) |
-| `album` | Render a binder as a static HTML album (reads the curation through grubber); `--title` names the album in the note's frontmatter, `--css` restyles it, `--milan` publishes it on the LAN |
+| `album` | The binder in order as JSON lines: each member's `list --json` line plus `position`, `fields` (its block, read through grubber) and `file` (Spotlight); `--title` names the album in the note's frontmatter |
 
 ### More examples
 
@@ -153,7 +154,7 @@ register list --inbox                        # binders with records nobody annot
 register list project-alpha --paths
 
 register order move project-alpha 482910337 --after 482910901
-register album project-alpha --title "Project Alpha, Q1" --open
+register album project-alpha --title "Project Alpha, Q1" > alpha.jsonl
 
 register marshal --binder project-alpha --out project-alpha.tar.gz
 register unmarshal project-alpha.tar.gz      # on the other machine
@@ -191,7 +192,7 @@ fileanchor engine, so a Linux port is a fileanchor port, not a register one.
 
 ### Companion releases
 
-`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads everything above the index: without it, fileregister is the index and nothing more. The core commands — `add`, `list`, `resolve`, `audit`, `repair` and the rest of the lifecycle — run without it; `register album` does not, because it renders a binder from its curation and the Markdown layer is read through grubber. This release is tested against **fileanchor 1.2.0** and **grubber v0.18.0**; `make fileanchor` and `make grubber` build both at those tags.
+`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads everything above the index: without it, fileregister is the index and nothing more. The core commands — `add`, `list`, `resolve`, `audit`, `repair` and the rest of the lifecycle — run without it; `register album` does not, because it joins the curation in, and the Markdown layer is read through grubber. This release is tested against **fileanchor 1.2.0** and **grubber v0.18.0**; `make fileanchor` and `make grubber` build both at those tags.
 
 ### Configuration
 
@@ -263,7 +264,7 @@ the set. See SPEC §Bookmarks.
 - [SPEC.md](SPEC.md) — on-disk format, data model, design decisions
 - [WORKFLOWS.md](WORKFLOWS.md) — organizing and querying collections
 - [ORDERING.md](ORDERING.md) — `sort:` keys and `register order`
-- [ALBUM.md](ALBUM.md) — static photo albums, and serving them on the LAN
+- [ALBUM.md](ALBUM.md) — albums: a binder in order, as data
 - [RATIONALE.md](RATIONALE.md) — why this exists when macOS already has tags
 
 ## License
