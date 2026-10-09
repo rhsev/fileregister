@@ -73,11 +73,16 @@ func buildOrderContext(binder, noteOpt string) (*orderCtx, bool) {
 			}
 		}
 	}
-	// One parse of the note serves both the ref overrides and the ordering
-	// config block.
+	// One read of the note serves both the ref overrides and the ordering
+	// config block. The note is Markdown, so grubber reads it.
+	blocks, gerr := grubberNoteBlocks(note)
+	if gerr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", gerr)
+		return nil, false
+	}
 	overrides := map[string]map[string]any{}
 	var config map[string]any
-	for _, r := range mdParseBlocks(note) {
+	for _, r := range blocks {
 		if t, _ := r["type"].(string); t == "ordering" {
 			if config == nil {
 				config = r

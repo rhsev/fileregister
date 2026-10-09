@@ -242,7 +242,7 @@ The core (`list`, `audit`, `refresh`, `repair`, `marshal`) reads the index direc
 
 - **Editing commands** (`rename`, `cleanup`) also read annotations via `read_annotations`, so a record's `binder` set is updated in both the index and any per-binder annotation blocks. (`remove` deliberately does not: it set-deletes in the index only, and `cleanup` reviews the stale blocks.)
 - **`list --inbox` / `list --curated`** — explicit on-demand filters that consult the Markdown layer to determine annotation status. The default `list` (no flag, no binder) is pure-register and never reads Markdown.
-- **The query layer** — grubber-over-Markdowns — reads the annotation layer, for matterbase's queries and for `register album`, which joins a binder's curation into its lines. register alone is the index; whenever the Markdown comes into play, grubber reads it. An album needs grubber at runtime for that reason.
+- **The query layer** — grubber-over-Markdowns — reads the annotation layer, for matterbase's queries, for `register album`, which joins a binder's curation into its lines, and for `register order` and `rename`, which read the binder's note. register alone is the index; whenever the Markdown comes into play, grubber reads it, so these commands need grubber at runtime. Numbers in grubber's JSON are decoded as their digits (`UseNumber`): an id written unquoted is a YAML integer, and as a float it would not match its record. Writing a note stays register's own (grubber only reads).
 
 A `type: ref` block hand-written into a project note is therefore part of the *annotation* layer; `register reindex` pulls such records into the index so the core sees them too.
 

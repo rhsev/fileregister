@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 )
 
@@ -20,6 +22,19 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	os.Setenv("HOME", tmp)
+
+	// order, rename and album read notes through grubber. Give the whole run
+	// the copy `make grubber` builds when none is configured or on PATH, the
+	// same lookup as grubberTestBin — the CI job has only that copy.
+	if os.Getenv("GRUBBER_BIN") == "" {
+		if _, err := exec.LookPath("grubber"); err != nil {
+			if bin, aerr := filepath.Abs(filepath.Join("..", "..", ".build", "grubber")); aerr == nil {
+				if _, serr := os.Stat(bin); serr == nil {
+					os.Setenv("GRUBBER_BIN", bin)
+				}
+			}
+		}
+	}
 	code := m.Run()
 	os.RemoveAll(tmp)
 	os.Exit(code)

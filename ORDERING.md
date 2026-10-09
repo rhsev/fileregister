@@ -48,7 +48,7 @@ grubber inherits frontmatter into every block of a file.
 
 ## Resolution
 
-1. Compute the base order per `rule` (name: filename, then id).
+1. Compute the base order per `rule` (name: filename, then id). The note is read through grubber; a binder without a note needs none.
 2. Members with a `sort:` key come first, sorted by `(sort, id)` as plain
    strings.
 3. Members without a key follow, in base order.

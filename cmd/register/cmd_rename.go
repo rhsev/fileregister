@@ -137,7 +137,12 @@ func cmdRename(args []string) int {
 		} else if n > 0 {
 			fmt.Printf("  %s: ordering config updated\n", filepath.Base(oldNote))
 		}
-		if other := noteHoldsOtherBinder(oldNote, oldName, newName); other != "" {
+		if other, rerr := noteHoldsOtherBinder(oldNote, oldName, newName); rerr != nil {
+			// Not knowing whose blocks the note holds, moving it could carry
+			// another binder's along. It stays.
+			fmt.Fprintf(os.Stderr, "  Note: %v — %s stays; move the '%s' blocks by hand if you like\n",
+				rerr, filepath.Base(oldNote), newName)
+		} else if other != "" {
 			// Binder names that differ only in case, or in a / vs -, share
 			// one note file. Moving it would carry the other binder's blocks
 			// and ordering along.
@@ -247,13 +252,18 @@ func cmdRename(args []string) int {
 }
 
 // noteHoldsOtherBinder returns a binder, other than the one being renamed, that
-// has a block in note — or "" when every block belongs to it.
-func noteHoldsOtherBinder(note, oldName, newName string) string {
-	for _, b := range mdParseBlocks(note) {
+// has a block in note — or "" when every block belongs to it. The note is read
+// through grubber; an error means it could not be told.
+func noteHoldsOtherBinder(note, oldName, newName string) (string, error) {
+	blocks, err := grubberNoteBlocks(note)
+	if err != nil {
+		return "", err
+	}
+	for _, b := range blocks {
 		name := index.AsString(b["binder"])
 		if name != "" && name != oldName && name != newName {
-			return name
+			return name, nil
 		}
 	}
-	return ""
+	return "", nil
 }

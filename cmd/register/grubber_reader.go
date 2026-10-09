@@ -11,6 +11,7 @@ package main
 import (
 	"github.com/rhsev/fileregister/internal/index"
 
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -55,15 +56,9 @@ func grubberRecordsFor(notesDir, binder string) (map[string]map[string]any, erro
 	if err != nil {
 		return nil, err
 	}
-	out, err := exec.Command(bin, "extract", notesDir, "-a", "--no-fill", "-f", "binder="+binder).Output()
+	records, err := grubberExtract(bin, notesDir, "-a", "--no-fill", "-f", "binder="+binder)
 	if err != nil {
-		return nil, fmt.Errorf("grubber failed for binder %q: %w%s", binder, err, grubberStderr(err))
-	}
-	var records []map[string]any
-	if len(out) > 0 {
-		if jerr := json.Unmarshal(out, &records); jerr != nil {
-			return nil, fmt.Errorf("grubber returned something that is not a record list: %w", jerr)
-		}
+		return nil, fmt.Errorf("grubber failed for binder %q: %w", binder, err)
 	}
 	byID := map[string]map[string]any{}
 	for _, r := range records {
@@ -79,6 +74,45 @@ func grubberRecordsFor(notesDir, binder string) (map[string]map[string]any, erro
 		}
 	}
 	return byID, nil
+}
+
+// grubberExtract runs `grubber extract <args>` and decodes the record list.
+// Numbers are kept as their digits (UseNumber): an id or sort key written
+// unquoted in a block is a YAML integer, and decoded as float64 it came out of
+// AsString as "2.70450536e+08", matching no record.
+func grubberExtract(bin string, args ...string) ([]map[string]any, error) {
+	out, err := exec.Command(bin, append([]string{"extract"}, args...)...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("%w%s", err, grubberStderr(err))
+	}
+	var records []map[string]any
+	if len(bytes.TrimSpace(out)) == 0 {
+		return nil, nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(out))
+	dec.UseNumber()
+	if jerr := dec.Decode(&records); jerr != nil {
+		return nil, fmt.Errorf("grubber returned something that is not a record list: %w", jerr)
+	}
+	return records, nil
+}
+
+// grubberNoteBlocks returns the blocks of one note, in the order they stand
+// in the document, each with the note's frontmatter passed down. A note that
+// does not exist has no blocks, and grubber is not asked.
+func grubberNoteBlocks(path string) ([]map[string]any, error) {
+	if !index.FileExists(path) {
+		return nil, nil
+	}
+	bin, err := grubberBin()
+	if err != nil {
+		return nil, err
+	}
+	records, err := grubberExtract(bin, path, "-a", "--no-fill")
+	if err != nil {
+		return nil, fmt.Errorf("grubber failed for %s: %w", filepath.Base(path), err)
+	}
+	return records, nil
 }
 
 // grubberStderr returns what grubber said on stderr before failing, as a

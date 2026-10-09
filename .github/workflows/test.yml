@@ -21,9 +21,8 @@ jobs:
       - name: Build the fileanchor engine
         run: make fileanchor
 
-      # The album reads the Markdown layer through grubber, so its checks need
-      # one exactly as the engine checks need fileanchor — and they skip without
-      # it, which the step below refuses.
+      # album, order and rename read the Markdown layer through grubber, so
+      # their checks need one exactly as the engine checks need fileanchor.
       - name: Build grubber
         run: make grubber
 
