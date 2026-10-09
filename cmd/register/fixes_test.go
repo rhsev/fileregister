@@ -79,23 +79,6 @@ func TestAnnotateReplaceProseNestedSections(t *testing.T) {
 	}
 }
 
-func TestUpsertOrderingConfigBelowFrontmatter(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "n.md")
-	if err := os.WriteFile(p, []byte("---\ntags: [x]\n---\n\nbody\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := upsertOrderingConfig(p, "b", "name"); err != nil {
-		t.Fatal(err)
-	}
-	got, _ := os.ReadFile(p)
-	if !strings.HasPrefix(string(got), "---\ntags: [x]\n---\n") {
-		t.Errorf("frontmatter no longer leads the file:\n%s", got)
-	}
-	if !strings.Contains(string(got), "type: ordering") {
-		t.Errorf("ordering block missing:\n%s", got)
-	}
-}
-
 // TestReindexFoldsMemberships: one id annotated in two binders rebuilds as ONE
 // record carrying both memberships (recovery must not drop the second binder).
 func TestReindexFoldsMemberships(t *testing.T) {

@@ -422,7 +422,7 @@ Note: this does **not** remove the bookmark blob or the record. When the last bi
 ### `register rename <old> <new>`
 
 - Rewrite every record with `binder: <old>` to `<new>` in **both** the index (`read_index` → `JsonlEditor`) and any annotation copies (`read_annotations` → `MdEditor`)
-- Carry the ordering layer along: the `type: ordering` config block is rewritten too (it names its binder in a field of its own, so a rename that skipped it would leave a block pointing at a binder that no longer exists), and the canonical note file `collections/binder_<old>.md` is renamed to `binder_<new>.md` (when the new name's note already exists — the `--merge` case — both stay and rename says so)
+- Carry the ordering layer along: an existing `type: ordering` block (written by earlier versions) is rewritten too (it names its binder in a field of its own, so a rename that skipped it would leave a block pointing at a binder that no longer exists), and the canonical note file `collections/binder_<old>.md` is renamed to `binder_<new>.md` (when the new name's note already exists — the `--merge` case — both stay and rename says so)
 - For each referenced file (once per `id`, backend taken from the index): remove `<old>` and add `<new>` in the per-record xattr layer (`kMDItemProjects` or `kMDItemUserTags`, or skip for `none`)
 
 Not atomic across many files. A subsequent `register refresh` reconciles any residue.
@@ -454,7 +454,7 @@ writes nothing (but the name, with `--title`). Each line is the member's
 
 | Key | Content |
 |---|---|
-| `position` | 1-based, in the order `register order show` resolves (`sort:` keys first, then the rule, `name`). One source of order: the album cannot disagree with the ordering it is made of. |
+| `position` | 1-based, in the order `register order show` resolves (`sort:` keys first, then the order of the blocks in the note, then members without a block by file name). One source of order: the album cannot disagree with the ordering it is made of. |
 | `fields` | The member's block as grubber returns it (`--no-fill`), frontmatter inherited, minus `type`, `id`, `binder`, `sort` and grubber's `_`-prefixed keys. Open set; omitted when empty. |
 | `file` | What the file carries: `size`, `modified` (file system); `type`, `title`, `comment`, `place`, `date`, `lat`, `lon`, `camera`, `width`, `height`, `pages`, `duration` (Spotlight, `mdls`, one call per file on a worker pool). Keys that mean what a field means take its name, so the shown value is `file` overlaid with `fields`. A `title` that only repeats the file name (Spotlight's default for images) is dropped. Omitted for URL refs and broken members. |
 
@@ -675,7 +675,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | Promote | Adding a Markdown annotation for a record via `register promote`. Additive — the index entry stays. |
 | Binder file | A Markdown file in `<notes_dir>/collections/` named `binder_<name>.md`, holding annotations for one binder. The default `register promote` target — and the binder's default ordering file. |
 | Album | An ordering of a bundle, as data: each member's `list --json` line plus position, fields and file metadata. The album is named by an `album:` field in the note's frontmatter, which grubber passes down into every block of the file: each member carries the name of the album it is in, and nothing looks it up. Absent, the binder name stands in. No record of its own, because the album's substance is the sequence, which the `sort:` keys already hold. Spec: [ALBUM.md](ALBUM.md). |
-| Ordering | A presentation record putting one binder's members into a sequence: a `type: ordering` config block plus sparse per-member overrides, in the binder file. The binder itself stays a pure set. Spec: [ORDERING.md](ORDERING.md). |
+| Ordering | A presentation putting one binder's members into a sequence: the order of their blocks in the binder file, with sparse `sort:` keys where a member is placed explicitly. No configuration. The binder itself stays a pure set. Spec: [ORDERING.md](ORDERING.md). |
 | Backend | The xattr layer chosen per record via the `xattr:` field: `itemprojects` (default), `tags`, or `none`. |
 | ItemProjects | The macOS `kMDItemProjects` xattr — default backend for membership. Quiet, Spotlight-only. |
 | Tags | The macOS `kMDItemUserTags` xattr (Finder Tags) — opt-in backend per record. Visible in Finder, syncs to iOS Files via iCloud Drive. |

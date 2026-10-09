@@ -193,8 +193,7 @@ Annotation — Markdown info layer:
   cleanup   [--interactive]
   album     <binder> [--title TEXT]   (the binder in order as JSON lines: list --json + position, fields, file)
 
-Ordering — presentation layer (binder = set, ordering = sort: keys; ORDERING.md):
-  order set     <binder> [--rule name]
+Ordering — presentation layer (binder = set; order = the note's blocks, sort: keys win; ORDERING.md):
   order show    <binder> [--json]
   order move    <binder> <id|aka> --after <id|aka> | --to <n>`
 

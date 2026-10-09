@@ -1,8 +1,8 @@
 package main
 
-// cmd_order — arrange a binder's members (ORDERING.md). Absolute-only: the
-// ordering is `sort:` keys on the member blocks in one ordering file; members
-// without a key follow in rule order. Membership stays global (the index).
+// cmd_order — arrange a binder's members (ORDERING.md). The order is the
+// document's: members follow their blocks in the binder's note, unless a
+// `sort:` key places them. Membership stays global (the index).
 
 import (
 	"github.com/rhsev/fileregister/internal/index"
@@ -14,12 +14,11 @@ import (
 	"strings"
 )
 
-const orderUsage = `Usage: register order <set|show|move> <binder> [options]
+const orderUsage = `Usage: register order <show|move> <binder> [options]
 
-  set     <binder> [--rule name]
-          Create the ordering config (or update its rule).
   show    <binder> [--json]
-          Print the members in resolved order (sort: keys first, then rule order).
+          Print the members in order: sort: keys first, then the order their
+          blocks stand in the note, then members without a block by file name.
   move    <binder> <id|aka> --after <id|aka> | --to <n>
           Move one member (1-based position). Writes a sort: key; when the
           neighbours carry no keys yet, keys are materialized for all members.
@@ -32,7 +31,7 @@ type orderCtx struct {
 	records         []map[string]any
 	overrides       map[string]map[string]any
 	config          map[string]any
-	rule            string
+	inNote          int // members with a block in the note
 	base, displayed []string
 }
 
@@ -82,6 +81,13 @@ func buildOrderContext(binder, noteOpt string) (*orderCtx, bool) {
 	}
 	overrides := map[string]map[string]any{}
 	var config map[string]any
+	isMember := map[string]bool{}
+	for _, r := range records {
+		isMember[index.AsString(r["id"])] = true
+	}
+	// Blocks come in document order; that order is the binder's, for every
+	// member a sort: key does not place.
+	var docOrder []string
 	for _, r := range blocks {
 		if t, _ := r["type"].(string); t == "ordering" {
 			if config == nil {
@@ -108,26 +114,26 @@ func buildOrderContext(binder, noteOpt string) (*orderCtx, bool) {
 		}
 		if id != "" {
 			overrides[id] = r
+			if isMember[id] {
+				docOrder = append(docOrder, id)
+			}
 		}
 	}
+	// An ordering block from before the order became the document's: its
+	// binder: still says which binder the note orders; a rule: line is inert.
 	if config != nil && index.AsString(config["binder"]) != "" && index.AsString(config["binder"]) != binder {
 		fmt.Fprintf(os.Stderr, "Error: %s orders binder '%s', not '%s'\n", filepath.Base(note), index.AsString(config["binder"]), binder)
 		return nil, false
 	}
 
-	rule := "name"
-	if config != nil && index.AsString(config["rule"]) != "" {
-		rule = index.AsString(config["rule"])
+	base := baseOrder(records, docOrder)
+	inNote := map[string]bool{}
+	for _, id := range docOrder {
+		inNote[id] = true
 	}
-	if !containsStr(orderRules, rule) {
-		fmt.Fprintf(os.Stderr, "Error: rule '%s' is not available yet (available: name)\n", rule)
-		return nil, false
-	}
-
-	base, _ := baseOrder(records, rule)
 	return &orderCtx{
 		notesDir: nd, note: note, records: records, overrides: overrides,
-		config: config, rule: rule, base: base,
+		config: config, inNote: len(inNote), base: base,
 		displayed: absoluteOrder(base, overrides),
 	}, true
 }
@@ -158,7 +164,10 @@ func cmdOrder(args []string) int {
 	sub, rest := args[0], args[1:]
 	switch sub {
 	case "set":
-		return orderSet(rest)
+		// There is nothing to set any more: the order is the document's.
+		fmt.Fprintln(os.Stderr, "register order: 'set' is gone — the order is the order of the blocks in the note, "+
+			"unless sort: keys place a member (register order move); there is no rule to set")
+		return 1
 	case "show":
 		return orderShow(rest)
 	case "move":
@@ -209,14 +218,10 @@ func orderShow(args []string) int {
 	}
 
 	origin := ""
-	if ctx.config == nil {
-		if len(ctx.overrides) == 0 {
-			origin = " (no ordering — pure rule order)"
-		} else {
-			origin = " (no config block)"
-		}
+	if ctx.inNote == 0 && len(ctx.overrides) == 0 {
+		origin = " (no blocks in the note yet — by file name)"
 	}
-	fmt.Printf("%s — %d member(s), rule: %s%s\n", binder, len(ctx.displayed), ctx.rule, origin)
+	fmt.Printf("%s — %d member(s)%s\n", binder, len(ctx.displayed), origin)
 	for i, id := range ctx.displayed {
 		rec := byID[id]
 		if rec == nil {
@@ -224,47 +229,6 @@ func orderShow(args []string) int {
 		}
 		fmt.Printf("%3d. %s\n", i+1, refLabel(rec))
 	}
-	return 0
-}
-
-func orderSet(args []string) int {
-	vals, bools, pos, unk := parseFlags(args, map[string]bool{"--note": true, "--rule": true}, nil)
-	if unk != "" {
-		return unknownOption("order", unk)
-	}
-	if bools["--help"] {
-		fmt.Println(orderUsage)
-		return 0
-	}
-	if bools["--version"] {
-		fmt.Println("register order " + registerVersion)
-		return 0
-	}
-	if len(pos) == 0 {
-		fmt.Fprintln(os.Stderr, "Error: <binder> is required")
-		return 1
-	}
-	binder := pos[0]
-	rule := vals["--rule"]
-	if rule != "" && !containsStr(orderRules, rule) {
-		fmt.Fprintf(os.Stderr, "Error: rule '%s' is not available yet (available: name)\n", rule)
-		return 1
-	}
-	ctx, ok := buildOrderContext(binder, vals["--note"])
-	if !ok {
-		return 1
-	}
-	r := orDefault(rule, ctx.rule)
-	result, err := upsertOrderingConfig(ctx.note, binder, r)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", ctx.note, err)
-		return 1
-	}
-	verb := "Updated"
-	if result == "created" {
-		verb = "Created"
-	}
-	fmt.Printf("%s ordering for '%s' (rule: %s) → %s\n", verb, binder, r, filepath.Base(ctx.note))
 	return 0
 }
 
@@ -370,12 +334,6 @@ func orderMove(args []string) int {
 		}
 	}
 
-	if ctx.config == nil {
-		if _, err := upsertOrderingConfig(ctx.note, binder, ctx.rule); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", ctx.note, err)
-			return 1
-		}
-	}
 	byID := recordsByID(ctx.records)
 	if single {
 		if orderWriteOverride(ctx.note, binder, rec, "sort", k) == "failed" {

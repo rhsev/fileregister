@@ -1,16 +1,15 @@
 package main
 
 // ordering — the pure algebra for arranging a binder's members (ORDERING.md).
-// Absolute-only: an ordering is `sort:` keys on the member blocks; members
-// without a key follow in rule order. No disk IO (that lives in cmd_order.go).
+// The order is the document's: members follow their blocks in the binder's
+// note, unless a `sort:` key places them; members without a block come last,
+// by file name. No disk IO (that lives in cmd_order.go).
 
 import (
 	"sort"
 
 	"github.com/rhsev/fileregister/internal/index"
 )
-
-var orderRules = []string{"name"}
 
 func containsStr(xs []string, s string) bool {
 	for _, x := range xs {
@@ -115,35 +114,36 @@ func base36Key(v, width int) string {
 	return string(b)
 }
 
-// baseOrder returns member ids in `rule` order (name: by filename, then id).
-func baseOrder(records []map[string]any, rule string) ([]string, error) {
-	switch rule {
-	case "name", "":
-		sorted := make([]map[string]any, len(records))
-		copy(sorted, records)
-		sort.SliceStable(sorted, func(i, j int) bool {
-			fi, fj := index.AsString(sorted[i]["filename"]), index.AsString(sorted[j]["filename"])
-			if fi != fj {
-				return fi < fj
-			}
-			return index.AsString(sorted[i]["id"]) < index.AsString(sorted[j]["id"])
-		})
-		ids := make([]string, len(sorted))
-		for i, r := range sorted {
-			ids[i] = index.AsString(r["id"])
+// baseOrder is the order of members without a key: those with a block in the
+// note as the blocks stand in the document, then those without one by file
+// name, id breaking ties. docOrder lists member ids in document order.
+func baseOrder(records []map[string]any, docOrder []string) []string {
+	placed := map[string]bool{}
+	ids := make([]string, 0, len(records))
+	for _, id := range docOrder {
+		if !placed[id] {
+			placed[id] = true
+			ids = append(ids, id)
 		}
-		return ids, nil
-	default:
-		return nil, errRule(rule)
 	}
+	var rest []map[string]any
+	for _, r := range records {
+		if !placed[index.AsString(r["id"])] {
+			rest = append(rest, r)
+		}
+	}
+	sort.SliceStable(rest, func(i, j int) bool {
+		fi, fj := index.AsString(rest[i]["filename"]), index.AsString(rest[j]["filename"])
+		if fi != fj {
+			return fi < fj
+		}
+		return index.AsString(rest[i]["id"]) < index.AsString(rest[j]["id"])
+	})
+	for _, r := range rest {
+		ids = append(ids, index.AsString(r["id"]))
+	}
+	return ids
 }
-
-type ruleError struct{ rule string }
-
-func (e ruleError) Error() string {
-	return "rule '" + e.rule + "' is not available (only: name)"
-}
-func errRule(rule string) error { return ruleError{rule} }
 
 // sortKeyOf returns the override "sort" for id, or "".
 func sortKeyOf(overrides map[string]map[string]any, id string) string {

@@ -1,0 +1,4 @@
+exit: 1
+=== stdout ===
+=== stderr ===
+register order: 'set' is gone — the order is the order of the blocks in the note, unless sort: keys place a member (register order move); there is no rule to set

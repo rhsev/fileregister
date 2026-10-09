@@ -92,8 +92,8 @@ The same inheritance makes the album searchable:
 grubber extract ~/notes -a -f album~Safari -f type=ref   # every member of that album
 ```
 
-`type=ref` keeps the rest out: the note's ordering block inherits the field
-too, and so does any other note with an `album` key in its header.
+`type=ref` keeps the rest out: any other note with an `album` key in its header
+matches too, and so does an ordering block written by earlier versions.
 
 The name belongs to the note, not to the binder: keep one binder per note, or
 every binder in it shares the name. `--title` writes to the binder's own note,
@@ -149,9 +149,11 @@ A reader that wants only what was curated reads `fields` and ignores `file`.
 
 ## Order
 
-`position` is the order `register order show safari` prints: members with a
-`sort` key first, in key order, then the rest by file name. `register order
-move` writes the keys; see [ORDERING.md](ORDERING.md).
+`position` is the order `register order show safari` prints, and that is the
+note's: members follow their blocks in the order they stand in the document.
+Moving a block in the editor moves the member. A `sort` key, which `register
+order move` writes, places a member ahead of the document order; members
+without a block come last, by file name. See [ORDERING.md](ORDERING.md).
 
 ## Rendering
 

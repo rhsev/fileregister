@@ -10,48 +10,48 @@ consumer declares which it reads — a binder (set) or an ordering (sequence).
 
 ## The data
 
-An ordering lives in **one Markdown file** (default: the binder's canonical
-note, `collections/binder_<name>.md`) holding:
+An ordering lives in **one Markdown file**, the binder's canonical note
+(`collections/binder_<name>.md`), as the member blocks themselves:
 
-- one `type: ordering` block — the config;
-- lean `type: ref` blocks with a `sort:` key — one per member that has been
-  *placed*. Members without a key follow in rule order, after all keyed ones.
+- **The document is the order.** Members follow their blocks in the order the
+  blocks stand in the note. Moving a block up in the editor moves the member.
+  Renaming a file moves nothing: its block stays where it is.
+- **A `sort:` key sets the order** for a member where the document should not
+  decide. Keyed members come first; `register order move` writes the keys.
+- Members **without a block** in the note (not promoted yet) come last, by file
+  name.
 
 ```markdown
-### · safari (ordering)
-```yaml
-type: ordering
-binder: safari        # the membership set this arranges
-rule: name            # the base order for unkeyed members
-```
-
 ### IMG_2041.jpg
 ```yaml
 type: ref
 id: '270450536'
 binder: safari
-sort: i               # fractional lexicographic key
+sort: i               # optional: set by `order move`, wins over the document
+```
+
+### IMG_2050.jpg
+```yaml
+type: ref
+id: '270450612'
+binder: safari
 ```
 ```
 
-### Config fields (`type: ordering`)
-
-| field | values | meaning |
-|---|---|---|
-| `type` | `ordering` | discriminator |
-| `binder` | a binder name | which membership set this orders |
-| `rule` | `name` | the base order for members without a `sort:` key |
-
-The config block is optional for *reading* (keys apply regardless); `order
-move` creates it on first write. It is a fenced block, not frontmatter, because
-grubber inherits frontmatter into every block of a file.
+There is nothing to configure. Earlier versions wrote a `type: ordering` block
+with a `rule: name` line (file-name order for unkeyed members); such a block is
+harmless. Its `rule:` is ignored, and its `binder:` still guards `--note`
+against a note that orders another binder.
 
 ## Resolution
 
-1. Compute the base order per `rule` (name: filename, then id). The note is read through grubber; a binder without a note needs none.
-2. Members with a `sort:` key come first, sorted by `(sort, id)` as plain
+1. Members with a `sort:` key come first, sorted by `(sort, id)` as plain
    strings.
-3. Members without a key follow, in base order.
+2. The rest follow in document order: the order their blocks stand in the note.
+3. Members without a block come last, by file name, then id.
+
+The note is read through grubber, which returns blocks in document order; a
+binder without a note needs no grubber.
 
 ## Keys
 
@@ -69,7 +69,6 @@ pair), it materializes fresh keys for **all** members in the intended order.
 register order show <binder> [--json]     # resolved order; --json for consumers
 register order move <binder> <id|aka> --after <id|aka>
 register order move <binder> <id|aka> --to <n>    # 1-based position
-register order set  <binder> [--rule name]        # create/update the config
 ```
 
 All subcommands accept `--note <file>.md` to address an ordering other than the

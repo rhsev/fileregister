@@ -1,6 +1,6 @@
 exit: 0
 === stdout ===
-Ord — 3 member(s), rule: name (no ordering — pure rule order)
+Ord — 3 member(s) (no blocks in the note yet — by file name)
   1. a.pdf (2)
   2. b.pdf (3)
   3. c.pdf (1)

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -73,12 +74,12 @@ func assertOrder(t *testing.T, label string, checkMd bool, argSets ...[]string) 
 }
 
 func TestOrder(t *testing.T) {
-	// show: pure rule order.
+	// show: no note yet, so by file name.
 	assertOrder(t, "show-pure", false, []string{"show", "Ord"})
 	assertOrder(t, "show-json", false, []string{"show", "Ord", "--json"})
 
-	// set: create the config block.
-	assertOrder(t, "set", true, []string{"set", "Ord"})
+	// set is gone: there is no rule to set, the order is the document's.
+	assertOrder(t, "set-gone", false, []string{"set", "Ord"})
 
 	// move: --after and --to. On a keyless binder the first move materializes
 	// sort keys for every member; a second move places a single key between them.
@@ -95,7 +96,57 @@ func TestOrder(t *testing.T) {
 	// errors. convert and --kind are gone (absolute-only).
 	assertOrder(t, "unknown-sub", false, []string{"bogus", "Ord"})
 	assertOrder(t, "convert-gone", false, []string{"convert", "Ord", "--kind", "absolute"})
-	assertOrder(t, "set-kind-gone", false, []string{"set", "Ord", "--kind", "absolute"})
 	assertOrder(t, "move-both", false, []string{"move", "Ord", "1", "--after", "2", "--to", "1"})
 	assertOrder(t, "not-member", false, []string{"move", "Ord", "999", "--to", "1"})
+}
+
+// The order is the document's: members follow their blocks in the note, a
+// sort: key places a member before all of them, and members without a block
+// come last by file name — here c.pdf before a.pdf because its block stands
+// first, b.pdf last although it sorts between them.
+func TestOrderFollowsTheDocument(t *testing.T) {
+	n := seedOrderFixture(t)
+	note := filepath.Join(n, "collections", "binder_Ord.md")
+	writeFile(t, note,
+		"### c.pdf\n```yaml\ntype: ref\nid: '1'\nbinder: Ord\n```\n\n"+
+			"### a.pdf\n```yaml\ntype: ref\nid: '2'\nbinder: Ord\n```\n")
+	show := func() string {
+		out, se, code := runGoOrder(t, orderEnv(t, n), "show", "Ord", "--json")
+		if code != 0 {
+			t.Fatalf("show: exit %d: %s", code, se)
+		}
+		var ids []string
+		for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
+			ids = append(ids, l[strings.Index(l, `"id":"`)+6:strings.Index(l, `","filename"`)])
+		}
+		return strings.Join(ids, " ")
+	}
+	if got := show(); got != "1 2 3" {
+		t.Errorf("document order: %s, want 1 2 3 (c.pdf, a.pdf, then b.pdf without a block)", got)
+	}
+
+	// Swap the blocks by hand: the order follows.
+	writeFile(t, note,
+		"### a.pdf\n```yaml\ntype: ref\nid: '2'\nbinder: Ord\n```\n\n"+
+			"### c.pdf\n```yaml\ntype: ref\nid: '1'\nbinder: Ord\n```\n")
+	if got := show(); got != "2 1 3" {
+		t.Errorf("after swapping the blocks: %s, want 2 1 3", got)
+	}
+
+	// A sort: key is set order and wins over the document.
+	writeFile(t, note,
+		"### a.pdf\n```yaml\ntype: ref\nid: '2'\nbinder: Ord\n```\n\n"+
+			"### c.pdf\n```yaml\ntype: ref\nid: '1'\nbinder: Ord\nsort: m\n```\n")
+	if got := show(); got != "1 2 3" {
+		t.Errorf("with a key on c.pdf: %s, want 1 2 3", got)
+	}
+
+	// A rule: line from before is inert.
+	writeFile(t, note,
+		"### · Ord (ordering)\n```yaml\ntype: ordering\nbinder: Ord\nrule: name\n```\n\n"+
+			"### c.pdf\n```yaml\ntype: ref\nid: '1'\nbinder: Ord\n```\n\n"+
+			"### a.pdf\n```yaml\ntype: ref\nid: '2'\nbinder: Ord\n```\n")
+	if got := show(); got != "1 2 3" {
+		t.Errorf("an old rule: name took effect: %s, want 1 2 3", got)
+	}
 }

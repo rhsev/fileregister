@@ -1,10 +1,3 @@
-### · Ord (ordering)
-```yaml
-type: ordering
-binder: Ord
-rule: name
-```
-
 ### a.pdf
 ```yaml
 type: ref
