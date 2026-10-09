@@ -45,7 +45,11 @@ func cmdReindex(args []string) int {
 	for _, r := range allIndex {
 		indexed[index.AsString(r["id"])] = true
 	}
-	mdRecs := readAnnotations(nd)
+	mdRecs, aerr := readAnnotations(nd)
+	if aerr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", aerr)
+		return 1
+	}
 
 	// Backfill id for hand-written aka-only blocks via the index's aka → id map.
 	akaToID := map[string]string{}

@@ -137,7 +137,12 @@ func cmdAnnotate(args []string) int {
 	// Candidate files: every note carrying a matching (id ∪ aka, binder) block.
 	seen := map[string]bool{}
 	var files []string
-	for _, r := range readAnnotations(nd) {
+	annos, aerr := readAnnotations(nd)
+	if aerr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", aerr)
+		return 1
+	}
+	for _, r := range annos {
 		if blockMatchesKeys(r, keys) && index.AsString(r["binder"]) == binder {
 			f := index.AsString(r["_note_file"])
 			if f != "" && !seen[f] {

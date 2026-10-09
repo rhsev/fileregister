@@ -192,7 +192,7 @@ fileanchor engine, so a Linux port is a fileanchor port, not a register one.
 
 ### Companion releases
 
-`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads everything above the index: without it, fileregister is the index and nothing more. The core commands — `add`, `list`, `resolve`, `audit`, `repair` and most of the lifecycle — run without it. Whatever reads a note does not: `register album`, `register order`, and `register rename` for a binder that has one, because the Markdown layer is read through grubber. This release is tested against **fileanchor 1.2.0** and **grubber v0.18.0**; `make fileanchor` and `make grubber` build both at those tags.
+`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads everything above the index: without it, fileregister is the index and nothing more. The core commands — `add`, `list`, `resolve`, `audit`, `repair`, `refresh`, `remove` — run without it. Whatever reads the notes does not: `album`, `order`, `annotate`, `aka`, `rename`, `marshal`, `reindex`, `cleanup` and `list --inbox`/`--curated`, because the Markdown layer is read through grubber, and register has no reader of its own. This release is tested against **fileanchor 1.2.0** and **grubber v0.18.0**; `make fileanchor` and `make grubber` build both at those tags.
 
 ### Configuration
 

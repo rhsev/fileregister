@@ -24,14 +24,18 @@ func refLabel(rec map[string]any) string {
 
 // annotationsForBinder returns the Markdown annotation records for a binder
 // (binder compared as a scalar, as md blocks carry one binder each).
-func annotationsForBinder(notesDir, binder string) []map[string]any {
+func annotationsForBinder(notesDir, binder string) ([]map[string]any, error) {
+	annos, err := readAnnotations(notesDir)
+	if err != nil {
+		return nil, err
+	}
 	var out []map[string]any
-	for _, r := range readAnnotations(notesDir) {
+	for _, r := range annos {
 		if index.AsString(r["binder"]) == binder {
 			out = append(out, r)
 		}
 	}
-	return out
+	return out, nil
 }
 
 func cmdRename(args []string) int {
@@ -87,7 +91,12 @@ func cmdRename(args []string) int {
 	if !refsOK {
 		return 1
 	}
-	records := append(recordsForBinder(refs, oldName), annotationsForBinder(nd, oldName)...)
+	annos, aerr := annotationsForBinder(nd, oldName)
+	if aerr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v — nothing renamed\n", aerr)
+		return 1
+	}
+	records := append(recordsForBinder(refs, oldName), annos...)
 	if len(records) == 0 {
 		fmt.Printf("No refs found for binder '%s'\n", oldName)
 		return 0

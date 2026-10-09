@@ -91,7 +91,11 @@ func cmdCleanup(args []string) int {
 	if !refsOK {
 		return 1
 	}
-	annos := readAnnotations(nd)
+	annos, aerr := readAnnotations(nd)
+	if aerr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", aerr)
+		return 1
+	}
 
 	indexIDs := map[string]bool{}
 	memberships := map[string]bool{}

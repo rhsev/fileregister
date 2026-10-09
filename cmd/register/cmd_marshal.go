@@ -165,7 +165,12 @@ func cmdMarshal(args []string) int {
 		idsSet[index.AsString(r["id"])] = true
 	}
 	notesForIDs := map[string][]map[string]any{}
-	for _, r := range readAnnotations(notesDir) {
+	annos, aerr := readAnnotations(notesDir)
+	if aerr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v — container would be incomplete\n", aerr)
+		return 1
+	}
+	for _, r := range annos {
 		if idsSet[index.AsString(r["id"])] {
 			nf := index.AsString(r["_note_file"])
 			notesForIDs[nf] = append(notesForIDs[nf], r)

@@ -49,9 +49,9 @@ func TestUnquotedIDReachesAlbumAndOrder(t *testing.T) {
 	}
 }
 
-// rename moves the canonical note along only after making sure no other binder
-// has blocks in it. When grubber cannot read the note, that cannot be told, so
-// the note stays where it is.
+// rename finds the binder's blocks through grubber before it changes anything.
+// When grubber cannot read the notes, nothing is renamed: not the index, not
+// the blocks, not the note.
 func TestRenameKeepsNoteWhenGrubberFails(t *testing.T) {
 	anchor := engineBin(t)
 	n, h := setupRenameWithMd(t, anchor, "700000901", "Old")
@@ -62,11 +62,15 @@ func TestRenameKeepsNoteWhenGrubberFails(t *testing.T) {
 	}
 	env := append(filterEnv(renameEnvHome(t, n, h, anchor), "GRUBBER_BIN"), "GRUBBER_BIN="+stub)
 
-	_, se, _ := runGoRename(t, env, "Old", "New")
-	if !strings.Contains(se, "broken on purpose") || !strings.Contains(se, "binder_Old.md stays") {
-		t.Errorf("stderr does not say why the note stayed: %q", se)
+	before := mustRead(t, filepath.Join(n, "collections", "inbox.jsonl"))
+	_, se, code := runGoRename(t, env, "Old", "New")
+	if code != 1 || !strings.Contains(se, "broken on purpose") || !strings.Contains(se, "nothing renamed") {
+		t.Errorf("exit %d, stderr does not say why nothing was renamed: %q", code, se)
 	}
 	if _, err := os.Stat(filepath.Join(n, "collections", "binder_Old.md")); err != nil {
 		t.Errorf("the note was moved although its blocks could not be read")
+	}
+	if mustRead(t, filepath.Join(n, "collections", "inbox.jsonl")) != before {
+		t.Errorf("the index changed although rename stopped")
 	}
 }

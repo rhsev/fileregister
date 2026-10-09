@@ -117,7 +117,10 @@ func listAllFiltered(notesDir, filter string, jsonOnly bool) error {
 
 	label := ""
 	if filter != "" {
-		annotated := annotatedIDs(notesDir)
+		annotated, aerr := annotatedIDs(notesDir)
+		if aerr != nil {
+			return aerr
+		}
 		kept := active[:0]
 		for _, r := range active {
 			a := annotated[r.ID]

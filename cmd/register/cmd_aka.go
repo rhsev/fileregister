@@ -112,7 +112,11 @@ func cmdAka(args []string) int {
 	}
 
 	// Markdown guard: no block may depend on a handle that changes owner.
-	blocks := readAnnotations(nd)
+	blocks, berr := readAnnotations(nd)
+	if berr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v — no handle changed\n", berr)
+		return 1
+	}
 	if conflicts := akaBlockConflicts(blocks, id, current, append(append([]string{}, toAdd...), toRemove...)); len(conflicts) > 0 {
 		fmt.Fprintln(os.Stderr, "Error: Markdown blocks carry the handle but belong to no or another record:")
 		for _, c := range conflicts {
