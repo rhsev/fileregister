@@ -461,7 +461,8 @@ writes nothing (but the name, with `--title`). Each line is the member's
 Absent values are omitted, never `""`/`null`. Broken members keep their line and
 position with `"broken":true`, as in `list --json`. The album name is the `album`
 frontmatter field, arriving in every line's `fields`; `--title TEXT` writes it to
-`collections/binder_<name>.md`, `--title ""` removes it (and a header left
+`collections/binder_<name>.md` (NFC-normalized, as binder names are; control
+characters refused, exit 1), `--title ""` removes it (and a header left
 empty). Messages go to stderr; stdout is only the lines. Unknown binder: exit 1,
 as `order show`.
 

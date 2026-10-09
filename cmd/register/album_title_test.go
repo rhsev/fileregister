@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"os"
+
+	unorm "golang.org/x/text/unicode/norm"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -140,5 +142,37 @@ func TestAlbumKeepsGrubberStderr(t *testing.T) {
 	}
 	if !strings.Contains(se, "exit status 1: grubber: config set not found: foo") {
 		t.Errorf("stderr lost grubber's reason: %q", se)
+	}
+}
+
+// A name pasted from the Finder arrives decomposed (NFD). Stored that way it
+// looks right and is not found by a search typed on the keyboard (NFC).
+func TestAlbumTitleIsStoredNFC(t *testing.T) {
+	anchor := engineBin(t)
+	n := seedAlbumFixture(t)
+	note := filepath.Join(n, "collections", "binder_Alb.md")
+	nfd := unorm.NFD.String("Ümläut Reise")
+	if _, se, code := runGoAlbum(t, albumEnv(t, n, anchor), "Alb", "--title", nfd); code != 0 {
+		t.Fatalf("exit %d: %s", code, se)
+	}
+	got := mustRead(t, note)
+	if !strings.Contains(got, "album: "+unorm.NFC.String("Ümläut Reise")) || strings.Contains(got, nfd) {
+		t.Errorf("name not stored NFC:\n%q", got)
+	}
+}
+
+func TestAlbumTitleRefusesControlCharacters(t *testing.T) {
+	anchor := engineBin(t)
+	n := seedAlbumFixture(t)
+	note := filepath.Join(n, "collections", "binder_Alb.md")
+	before := mustRead(t, note)
+	for _, title := range []string{"two\nlines", "tab\there"} {
+		so, se, code := runGoAlbum(t, albumEnv(t, n, anchor), "Alb", "--title", title)
+		if code != 1 || so != "" || !strings.Contains(se, "one line") {
+			t.Errorf("%q: exit %d, stdout %q, stderr %q", title, code, so, se)
+		}
+	}
+	if mustRead(t, note) != before {
+		t.Errorf("a refused name changed the note")
 	}
 }

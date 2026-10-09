@@ -76,6 +76,12 @@ register album safari --title "Safari, Namibia 2026"   # writes or updates the f
 register album safari --title ""                       # removes it again
 ```
 
+Any name works: colons, quotes, emoji, words YAML would otherwise read as a
+number or `yes`; the field is quoted where it has to be. `--title` stores it in
+NFC, the composed Unicode form, so a name pasted from the Finder (which can
+arrive decomposed and looks the same) is still found by a search typed on the
+keyboard. A name is one line: line breaks and tabs are refused.
+
 Nothing looks the value up. grubber passes every frontmatter key down into each
 block of the file, so it arrives in every line's `fields`, and so does any
 other key the frontmatter carries (a period, an author, a client). A reader

@@ -24,6 +24,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+
+	unorm "golang.org/x/text/unicode/norm"
 )
 
 const albumUsage = "Usage: register album <binder> [--title TEXT]"
@@ -65,6 +68,16 @@ func cmdAlbum(args []string) int {
 	// stdout is the data.
 	title, titleSet := vals["--title"]
 	clearTitle := titleSet && strings.TrimSpace(title) == ""
+	if titleSet && !clearTitle {
+		// NFC, as binder names are: a name pasted from the Finder arrives
+		// decomposed, looks the same, and a search typed on the keyboard would
+		// not find it. A heading is one line, so no line breaks or tabs.
+		title = unorm.NFC.String(title)
+		if strings.IndexFunc(title, unicode.IsControl) >= 0 {
+			fmt.Fprintf(os.Stderr, "register album: %q contains a line break or another control character — an album name is one line\n", title)
+			return 1
+		}
+	}
 	cleared := ""
 	if clearTitle {
 		var werr error
