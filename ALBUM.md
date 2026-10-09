@@ -95,10 +95,11 @@ grubber extract ~/notes -a -f album~Safari -f type=ref   # every member of that 
 `type=ref` keeps the rest out: any other note with an `album` key in its header
 matches too, and so does an ordering block written by earlier versions.
 
-The name belongs to the note, not to the binder: keep one binder per note, or
-every binder in it shares the name. `--title` writes to the binder's own note,
-`collections/binder_safari.md`, where `promote` puts its blocks, so this only
-comes up with notes put together by hand.
+The name belongs to the note, not to the binder. A note may hold blocks of
+several binders (`promote --target` writes into any note), and then they all
+carry the name its frontmatter gives. `--title` writes to the binder's own
+note, `collections/binder_safari.md`, where `promote` puts its blocks by
+default.
 
 ## Fields
 
