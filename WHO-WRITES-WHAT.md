@@ -50,7 +50,7 @@ The columns for the file and the index:
 | `forget`† | record out | out | id out | out | — | — | — |
 | `rename`† | binder renamed | — | — | — | — | old out, new add | renamed |
 | `refresh` | — | renewed (stale) | restore | set | set (member) | add | — |
-| `repair` | — | re-bound | add | set | set (member) | add | — |
+| `repair` | `filename` edited (renamed file) | re-bound | add | set | set (member) | add | — |
 | `unmarshal` | new records | new | add | set | set (member) | add | — |
 | `write` (`.jsonl` target) | records | — | — | — | set (`_ref_path`) | add (`_ref_path`) | — |
 | `cleanup --prune`, `--interactive`† | — | unrepairable entries out | — | — | — | — | — |

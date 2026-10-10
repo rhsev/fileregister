@@ -159,6 +159,23 @@ func repairRecord(rec map[string]any, newPath string) (string, []string) {
 	return id, failed
 }
 
+// setIndexFilename records a repaired file's current name on its index line.
+// filename is the display label list and album show; the id stays the identity,
+// and note headings are left as they are.
+func setIndexFilename(jsonlPath, id, name string) error {
+	if !strings.HasSuffix(strings.ToLower(jsonlPath), ".jsonl") {
+		return nil
+	}
+	_, err := index.JSONLRewrite(jsonlPath, func(rec map[string]any) (map[string]any, bool) {
+		if index.AsString(rec["id"]) != id || index.AsString(rec["filename"]) == name {
+			return rec, false
+		}
+		rec["filename"] = name
+		return rec, true
+	})
+	return err
+}
+
 var digitsRe = regexp.MustCompile(`^\d+$`)
 
 func cmdRepair(args []string) int {
@@ -310,6 +327,13 @@ func cmdRepair(args []string) int {
 
 		if rid, failed := repairRecord(rec, newPath); rid != "" {
 			fmt.Printf("  Repaired: re-bound id %s (unchanged)\n", id)
+			if old, nw := index.AsString(rec["filename"]), filepath.Base(newPath); old != "" && old != nw {
+				if err := setIndexFilename(index.AsString(rec["_note_file"]), id, nw); err != nil {
+					fmt.Fprintf(os.Stderr, "  Warning: could not update the file name in the index: %v\n", err)
+				} else {
+					fmt.Printf("  File name in the index: %s → %s\n", old, nw)
+				}
+			}
 			if len(failed) > 0 {
 				fmt.Printf("  But could not write %s on the file — run 'register refresh' once it is writable\n",
 					strings.Join(failed, ", "))

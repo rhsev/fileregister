@@ -58,3 +58,21 @@ func TestRepair(t *testing.T) {
 	repl := map[string]string{fN: "<NOTES>"}
 	assertGolden(t, "repair_not-found", cliResult(norm(fOut, repl), norm(fErr, repl), fCode))
 }
+
+// A repaired file that was renamed gets its current name on the index line;
+// other records and other fields stay as they are.
+func TestSetIndexFilename(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "inbox.jsonl")
+	writeFile(t, path,
+		`{"binder":["Bnd"],"filename":"beta.txt","id":"700000901","kind":"txt","type":"ref"}`+"\n"+
+			`{"binder":["Bnd"],"filename":"other.txt","id":"700000902","kind":"txt","type":"ref"}`+"\n")
+	if err := setIndexFilename(path, "700000901", "beta-renamed.txt"); err != nil {
+		t.Fatal(err)
+	}
+	got := mustRead(t, path)
+	want := `{"binder":["Bnd"],"filename":"beta-renamed.txt","id":"700000901","kind":"txt","type":"ref"}` + "\n" +
+		`{"binder":["Bnd"],"filename":"other.txt","id":"700000902","kind":"txt","type":"ref"}` + "\n"
+	if got != want {
+		t.Errorf("index after setIndexFilename:\n got: %s\nwant: %s", got, want)
+	}
+}
