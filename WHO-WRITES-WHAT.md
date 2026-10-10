@@ -80,11 +80,3 @@ the text around it, which grubber does not give.
 - **The frontmatter has one writer** and one field: `album --title`.
 - **★ leaves a file** only with its last binder (`remove`). `forget` has nothing
   to take off: a record in no binder carries no ★.
-
-## Findings
-
-- `cleanupDeleteMdBlock` has a branch for `.jsonl` "notes" that removes a binder
-  from an index record, or the whole record when the block named no binder. It
-  is unreachable: `cleanup` gets its items from the notes, read through grubber
-  as `.md` only. It is also the one place outside `forget` that could delete a
-  record. Candidate for removal.

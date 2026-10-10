@@ -31,25 +31,11 @@ func cleanupShortDesc(rec map[string]any) string {
 	return label + " (" + b + ")"
 }
 
-// cleanupDeleteMdBlock deletes one per-binder Markdown context block.
+// cleanupDeleteMdBlock deletes one per-binder Markdown context block. The
+// items come from the notes (readAnnotations reads .md only), so this is only
+// ever a block; a record is deleted by forget and nothing else.
 func cleanupDeleteMdBlock(item cleanupItem) (int, error) {
-	id := index.AsString(item.rec["id"])
-	binder := index.AsString(item.rec["binder"])
-	// Annotations are Markdown; dispatch by extension for safety.
-	if strings.HasSuffix(strings.ToLower(item.noteFile), ".jsonl") {
-		if binder != "" {
-			// Set model: deleting an (id, binder) pair set-deletes that one
-			// membership — the record stays (an emptied set is a bookmark).
-			return index.JSONLRemoveBinder(item.noteFile, id, binder)
-		}
-		return index.JSONLRewrite(item.noteFile, func(rec map[string]any) (map[string]any, bool) {
-			if index.AsString(rec["id"]) == id {
-				return nil, true
-			}
-			return rec, false
-		})
-	}
-	return mdDeleteBlock(item.noteFile, id, binder)
+	return mdDeleteBlock(item.noteFile, index.AsString(item.rec["id"]), index.AsString(item.rec["binder"]))
 }
 
 func cmdCleanup(args []string) int {
