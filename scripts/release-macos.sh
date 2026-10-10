@@ -12,7 +12,7 @@
 # requires FULL Xcode. With only the Command Line Tools we build the host arch.
 # register itself (pure Go) cross-compiles freely; fileanchor is the constraint.
 #
-# Env: FILEANCHOR_VERSION (tag, default 1.2.0), FILEANCHOR_SRC (local checkout)
+# Env: FILEANCHOR_VERSION (tag, default 1.3.0), FILEANCHOR_SRC (local checkout)
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -20,7 +20,7 @@ cd "$(dirname "$0")/.."
 # The bundle carries the engine, so a stale default ships an engine that cannot
 # do what register expects of it — audit withholds its dead verdict then, which
 # is correct but a poor thing to publish.
-FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.2.0}"
+FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.3.0}"
 FILEANCHOR_REPO="${FILEANCHOR_REPO:-https://github.com/rhsev/fileanchor.git}"
 # register album reads the Markdown layer through grubber, so the bundle carries
 # it the way it carries the engine. Same pin as the Makefile, and the published
@@ -68,6 +68,18 @@ cp "$SRC/LICENSE" "$STAGE/licenses/fileanchor.txt"
 curl -fsSL -o "$STAGE/licenses/grubber.txt" \
 	"https://raw.githubusercontent.com/rhsev/grubber/$GRUBBER_VERSION/LICENSE"
 
+# Ask each binary in the bundle for its version before packing it: a bundle
+# whose parts do not say what was pinned is not shipped.
+check_version() { # <binary> <expected first line>
+	got="$("$1" --version 2>&1 | head -1)"
+	[ "$got" = "$2" ] || { echo "release-macos.sh: $(basename "$1") reports '$got', expected '$2'" >&2; exit 1; }
+	echo "    $got"
+}
+echo "==> versions"
+check_version "$STAGE/register" "register $VERSION"
+check_version "$STAGE/libexec/fileanchor" "fileanchor $FILEANCHOR_VERSION"
+check_version "$STAGE/libexec/grubber" "grubber ${GRUBBER_VERSION#v} (Go)"
+
 cat > "$STAGE/INSTALL.txt" <<'NOTE'
 fileregister for macOS, Apple Silicon (arm64)
 
@@ -97,7 +109,7 @@ developer cannot be verified, clear the quarantine flag once:
 Point register at a notes directory first: export GRUBBER_NOTES=~/notes (README).
 Intel Mac? Build from source instead (go install + `make fileanchor` +
 `make grubber`).
-Tested with fileanchor 1.2.0 and grubber v0.19.0.
+Tested with fileanchor 1.3.0 and grubber v0.19.0.
 NOTE
 
 TARBALL="$OUT/fileregister-macos-$ARCH.tar.gz"

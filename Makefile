@@ -9,7 +9,7 @@ WORKFLOWS     = add-to-binder binder-of
 # The metadata engine is a separate project. Pin the tag the checks run against;
 # bump it deliberately rather than drifting to whatever main happens to be.
 FILEANCHOR_REPO    ?= https://github.com/rhsev/fileanchor.git
-FILEANCHOR_VERSION ?= 1.2.0
+FILEANCHOR_VERSION ?= 1.3.0
 
 # The Markdown layer is read through grubber, so the album checks need it the
 # same way half the suite needs the engine. Same rule: pin a tag.
