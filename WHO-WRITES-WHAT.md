@@ -78,7 +78,7 @@ Read only: `album`, `order show`, `marshal`, `list --inbox/--curated`.
 block of the binder under a heading naming the file gets the id back, instead of
 a second block being written.
 
-grubber reads the notes in two ways. As records, blocks as they stand
+grubber reads the notes in two ways, always with `--no-config`, so the user's grubber config does not change what register sees. As records, blocks as they stand
 (`-b --inherit=`): `annotate`, `aka`, `cleanup`, `forget`, `marshal`, `reindex`,
 `rename`, `list --inbox/--curated` and `order` (the binder's note). For the
 album, with the note's frontmatter inherited into every block (`-b`). A writer

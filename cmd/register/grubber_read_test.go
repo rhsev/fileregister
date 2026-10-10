@@ -112,3 +112,29 @@ func TestBinderInNFDIsTheSameBinder(t *testing.T) {
 		t.Errorf("the writer missed the NFD block and added another:\n%s", got)
 	}
 }
+
+// The user's grubber config is for their own queries. A default filter there
+// hid blocks from register: annotate found none, and rename renamed the index
+// and the note file but left the block on the old binder. grubber is called
+// with --no-config, so its config does not steer what register changes.
+func TestGrubberConfigDoesNotSteerRegister(t *testing.T) {
+	anchor := engineBin(t)
+	n, h := setupRenameWithMd(t, anchor, "700000902", "Old")
+	if err := os.MkdirAll(filepath.Join(h, ".config", "grubber"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(h, ".config", "grubber", "config.yaml"),
+		"defaults:\n  filters:\n    - \"type=meeting\"\n  array_fields: [binder, id]\n")
+	env := append(renameEnvHome(t, n, h, anchor), "GRUBBER_ARRAY_FIELDS=binder")
+
+	if _, se, code := runGoAnnotate(t, env, "", "Old", "700000902", "--set", "note=kept"); code != 0 {
+		t.Fatalf("annotate did not find the block: exit %d %s", code, se)
+	}
+	if _, se, code := runGoRename(t, env, "Old", "New"); code != 0 {
+		t.Fatalf("rename: exit %d %s", code, se)
+	}
+	got := mustRead(t, filepath.Join(n, "collections", "binder_New.md"))
+	if !strings.Contains(got, "binder: New") || strings.Contains(got, "binder: Old") || !strings.Contains(got, "note: kept") {
+		t.Errorf("the block was not renamed with its binder:\n%s", got)
+	}
+}

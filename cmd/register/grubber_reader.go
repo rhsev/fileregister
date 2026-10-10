@@ -78,12 +78,16 @@ func grubberRecordsFor(notesDir, binder string) (map[string]map[string]any, erro
 	return byID, nil
 }
 
-// grubberExtract runs `grubber extract <args>` and decodes the record list.
+// grubberExtract runs `grubber extract --no-config <args>` and decodes the
+// record list. --no-config: the call means what its arguments say, whatever
+// the user's grubber config and GRUBBER_* variables set for their own queries.
+// A default filter there would otherwise hide blocks from rename, forget and
+// cleanup, which decide by grubber's answer what to change.
 // Numbers are kept as their digits (UseNumber): an id or sort key written
 // unquoted in a block is a YAML integer, and decoded as float64 it came out of
 // AsString as "2.70450536e+08", matching no record.
 func grubberExtract(bin string, args ...string) ([]map[string]any, error) {
-	out, err := exec.Command(bin, append([]string{"extract"}, args...)...).Output()
+	out, err := exec.Command(bin, append([]string{"extract", "--no-config"}, args...)...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("%w%s", err, grubberStderr(err))
 	}
