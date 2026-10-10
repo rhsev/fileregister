@@ -81,3 +81,29 @@ func TestWrite(t *testing.T) {
 	assertGolden(t, "write_extra.jsonl",
 		strings.Join(manifestMultiset(t, filepath.Join(n, "collections", "extra.jsonl")), "\n")+"\n")
 }
+
+// Labels are annotation and live in the note's block; the index knows identity
+// and membership. A line that still carries tags is written without them, and
+// write says so once instead of dropping them silently.
+func TestWriteIgnoresTags(t *testing.T) {
+	n := t.TempDir()
+	col := filepath.Join(n, "collections")
+	os.MkdirAll(col, 0755)
+	jsonl := filepath.Join(col, "inbox.jsonl")
+	md := filepath.Join(col, "binder_Docs.md")
+	input := `{"_note_file":"` + jsonl + `","type":"ref","id":"5","binder":"Docs","filename":"d.pdf","tags":["draft","v2"]}` + "\n" +
+		`{"_note_file":"` + md + `","type":"ref","id":"5","binder":"Docs","filename":"d.pdf","tags":"draft"}` + "\n"
+
+	_, se, code := runGoWrite(t, writeEnv(t, n), input)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, se)
+	}
+	if !strings.Contains(se, "2 line(s) carry tags") {
+		t.Errorf("no word about the dropped tags: %q", se)
+	}
+	for _, f := range []string{jsonl, md} {
+		if got := mustRead(t, f); strings.Contains(got, "tags") || strings.Contains(got, "draft") {
+			t.Errorf("%s still carries tags:\n%s", filepath.Base(f), got)
+		}
+	}
+}

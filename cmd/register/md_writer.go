@@ -452,9 +452,6 @@ func mdToMarkdown(r index.RefRecord) string {
 	if index.NotEmptyVal(r.Aka) {
 		b.WriteString(yamlFieldVal("aka", r.Aka))
 	}
-	if index.NotEmptyVal(r.Tags) {
-		b.WriteString(yamlFieldVal("tags", r.Tags))
-	}
 	if r.Xattr != "" && r.Xattr != "itemprojects" {
 		b.WriteString(yamlField("xattr", r.Xattr))
 	}

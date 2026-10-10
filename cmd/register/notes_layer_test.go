@@ -98,7 +98,7 @@ func TestReindexDoesNotIndexTheFrontmatter(t *testing.T) {
 	os.MkdirAll(col, 0755)
 	writeFile(t, filepath.Join(col, "inbox.jsonl"), "")
 	writeFile(t, filepath.Join(col, "binder_trip.md"),
-		"---\nurl: https://example.com/this-note\nalbum: Safari\n---\n\n### a.pdf\n```yaml\ntype: ref\nid: '1'\nbinder: trip\nfilename: a.pdf\n```\n")
+		"---\nurl: https://example.com/this-note\nalbum: Safari\n---\n\n### a.pdf\n```yaml\ntype: ref\nid: '1'\nbinder: trip\nfilename: a.pdf\ntags: [draft]\n```\n")
 
 	if _, se, code := runGoReindex(t, reindexEnv(t, notes)); code != 0 {
 		t.Fatalf("reindex: exit %d: %s", code, se)
@@ -109,6 +109,10 @@ func TestReindexDoesNotIndexTheFrontmatter(t *testing.T) {
 	}
 	if strings.Contains(got, "example.com") || strings.Contains(got, "album") {
 		t.Errorf("the note's frontmatter reached the index:\n%s", got)
+	}
+	// A label in the block is annotation and stays there.
+	if strings.Contains(got, "draft") {
+		t.Errorf("the block's tags reached the index:\n%s", got)
 	}
 }
 

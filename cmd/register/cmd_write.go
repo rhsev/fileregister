@@ -44,6 +44,7 @@ type writeItem struct {
 	isJSONL bool
 	rec     index.RefRecord
 	refPath string
+	tags    bool // the line carried tags, which no record has any more
 }
 
 // writeParse validates one input line into a writeItem.
@@ -70,11 +71,9 @@ func writeParse(line string) writeItem {
 			return writeItem{status: writeStatusErr(targetStr, "binder must be one string per line (one membership each)")}
 		}
 	}
-	// aka and tags are lists in a record; a single string is one element.
-	for _, k := range []string{"aka", "tags"} {
-		if s, ok := data[k].(string); ok {
-			data[k] = []any{s}
-		}
+	// aka is a list in a record; a single string is one element.
+	if s, ok := data["aka"].(string); ok {
+		data["aka"] = []any{s}
 	}
 	rec := index.NewRefRecord(data)
 	if !rec.Valid() {
@@ -91,6 +90,7 @@ func writeParse(line string) writeItem {
 		isJSONL: strings.HasSuffix(strings.ToLower(targetStr), ".jsonl"),
 		rec:     rec,
 		refPath: index.AsString(data["_ref_path"]),
+		tags:    index.NotEmptyVal(data["tags"]),
 	}
 }
 
@@ -146,8 +146,18 @@ func cmdWrite(args []string) int {
 	}
 
 	items := make([]writeItem, len(lines))
+	tagged := 0
 	for i, line := range lines {
 		items[i] = writeParse(line)
+		if items[i].tags {
+			tagged++
+		}
+	}
+	// Labels are annotation, and annotation lives in the note: say so once
+	// rather than drop them without a word.
+	if tagged > 0 {
+		fmt.Fprintf(os.Stderr, "register write: %d line(s) carry tags, which are not a record field — ignored; "+
+			"labels go into the member's block (register annotate <binder> <id> --set tags=…)\n", tagged)
 	}
 
 	// A .jsonl target inside a collections/ folder is part of an index: the

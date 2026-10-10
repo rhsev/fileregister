@@ -77,11 +77,10 @@ Fields:
 | `kind` | optional | Coarse classification used for display and filtering (e.g. `pdf`, `image`, `mail`, `video`). Auto-detected from the file's extension on `register add` (jpg/png/heic/… → `image`, mp4/mov/… → `video`, eml/mbox/… → `mail`, md/markdown → `md`, typ → `typst`; unknown extensions fall back to the extension itself, no-extension to `file`). `--kind` overrides the auto-detect. For URL refs, derived from the scheme (`https` → `web`, `x-devonthink-item` → `devonthink`, `message` → `mail`; unknown schemes fall back to the scheme itself). |
 | `url` | optional | Locator alternative to the bookmark: the record references a URL (e.g. `x-devonthink-item://…`) instead of a file. Mutually exclusive with the bookmark identity — see [URL refs](#url-refs). |
 | `aka` | optional | Array of human-chosen handles that also resolve to this record (resolution matches `id` ∪ `aka`). For referencing a file by name — e.g. behind a `milan://` URL via `register resolve`. Must be unique across the index. |
-| `tags` | optional | Free-form annotation labels local to this ref (e.g. `[draft, v2]`). Not synchronized to macOS Spotlight metadata. |
 | `kept_tags` | optional | Set by register, never by hand. Binder names whose Finder tag was already on the file when it joined that binder with the `tags` backend: the user's own tags, which only happen to match a binder. `remove` and `rename` never take them off the file, and `audit` does not report them as ghosts. Absent means every binder tag on the file is register's. |
 | `xattr` | optional | xattr backend for this **file**: `itemprojects` (default), `tags`, or `none`. One choice per record; determines which macOS metadata field caches the binder names — see [macOS metadata layer](#macos-metadata-layer-derived). |
 
-`binder` is the only field synchronized with the macOS Spotlight metadata layer. The optional `tags:` array is reserved for record-level annotations — labels that distinguish files from each other (status, version, importance) without affecting Spotlight. Use it only when something more specific than `kind` needs to be expressed.
+`binder` is the only field synchronized with the macOS Spotlight metadata layer. Labels that distinguish files from each other (status, version, importance) are annotation, not identity: they go into the member's block as `tags:` (or any other field), where grubber and matterbase query them, and the index carries none. `register write` ignores a `tags` key and says so; an old index line that has one keeps it, unread.
 
 **One record per file.** A file in three binders is **one** index line with a three-element `binder` array. Duplicate `(id, binder)` registrations are structurally impossible: membership is set membership, so adding twice is a no-op and there is nothing to dedupe.
 
@@ -180,7 +179,7 @@ In Markdown, an annotation block must be preceded by a heading at any level. mat
 
 ### URL refs
 
-A `type: ref` record may reference a **URL** instead of a file — a DEVONthink item link (`x-devonthink-item://UUID`), a web page, a `message:` link. The bookmark was never the essence of a ref; it is the macOS accelerator for the *file* locator. A URL ref is the same record with a different locator: identity (`id`), membership (`binder`), aka, tags, annotations, and promote all work identically, and `register resolve` returns the URL — `open "$(register resolve <key>)"` is uniform for both (milan needs no change).
+A `type: ref` record may reference a **URL** instead of a file — a DEVONthink item link (`x-devonthink-item://UUID`), a web page, a `message:` link. The bookmark was never the essence of a ref; it is the macOS accelerator for the *file* locator. A URL ref is the same record with a different locator: identity (`id`), membership (`binder`), aka, annotations, and promote all work identically, and `register resolve` returns the URL — `open "$(register resolve <key>)"` is uniform for both (milan needs no change).
 
 What does **not** apply is the entire derived layer: no bookmark, no xattr cache, no ★, no Spotlight, no `repair`, no `of`. URL refs are implicitly `xattr: none` — index + annotation citizens, the same standing `none`-backend files already have. `refresh`/`audit`/`repair` skip them (counted); `marshal` carries them as pure data (no file payload). Created with `register add --url <URL> --binder <name> [--label <name>]`; `filename` holds the optional display label (its human-recognition role — the repair-anchor role is moot). Removed with `register remove <url> --binder <name>`. Idempotent over `(url, binder)`.
 
@@ -574,7 +573,7 @@ Non-conforming input is rejected per-record with a status entry; the stream is n
 
 ### Record Identity
 
-In the JSONL index a record is identified by `id` alone (one record per file); `register write` set-inserts the input's `binder` into the existing record rather than appending a second line. In Markdown a context block is identified by `(id, binder)`. Other fields (kind, aka, tags) may differ between input and existing record — `register write` does not rewrite an existing record's other fields, only ensures the membership is present. To change an existing record's fields, the user edits it directly (handles: `register aka`).
+In the JSONL index a record is identified by `id` alone (one record per file); `register write` set-inserts the input's `binder` into the existing record rather than appending a second line. In Markdown a context block is identified by `(id, binder)`. Other fields (kind, aka) may differ between input and existing record — `register write` does not rewrite an existing record's other fields, only ensures the membership is present. To change an existing record's fields, the user edits it directly (handles: `register aka`).
 
 ### Heading Convention
 
@@ -596,7 +595,7 @@ Required fields:
 - `type: ref`, `id`, `binder`
 
 Optional fields:
-- `filename`, `kind`, `aka`, `tags`, `xattr` — record content
+- `filename`, `kind`, `aka`, `xattr` — record content (a `tags` key is ignored with a note: labels belong in the block)
 - `_ref_path` — path to the referenced file. When set, the file exists and the target is an index `.jsonl`, `register write` writes the membership to the file through the record's backend and sets ★ (idempotent)
 
 Example:
@@ -654,7 +653,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 - **Binder names may contain spaces**: kMDItemProjects is a real array, so `alpha project` is one element and matches exactly. Only the opt-in `tags` backend benefits from short, space-free names (spaces clutter Finder Tag chips — convention there: hyphens, underscores, or the colon-hierarchy `urlaub:2024:italien`). Not enforced; documented.
 - **Backend migration is not automatic**: changing a record's `xattr:` field from one backend to another (e.g. `itemprojects` → `tags`) leaves the old xattr entry behind. `register audit` will eventually surface this as a ghost; resolve manually.
 - **xattr failures are non-fatal**: when an xattr write fails, the Markdown write has still succeeded. The canonical layer is intact; the cache is missing for that file. `register refresh` can re-attempt later.
-- **`tags` (annotation field) vs `binder`**: a record's optional `tags:` array is record-level annotation, never mirrored to xattr. Only `binder` participates in the xattr layer (ItemProjects or UserTags backend).
+- **Labels vs `binder`**: labels (`tags:` in a block) are annotation, never in the index and never mirrored to xattr. Only `binder` participates in the xattr layer (ItemProjects or UserTags backend).
 
 ## Possible Future Refinements
 

@@ -13,7 +13,7 @@ import (
 // RefRecord holds a ref record's canonical fields.
 type RefRecord struct {
 	ID, Binder, URL, Filename, Kind, Xattr string
-	Aka, Tags                              any
+	Aka                                    any
 }
 
 func NewRefRecord(data map[string]any) RefRecord {
@@ -25,7 +25,6 @@ func NewRefRecord(data map[string]any) RefRecord {
 		Kind:     AsString(data["kind"]),
 		Xattr:    AsString(data["xattr"]),
 		Aka:      data["aka"],
-		Tags:     data["tags"],
 	}
 }
 
@@ -60,9 +59,6 @@ func (r RefRecord) ToH() map[string]any {
 	}
 	if NotEmptyVal(r.Aka) {
 		h["aka"] = r.Aka
-	}
-	if NotEmptyVal(r.Tags) {
-		h["tags"] = r.Tags
 	}
 	if r.Xattr != "" && r.Xattr != "itemprojects" {
 		h["xattr"] = r.Xattr
@@ -109,7 +105,7 @@ func containsAnyStr(arr []any, s string) bool {
 // backfillIndexFields adds scalar fields the existing record lacks (never overwrites).
 func backfillIndexFields(existing map[string]any, record RefRecord) {
 	src := record.ToH()
-	for _, k := range []string{"url", "filename", "kind", "aka", "tags", "xattr"} {
+	for _, k := range []string{"url", "filename", "kind", "aka", "xattr"} {
 		if v, ok := src[k]; ok {
 			if ev, present := existing[k]; !present || ev == nil || ev == "" {
 				existing[k] = v
