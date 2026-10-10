@@ -51,7 +51,7 @@ func setupRefreshCase(t *testing.T, anchor string) (notes, home string) {
 	real, _ := filepath.EvalSymlinks(f)
 
 	blob := engineSave(t, anchor, real)
-	share := filepath.Join(home, ".local", "share")
+	share := filepath.Join(home, ".local", "share", "fileregister")
 	os.MkdirAll(share, 0755)
 	dbJSON, _ := json.Marshal(map[string]string{"800000001": blob})
 	writeFile(t, filepath.Join(share, "bookmarks.json"), string(dbJSON))
@@ -100,7 +100,7 @@ func TestRefreshRestoresSearchableID(t *testing.T) {
 	f := filepath.Join(t.TempDir(), "doc.txt")
 	writeFile(t, f, "x")
 	real, _ := filepath.EvalSymlinks(f)
-	share := filepath.Join(home, ".local", "share")
+	share := filepath.Join(home, ".local", "share", "fileregister")
 	os.MkdirAll(share, 0755)
 	dbJSON, _ := json.Marshal(map[string]string{"800000011": engineSave(t, anchor, real)})
 	writeFile(t, filepath.Join(share, "bookmarks.json"), string(dbJSON))

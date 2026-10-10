@@ -83,7 +83,7 @@ func setupRenameCase(t *testing.T, anchor, id, binder string) (notes, home, file
 	real, _ := filepath.EvalSymlinks(f)
 
 	blob := engineSave(t, anchor, real)
-	share := filepath.Join(home, ".local", "share")
+	share := filepath.Join(home, ".local", "share", "fileregister")
 	os.MkdirAll(share, 0755)
 	dbJSON, _ := json.Marshal(map[string]string{id: blob})
 	writeFile(t, filepath.Join(share, "bookmarks.json"), string(dbJSON))

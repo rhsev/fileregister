@@ -3,8 +3,8 @@ package index
 // bookmarks — id↔file identity over the fileanchor engine.
 //
 // Manages
-// ~/.local/share/bookmarks.json (id → bookmark-blob) directly; the engine is
-// stateless about that map. It does save(path)→blob, resolve(blob)→path, and the
+// ~/.local/share/fileregister/bookmarks.json (id → bookmark-blob) directly; the
+// engine is stateless about that map. It does save(path)→blob, resolve(blob)→path, and the
 // id-cache xattrs (description, sync). Blobs are the same Foundation format the
 // engine emits, so an existing bookmarks.json keeps resolving whether the
 // Go writes it during the transition.
@@ -30,11 +30,11 @@ var (
 	trailingNumRe     = regexp.MustCompile(`\d+$`)
 )
 
-// bookmarkFile is ~/.local/share/bookmarks.json. Resolved via $HOME (os.UserHomeDir)
-// so tests can isolate it.
+// bookmarkFile is ~/.local/share/fileregister/bookmarks.json, a store only
+// register writes. Resolved via $HOME (os.UserHomeDir) so tests can isolate it.
 func bookmarkFile() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".local", "share", "bookmarks.json")
+	return filepath.Join(home, ".local", "share", "fileregister", "bookmarks.json")
 }
 
 // LoadDB reads the id→blob map. Only a missing file is an empty database. A
