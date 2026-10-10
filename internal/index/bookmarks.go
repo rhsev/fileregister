@@ -486,6 +486,34 @@ func RestoreDescriptionID(path, id string) (bool, string) {
 	return resp["action"] == "added", ""
 }
 
+// ForgetFileID takes id off a file: out of its kMDItemInformation ids (other
+// ids stay) and out of the #S copy when that holds id. Returns whether
+// anything was removed, and why it failed ("" on success).
+func ForgetFileID(path, id string) (bool, string) {
+	removed := false
+	resp, err := fileAnchor().request(map[string]any{"op": "set_meta", "path": path, "key": "id", "value": id, "mode": "remove"})
+	if err != nil {
+		return false, err.Error()
+	}
+	if ok, _ := resp["ok"].(bool); !ok {
+		why, _ := resp["error"].(string)
+		return false, why
+	}
+	removed = resp["action"] == "removed"
+	if syncID(path) == id {
+		resp, err := fileAnchor().request(map[string]any{"op": "set_meta", "path": path, "key": "sync", "value": "", "mode": "set"})
+		if err != nil {
+			return removed, err.Error()
+		}
+		if ok, _ := resp["ok"].(bool); !ok {
+			why, _ := resp["error"].(string)
+			return removed, why
+		}
+		removed = removed || resp["action"] == "removed"
+	}
+	return removed, ""
+}
+
 // HasDescriptionID reports whether id is among the file's kMDItemInformation
 // ids. Unlike OfFileIDs it does not fall back to the #S copy, which is exactly
 // what is left when iCloud stripped the searchable one.

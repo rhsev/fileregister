@@ -17,6 +17,8 @@ import (
 	"unicode"
 
 	"gopkg.in/yaml.v3"
+
+	unorm "golang.org/x/text/unicode/norm"
 )
 
 // defaultPromoteTarget is the binder's default annotation note (also its default
@@ -233,6 +235,18 @@ func promoteRecords(records []map[string]any, mdTarget, binder string) (int, int
 			noop++
 			continue
 		}
+		// A block that lost its id to forget, under a heading naming this
+		// file: the file is back, and so is its block.
+		if reattached, rerr := mdReattachBlock(mdTarget, binder, index.AsString(rec["filename"]), id); rerr != nil {
+			fmt.Fprintf(os.Stderr, "  Error: reattaching a block in %s failed: %v\n", mdTarget, rerr)
+			failed++
+			continue
+		} else if reattached {
+			fmt.Printf("  Reattached the block for %s in %s\n", index.AsString(rec["filename"]), filepath.Base(mdTarget))
+			existing[id] = true
+			promoted++
+			continue
+		}
 		blocks = append(blocks, leanAnnotation(rec, binder))
 		existing[id] = true
 		promoted++
@@ -338,6 +352,105 @@ func mdTransformFile(path string, fn func(lines []string, parsed map[string]any)
 		}
 	}
 	return changes, nil
+}
+
+// mdForgetIDs removes the id: line from every ref block in one note whose id
+// is one of keys (a record's id, or a handle written in the id slot). The rest
+// of the block stays: what it says is the note's, and with the id gone reindex
+// no longer rebuilds the record from it. Returns the number of blocks changed.
+func mdForgetIDs(path string, keys map[string]bool) (int, error) {
+	return mdTransformFile(path, func(lines []string, parsed map[string]any) (string, bool) {
+		if !keys[index.AsString(parsed["id"])] {
+			return "", false
+		}
+		ind := blockIndent(lines)
+		var out []string
+		skip := false
+		for _, l := range lines {
+			if skip {
+				if strings.TrimSpace(l) == "" || !opensKey(l, ind) {
+					continue // a value written over several lines
+				}
+				skip = false
+			}
+			if keyLine(l, "id", ind) {
+				skip = true
+				continue
+			}
+			out = append(out, l)
+		}
+		return "```yaml\n" + strings.Join(out, "\n") + "\n```", true
+	})
+}
+
+// mdReattachBlock gives an id back to a block that lost it to forget: the one
+// ref block in the note for binder that has no id and stands under a heading
+// naming the file. promote writes that heading (the file name), so a file
+// that returns finds its old block, fields and all, instead of getting a
+// second one. With no such block, or more than one, nothing is written and
+// the caller appends a new block. Returns whether a block was reattached.
+func mdReattachBlock(path, binder, filename, id string) (bool, error) {
+	content, crlf, err := readNote(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	want := unorm.NFC.String(strings.TrimSpace(headingText(filename)))
+	lines := strings.Split(content, "\n")
+	type span struct{ start, end int }
+	var hits []span
+	heading, fence := "", false
+	for i := 0; i < len(lines); i++ {
+		l := lines[i]
+		if l == "```yaml" && !fence {
+			end := i + 1
+			for end < len(lines) && lines[end] != "```" {
+				end++
+			}
+			if end >= len(lines) {
+				break
+			}
+			var parsed map[string]any
+			if yaml.Unmarshal([]byte(strings.Join(lines[i+1:end], "\n")), &parsed) == nil && parsed != nil {
+				t, _ := parsed["type"].(string)
+				if t == "ref" && index.AsString(parsed["id"]) == "" &&
+					index.SameBinder(index.AsString(parsed["binder"]), binder) && heading == want {
+					hits = append(hits, span{i + 1, end})
+				}
+			}
+			i = end
+			continue
+		}
+		if strings.HasPrefix(l, "```") {
+			fence = !fence
+			continue
+		}
+		if !fence && strings.HasPrefix(l, "#") {
+			if text := strings.TrimLeft(l, "#"); text != l && (text == "" || text[0] == ' ' || text[0] == '\t') {
+				heading = unorm.NFC.String(strings.TrimSpace(text))
+			}
+		}
+	}
+	if len(hits) != 1 {
+		return false, nil
+	}
+	h := hits[0]
+	ind := blockIndent(lines[h.start:h.end])
+	at := h.start
+	for j := h.start; j < h.end; j++ {
+		if keyLine(lines[j], "type", ind) {
+			at = j + 1
+			break
+		}
+	}
+	idLine := ind + yamlLine("id", id)
+	lines = append(lines[:at], append([]string{idLine}, lines[at:]...)...)
+	if err := writeNote(path, strings.Join(lines, "\n"), crlf); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // mdRenameBinder rewrites the binder: line in every block whose binder == oldName.

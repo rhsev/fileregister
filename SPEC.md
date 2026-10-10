@@ -171,7 +171,7 @@ A bookmark arises two ways, indistinguishable and both legitimate:
 - **Created directly** — `register add <file>` with no `--binder` registers the file as a pure bookmark (id + optional `aka`, empty set, no binder xattr cache, no ★).
 - **Emptied by removal** — `register remove` deletes a binder from the set; when the last one goes, what remains is a bookmark. Removal never destroys the record or its annotations.
 
-**A bookmark is never deleted automatically.** The record disappears only when the file itself is gone, or by explicit human choice. Re-adding a binder is a plain set-insert on the existing record — there is nothing to "reclaim" and no duplicate to avoid.
+**A bookmark is never deleted automatically.** The record disappears only by explicit human choice: `register forget`. Re-adding a binder is a plain set-insert on the existing record — there is nothing to "reclaim" and no duplicate to avoid.
 
 Bookmarks are inert for membership queries: `grubber -f type=ref -f binder=X` never returns a record that lacks `X` in its set. A bookmark surfaces only in the per-file view (no binder filter) or by `id`/`aka` lookup.
 
@@ -316,6 +316,8 @@ Adds a lean Markdown annotation for a binder's records. The index entry **stays 
 
 Flow per record: read it from the index (`read_index`), then append a lean annotation block to the target. The block is keyed by `(id, binder)` — it is the file's context in *this* binder. Idempotent: a record whose `id` already has a block for this binder in the target is skipped (counted as `noop`). The index is never modified.
 
+**Reattaching a forgotten block.** Before writing a new block, promote looks for one that `forget` left behind: a `type: ref` block for this binder **without an id**, under a heading that names the file (the heading promote wrote). If there is exactly one, it gets the record's id back, fields and all, instead of the file getting a second block. Two or more such blocks cannot be told apart, so none is touched and a new block is written. `add --annotate` goes through the same path.
+
 The target must be a `.md` file. There is **no `demote`**, and promote never deletes the index entry — reverting an annotation is a manual Markdown edit (see [Capture and promote](#capture-and-promote)). `promote` is the natural home for future cross-cutting features (validation, enrichment, field normalization); keeping it a clean pipeline lets those slot in at one point.
 
 ### `register annotate <binder> <id|aka> [--set k=v]… [--unset k]… [--prose <text>|-]`
@@ -409,6 +411,19 @@ Two more findings on the record side: a file whose bookmark followed it into the
 
 Output is plain text. Decisions stay with the user.
 
+### `register forget <id|aka>... [--dry-run]`
+
+Takes a record out of the register for good — the one command that deletes one. Only a record in **no binder**: a member leaves its binders with `remove` first, which also takes the membership marks off the file. Every key must name such a record, or nothing happens.
+
+In this order, so that an interruption leaves nothing `reindex` could bring back:
+
+1. **The notes**: every ref block whose `id:` names the record (its id, or a handle written in the id slot) loses that line. The block stays — heading, fields, prose: what a note says belongs to the note. Without the id, `reindex` no longer rebuilds the record from it, and `promote` can reattach it should the file return (see above).
+2. **The index**: the record's line, in the index file it lives in.
+3. **The bookmark store**: its entry in `~/.local/share/bookmarks.json`.
+4. **The file**, when its bookmark still resolves: the id leaves `kMDItemInformation` (other ids stay) and the `com.fileregister.id#S` copy, so adding the file again gives it a fresh id. A failure here is a warning; the record is gone either way.
+
+`--dry-run` lists what would go. URL refs have no bookmark and no file; their index line and blocks go the same way.
+
 ### `register remove <file> --binder <name>`
 
 The inverse of `register add` — removes a file from a binder without destroying its annotations. It reads only the index (`read_index`); Markdown context blocks are never touched.
@@ -440,7 +455,7 @@ Surfaces, for the user to decide:
 
 - **Stale context blocks** — a per-binder annotation block whose binder is *not* in the index record's `binder` set (e.g. an annotated block kept by `remove`). Either delete it (the context is obsolete) or re-add the binder (the membership was dropped by mistake).
 - **Unindexed annotations** — a `type: ref` block whose `id` has no index record at all (legacy data, hand-written refs). Usually resolved by `register reindex`, which pulls them into the index; cleanup flags any that should instead be deleted.
-- **Bookmarks for review** — records with an empty `binder` set, listed so the user can prune ones no longer wanted. **Listed, never auto-deleted.**
+- **Bookmarks for review** — records with an empty `binder` set, listed so the user can prune ones no longer wanted. **Listed, never auto-deleted.** Pruning one is `register forget <id>`.
 - **Unrepairable bookmark entries** — entries in the shared bookmark store that no repair can fix: the file is gone, or the key was never a minted id. The verdicts that are *not* cruft stay out of this section — an orphan that resolves may be held on purpose, a broken one belongs to `repair`, and one whose volume is away or unindexed was never judged. `register audit` shows all five; the judging is one implementation shared by both commands.
 
 `--prune` drops the unrepairable entries without asking and **refuses to run while any entry could not be judged**, naming the volume or the missing engine capability. "Dead" means the blob does not resolve and no file carries the id, which is only true if the question could be asked: an unmounted volume, or a mounted one Spotlight does not index, makes every bookmark on it look dead. The mode trusts a checkable condition, not the system. `--dry-run` says what it would drop.
@@ -693,6 +708,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | `add` | Bookmark + write/update the index record (set-insert the binder). With `--binder` joins a binder; **without `--binder` creates a bookmark** (empty set — folds in the former `link`). `--md`/`--target *.md` also writes an annotation. `--xattr` selects backend. |
 | `promote` | Adds a per-binder Markdown context block for a binder's records (binder- or record-granularity). Additive; the index entry stays. |
 | `remove` | Set-deletes the binder from the index record and removes the binder name from the xattr layer; annotation blocks stay (`cleanup` reviews stale ones). An emptied set is a bookmark — the record stays. |
+| `forget` | Deletes a record in no binder: index line, bookmark entry, its id in the notes' blocks (the blocks stay) and on the file. The only command that deletes a record. |
 | `refresh` | Reconciles index state to the xattr layer (ItemProjects, Tags, or skipped for `none`). Idempotent. |
 | `audit` | Read-only consistency report — dangling records, broken bookmarks, mismatched/ghost xattr in both layers. |
 | `repair` | Re-binds a moved file's broken bookmark under its **unchanged** `id`; locates the file via Spotlight (id lookup first — backend-agnostic). |

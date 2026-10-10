@@ -118,6 +118,7 @@ register <subcommand> [args...]
 | `promote` | Write the per-binder Markdown block for a binder's records; `--edit` opens the note in `$EDITOR` |
 | `annotate` | Edit an existing block's fields or note from the command line (`--set`, `--unset`, `--prose`) |
 | `remove` | Take files out of a binder; a record whose binder set runs empty stays as a bookmark |
+| `forget` | Delete a record in no binder for good: index line, bookmark entry, its id in the notes and on the file; the notes' blocks stay, and `promote` reattaches one if the file returns |
 | `refresh` | Push record state into macOS metadata |
 | `audit` | Read-only consistency report in three directions: record → file, file → record, and bookmark → record |
 | `repair` | Re-bind a moved file's broken bookmark under its unchanged id, located via Spotlight |
