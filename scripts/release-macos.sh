@@ -23,9 +23,9 @@ cd "$(dirname "$0")/.."
 FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.2.0}"
 FILEANCHOR_REPO="${FILEANCHOR_REPO:-https://github.com/rhsev/fileanchor.git}"
 # register album reads the Markdown layer through grubber, so the bundle carries
-# it the way it carries the engine. Same pin as the Makefile. The published
-# release binary, not a source build: a build of the v0.18.0 tag reports 0.16.0.
-GRUBBER_VERSION="${GRUBBER_VERSION:-v0.18.0}"
+# it the way it carries the engine. Same pin as the Makefile, and the published
+# release binary rather than a source build, for the same reason.
+GRUBBER_VERSION="${GRUBBER_VERSION:-v0.19.0}"
 ARCH="arm64"
 OUT="$(pwd)/.build/dist"
 STAGE="$OUT/fileregister-macos-$ARCH"
@@ -96,7 +96,7 @@ developer cannot be verified, clear the quarantine flag once:
 Point register at a notes directory first: export GRUBBER_NOTES=~/notes (README).
 Intel Mac? Build from source instead (go install + `make fileanchor` +
 `make grubber`).
-Tested with fileanchor 1.2.0 and grubber v0.18.0.
+Tested with fileanchor 1.2.0 and grubber v0.19.0.
 NOTE
 
 TARBALL="$OUT/fileregister-macos-$ARCH.tar.gz"

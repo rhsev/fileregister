@@ -13,7 +13,7 @@ FILEANCHOR_VERSION ?= 1.2.0
 
 # The Markdown layer is read through grubber, so the album checks need it the
 # same way half the suite needs the engine. Same rule: pin a tag.
-GRUBBER_VERSION ?= v0.18.0
+GRUBBER_VERSION ?= v0.19.0
 
 # Stamp the version from the tag rather than trusting a literal in main.go,
 # which shipped 1.4.0 as 1.3.0. A dirty or untagged tree says so in --version.
@@ -40,10 +40,8 @@ fileanchor:
 	@echo "→ $(BUILD_DIR)/fileanchor ($(FILEANCHOR_VERSION))"
 
 # Fetch grubber's published release binary for this machine, not a source
-# build. The release assets carry the right version string (a source build of
-# v0.18.0 reports 0.16.0: the tag still has the literal as a const, which
-# -ldflags cannot override), and grubber needs Go 1.27 to build while this repo
-# pins an older one — a download keeps the two toolchains apart.
+# build. grubber needs Go 1.27 to build while this repo pins an older one, and a
+# download keeps the two toolchains apart.
 GRUBBER_ARCH = $(subst x86_64,amd64,$(shell uname -m))
 grubber:
 	@mkdir -p $(BUILD_DIR)
@@ -59,7 +57,8 @@ grubber:
 # `register` is a single self-contained Go binary. The engine is installed
 # alongside it under libexec/, which is where the binary looks when neither
 # $FILEANCHOR nor a `fileanchor` on PATH resolves. Run `make fileanchor` first,
-# or install the engine yourself and skip that step.
+# or install the engine yourself and skip that step. grubber goes the same way
+# when `make grubber` has fetched it.
 install: build
 	install -d $(PREFIX)
 	install -m 755 $(CURDIR)/$(BIN) $(PREFIX)/$(BIN)
@@ -70,6 +69,11 @@ install: build
 	else \
 		echo "installed $(PREFIX)/register"; \
 		echo "note: no engine installed — put fileanchor on PATH, set \$$FILEANCHOR, or run 'make fileanchor && make install'"; \
+	fi
+	@if [ -x $(BUILD_DIR)/grubber ]; then \
+		install -d $(LIBEXEC_DIR); \
+		install -m 755 $(BUILD_DIR)/grubber $(LIBEXEC_DIR)/grubber; \
+		echo "installed $(LIBEXEC_DIR)/grubber"; \
 	fi
 
 # Development machine: link once, then `make build` is all that deploying takes.
