@@ -69,12 +69,12 @@ curl -fsSL -o "$STAGE/licenses/grubber.txt" \
 	"https://raw.githubusercontent.com/rhsev/grubber/$GRUBBER_VERSION/LICENSE"
 
 cat > "$STAGE/INSTALL.txt" <<'NOTE'
-fileregister — macOS, Apple Silicon (arm64)
+fileregister for macOS, Apple Silicon (arm64)
 
 Contents
   register            the CLI
   libexec/fileanchor  the metadata engine register calls at runtime
-  libexec/grubber     reads the Markdown layer (captions, the album name, order)
+  libexec/grubber     reads the Markdown layer (the notes and their blocks)
   licenses/           register and fileanchor: PolyForm Noncommercial 1.0.0;
                       grubber: MIT
 
@@ -84,9 +84,10 @@ Install (copy all three, keeping the libexec/ layout, onto your PATH):
   cp libexec/fileanchor libexec/grubber ~/bin/libexec/
 
 register finds each helper via its variable ($FILEANCHOR, $GRUBBER_BIN), then
-on PATH, then in <dir-of-register>/libexec/ — so the layout above just works.
-Without grubber, register is the index: the lifecycle commands run, but
-`register album` does not.
+on PATH, then in <dir-of-register>/libexec/, so the layout above works as is.
+Without grubber, register manages only the index. The core commands run, but
+the commands that read notes do not: album, order, annotate, aka, rename,
+forget, marshal, reindex, cleanup and list --inbox/--curated.
 
 Gatekeeper: these are command-line tools, not apps. Fetched with curl/wget they
 run straight away. If you downloaded through a browser and macOS says the
