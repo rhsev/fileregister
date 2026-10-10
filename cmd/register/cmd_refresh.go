@@ -159,6 +159,12 @@ func cmdRefresh(args []string) int {
 
 		for _, binder := range binders {
 			if dryRun {
+				// Report what the real run would write: a name already on the
+				// file is a noop there, so it is one here.
+				if index.XattrBackendIncludes(refPath, binder, backend) {
+					noop++
+					continue
+				}
 				fmt.Printf("[dry-run] (%s) %s → %s\n", backend, filepath.Base(refPath), binder)
 				refreshed++
 				continue

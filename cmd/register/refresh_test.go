@@ -126,3 +126,17 @@ func TestRefreshRestoresSearchableID(t *testing.T) {
 		t.Errorf("a present id was written again:\n%s", out)
 	}
 }
+
+// --dry-run reports what the real run would write: after a refresh the binder
+// is on the file, so a dry run finds nothing to do rather than listing it again.
+func TestRefreshDryRunSkipsPresentBinder(t *testing.T) {
+	anchor := engineBin(t)
+	notes, home := setupRefreshCase(t, anchor)
+	env := refreshEnv(t, notes, home, anchor)
+
+	runGoRefresh(t, env)
+	out, _, _ := runGoRefresh(t, env, "--dry-run")
+	if strings.Contains(out, "[dry-run]") || !strings.Contains(out, "Refreshed    : 0") || !strings.Contains(out, "Already ok   : 1") {
+		t.Errorf("dry run after a refresh should find the binder present:\n%s", out)
+	}
+}
