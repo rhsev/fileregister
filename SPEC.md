@@ -87,7 +87,7 @@ Besides `id`, `binder` is the only field mirrored to xattrs on the file. Labels 
 
 ### The index file
 
-The index is `<notes_dir>/collections/inbox.jsonl`, one record per line. Every record lives here; the core reads it directly (`read_index`). Field order is irrelevant (JSON objects are unordered), and the line does **not** store `_note_file`. It is injected at read time and set to the exact `.jsonl` file the record was read from, so records are self-locating after a read and the on-disk lines stay portable.
+The index is `<notes_dir>/collections/inbox.jsonl`, one record per line. Every record lives here; the core reads it directly (`index.ReadAllRefs`). Field order is irrelevant (JSON objects are unordered), and the line does **not** store `_note_file`. It is injected at read time and set to the exact `.jsonl` file the record was read from, so records are self-locating after a read and the on-disk lines stay portable.
 
 The historical name `inbox.jsonl` is kept for compatibility; it is no longer an *inbox* in the staging sense (records are not consumed out of it), but the authoritative directory.
 
@@ -508,7 +508,7 @@ layer and Spotlight.
 
 ### `register reindex [--dry-run]`
 
-Rebuilds the index from Markdown ref blocks, restoring the invariant that every record has an authoritative index entry. For each `type: ref` block found under `notes_dir` (`read_annotations`) whose `id` is **not** already in the index (`read_index`), it reconstructs an index line and appends it to `collections/inbox.jsonl`. Every block of an id contributes: a record annotated in several binders is rebuilt as **one** record with all memberships folded into its `binder` set. Idempotent; `--dry-run` previews the additions without writing.
+Rebuilds the index from Markdown ref blocks, restoring the invariant that every record has an authoritative index entry. For each `type: ref` block found under `notes_dir` (`readAnnotations`, through grubber) whose `id` is **not** already in the index (`index.ReadAllRefs`), it reconstructs an index line and appends it to `collections/inbox.jsonl`. Every block of an id contributes: a record annotated in several binders is rebuilt as **one** record with all memberships folded into its `binder` set. Idempotent; `--dry-run` previews the additions without writing.
 
 This is the migration/repair path:
 
@@ -516,7 +516,7 @@ This is the migration/repair path:
 - **Hand-written refs**: a `type: ref` block dropped into a project note becomes an index record.
 - **Recovery**: if an index file is lost but the annotations survive, reindex rebuilds what it can (a lean annotation yields a minimal record; a full legacy block yields a complete one).
 
-Annotations are left untouched; reindex only ever *adds* to the index.
+Annotations are left untouched; reindex only ever *adds* to the index. A record rebuilt this way has no bookmark yet. `register repair --interactive` binds it to its file; a match by name is confirmed by hand, since only a match by id is taken without asking. The same holds for a record `register write` puts into the index.
 
 ## matterbase Touchpoints
 
@@ -705,7 +705,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | Ref / Reference | A single record describing **one file**: its `id`, its `binder` set, and plain-text anchors. Canonical form: one index line; optionally mirrored as per-binder Markdown annotation blocks. |
 | Loose record | A record whose `binder` set is empty, a file tracked by identity alone, in no binder. Never auto-deleted (`register forget` deletes one on request). Created directly by `register add` (no `--binder`) or left when `register remove` empties the set. |
 | Index ("yellow pages") | The central JSONL store (`<notes_dir>/collections/inbox.jsonl`) holding every record's mandatory metadata, one per file. The authoritative directory the core reads directly. (The filename `inbox` is historical.) |
-| JSONL store | Any `*.jsonl` under `collections/` (the live `inbox.jsonl` plus optional archives/imports). All are read-merged by `read_index`; only `inbox.jsonl` is written by `add`. |
+| JSONL store | Any `*.jsonl` under `collections/` (the live `inbox.jsonl` plus optional archives/imports). All are read-merged by `index.ReadAllRefs`; only `inbox.jsonl` is written by `add`. |
 | Annotation | An optional lean Markdown ref block (H3 = filename, YAML = `id` + a single `binder` + custom fields), linked to the index by `id`. One block per `(id, binder)`, the file's context in that binder. Carries custom metadata + prose. Created by `promote` / `add --md`. |
 | Promote | Adding a Markdown annotation for a record via `register promote`. Additive; the index entry stays. |
 | Binder file | A Markdown file in `<notes_dir>/collections/` named `binder_<name>.md`, holding annotations for one binder. The default `register promote` target, and the binder's default ordering file. |

@@ -320,7 +320,11 @@ func cmdRepair(args []string) int {
 
 		if newPath == "" {
 			notFound = append(notFound, unresolvedT{id, binderLabel, label, index.AsString(rec["_note_file"])})
-			fmt.Println("  Not found — skipped")
+			if len(candidates) > 0 {
+				fmt.Println("  Not bound without confirmation — skipped")
+			} else {
+				fmt.Println("  Not found — skipped")
+			}
 			fmt.Println("")
 			continue
 		}
