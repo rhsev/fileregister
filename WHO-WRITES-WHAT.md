@@ -1,7 +1,7 @@
 # Who writes what
 
 fileregister keeps its data in up to four places: the **index**
-(`collections/*.jsonl`), the **bookmark store** (`~/.local/share/bookmarks.json`),
+(`collections/*.jsonl`), the **bookmark store** (`~/.local/share/fileregister/bookmarks.json`),
 the **attributes on the file**, and, if you use them, the **notes** (Markdown
 sidecars). This page shows which command writes to which of them.
 
@@ -53,7 +53,7 @@ The columns for the file and the index:
 | `repair` | `filename` edited (renamed file) | re-bound | add | set | set (member) | add | — |
 | `unmarshal` | new records | new | add | set | set (member) | add | — |
 | `write` (`.jsonl` target) | records | — | — | — | set (`_ref_path`) | add (`_ref_path`) | — |
-| `cleanup --prune`, `--interactive`† | — | unrepairable entries out | — | — | — | — | — |
+| `cleanup --prune`, `--interactive`† | — | entries no record needs out | — | — | — | — | — |
 
 Read only: `list`, `resolve`, `of`, `audit`.
 

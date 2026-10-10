@@ -359,8 +359,8 @@ func cmdAudit(args []string) int {
 }
 
 // auditExit is 1 while something needs the user, so a monitor can tell, as with
-// refresh and repair. Copies, orphan bookmarks and entries on an absent volume
-// are reported but do not count: there is nothing to fix, or not yet.
+// refresh and repair. Copies and entries on an absent volume are reported but
+// do not count: there is nothing to fix, or not yet.
 func auditExit(needsYou bool) int {
 	if needsYou {
 		return 1
@@ -369,7 +369,7 @@ func auditExit(needsYou bool) int {
 }
 
 // auditBookmarkDirection prints Direction 3: the bookmark store against the
-// index, and reports whether an entry needs the user (broken, dead or
+// index, and reports whether an entry needs the user (orphan, broken, dead or
 // malformed). The judging lives in bookmark_health.go, shared with cleanup.
 func auditBookmarkDirection(db map[string]string, records []map[string]any) bool {
 	if len(db) == 0 {
@@ -409,5 +409,5 @@ func auditBookmarkDirection(db map[string]string, records []map[string]any) bool
 			fmt.Println("Unreachable ones were not judged — mount the volume and run again.")
 		}
 	}
-	return tally[bmBroken]+tally[bmDead]+tally[bmMalformed] > 0
+	return tally[bmOrphan]+tally[bmBroken]+tally[bmDead]+tally[bmMalformed] > 0
 }

@@ -48,3 +48,17 @@ func TestPruneDropsOnlyTheUnrepairable(t *testing.T) {
 		t.Error("an entry nobody judged was removed")
 	}
 }
+
+// The store is register's alone, so an orphan is offered with the dead and the
+// malformed. A broken entry belongs to repair, an unreachable one was never
+// judged: neither is offered.
+func TestOrphanIsOfferedForPruning(t *testing.T) {
+	for kind, want := range map[string]bool{
+		bmOrphan: true, bmDead: true, bmMalformed: true,
+		bmBroken: false, bmUnreachable: false,
+	} {
+		if got := (bookmarkFinding{kind: kind}).prunable(); got != want {
+			t.Errorf("%s: prunable = %v, want %v", kind, got, want)
+		}
+	}
+}

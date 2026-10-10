@@ -16,7 +16,7 @@ Four layers carry the information, with different roles:
 |---|---|---|
 | JSONL index, the central directory ("yellow pages") | Mandatory metadata: id, binder, filename, kind | Source of truth for membership |
 | Markdown YAML annotations | Optional custom metadata + prose, linked to the index by `id` | Source of truth for that custom data |
-| Bookmark store (`~/.local/share/bookmarks.json`, id → bookmark blob) | Anchor that finds the file again when its path changes | Anchor; `repair` re-binds it and `unmarshal` re-creates it under the same id, `refresh` renews a stale one |
+| Bookmark store (`~/.local/share/fileregister/bookmarks.json`, id → bookmark blob) | Anchor that finds the file again when its path changes | Anchor; `repair` re-binds it and `unmarshal` re-creates it under the same id, `refresh` renews a stale one |
 | xattrs on the file (id, binder names, ★) | Cache for Spotlight | Derived; `refresh` rebuilds it from the index |
 
 Every record lives in the **index**, one central JSONL store per notes directory (`<notes_dir>/collections/inbox.jsonl`). It is the authoritative directory of what belongs to which binder, and the core reads it directly (no scan-and-union step). The bookmark blob is not part of the index row; it lives in `bookmarks.json`, keyed by the record's id.
@@ -295,7 +295,7 @@ No watchers, no auto-sync. Reconciliation is explicit, invoked when the user wan
 
 The user-facing entry point for registering one or more files. With `--binder` the files join that binder (set-insert); **without `--binder` each file is registered [in no binder](#records-in-no-binder)**: an empty `binder` set, no binder xattr cache, no ★. This replaces the former `link` subcommand; a binderless add does what `link` did. The full flow:
 
-1. **Register** every file with the bookmark functions in `internal/index/bookmarks.go`. This creates the `id`, stores the bookmark in `~/.local/share/bookmarks.json` and writes the id to the file (`kMDItemInformation` and `com.fileregister.id#S`). For batches this goes through `index.AddMany`, which loads and saves the bookmark DB **once** for the whole batch. The engine's save still runs per file (each file needs its own blob), but the DB write is O(1) instead of one full rewrite per file
+1. **Register** every file with the bookmark functions in `internal/index/bookmarks.go`. This creates the `id`, stores the bookmark in `~/.local/share/fileregister/bookmarks.json` and writes the id to the file (`kMDItemInformation` and `com.fileregister.id#S`). For batches this goes through `index.AddMany`, which loads and saves the bookmark DB **once** for the whole batch. The engine's save still runs per file (each file needs its own blob), but the DB write is O(1) instead of one full rewrite per file
 2. **Write the index record** via `index.JSONLWriteMany`, which reads the target (`collections/inbox.jsonl`, or the `--target *.jsonl` index file) **once**, indexes existing records by `id`, then for each file **set-inserts** the binder into the matching record's `binder` array (or creates a new record, with an empty set when no `--binder` was given), and writes the target **once**. One record per file; a binder already in the set is a no-op, so no duplicate can arise. The chosen backend is recorded as `xattr:` in the record (omitted when default `itemprojects`)
 3. **Write the annotation (optional)**. With `--md` (→ `collections/binder_<name>.md`) or `--target *.md`, a lean annotation is also written for each new record via `promoteRecords` (idempotent). The index entry from step 2 stays authoritative
 4. **Write the xattr layer** for each file according to the chosen backend, through `index.XattrBackendAdd`, and set ★ on each file that joined a binder:
@@ -387,11 +387,14 @@ For records with broken bookmarks (typical after cross-volume move or transfer t
 
 Exit status is 1 while a record stays unresolved or a repaired file is missing metadata, so a monitor can tell. Records on a volume that is not mounted do not count, since they need only the volume.
 
-### The bookmark store is shared
+### The bookmark store
 
-`~/.local/share/bookmarks.json` is a plain map of id → Foundation bookmark
-blob, and it is the one piece of state outside the notes directory. Two rules
-hold for anything that writes it:
+`~/.local/share/fileregister/bookmarks.json` is a plain map of id → Foundation
+bookmark blob, and it is the one piece of state outside the notes directory.
+Only register writes it. Versions before 2.1 kept it at
+`~/.local/share/bookmarks.json`, a path the bookmark CLI shared; moving it is a
+one-time `mv` by hand, and register has no migration code for it. Two rules hold
+for anything that writes it:
 
 - **Keys are minted ids.** Nothing else can ever be looked up, because every
   reader addresses the store by id. A key of any other shape is dead weight;
@@ -417,13 +420,13 @@ Read-only consistency report. Three directions:
 
 - **Record → File**: records whose bookmark does not resolve, or whose target file lacks the expected xattr value in the record's chosen backend (ItemProjects, UserTags, or no check for `none`). Records in no binder are included, with the resolution check and the id check below but no binder xattr expectations.
 - **File → Record**: files in scope that carry a binder name in their binder xattr (`kMDItemProjects` or Finder tags) but no corresponding `type: ref` record. Scans both `kMDItemProjects` and `kMDItemUserTags` to catch ghost entries regardless of backend (e.g. record was deleted, xattr manually edited, `refresh` ran with stale state)
-- **Bookmark → Record**: entries in `~/.local/share/bookmarks.json` judged against the index. Needs fileanchor **1.2.0** for the `last_path` of a failed resolve; without it the dead verdict is withheld and every unresolvable entry is reported as unreachable, because a gone file could not be told from an absent volume. The capability is measured, not read off a version number. The bookmark store is the one store the other two directions cannot see into. They start from records, so an entry no record claims is invisible to them, and the store would only grow. One batch resolve covers it; Spotlight is asked only about entries that failed to resolve. Four outcomes: **orphan** (resolves, no record claims the id), **broken** (does not resolve, but a file still carries the id, so `register repair` can re-bind it), **dead** (neither, so there is nothing to repair), **malformed** (the key is not a minted id at all, which a foreign writer on the shared store can leave behind). Skipped under `--binder`, since the bookmark store has no binder and an orphan has no record to filter by. Judged against *every* ref record, including those in no binder, since a record kept in no binder on purpose is a record like any other.
+- **Bookmark → Record**: entries in `~/.local/share/fileregister/bookmarks.json` judged against the index. Needs fileanchor **1.2.0** for the `last_path` of a failed resolve; without it the dead verdict is withheld and every unresolvable entry is reported as unreachable, because a gone file could not be told from an absent volume. The capability is measured, not read off a version number. The bookmark store is the one store the other two directions cannot see into. They start from records, so an entry no record claims is invisible to them, and the store would only grow. One batch resolve covers it; Spotlight is asked only about entries that failed to resolve. Four outcomes: **orphan** (resolves, no record claims the id), **broken** (does not resolve, but a file still carries the id, so `register repair` can re-bind it), **dead** (neither, so there is nothing to repair), **malformed** (the key is not a minted id at all, which a hand edit can leave behind). Skipped under `--binder`, since the bookmark store has no binder and an orphan has no record to filter by. Judged against *every* ref record, including those in no binder, since a record kept in no binder on purpose is a record like any other.
 
 Two more findings on the record side: a file whose bookmark followed it into the **Trash or a backup** (a bookmark tracks its file wherever it moves), and a **shared file** that several records resolve to (two identities on one file, the trace a bad re-bind leaves). `refresh` marks neither kind (it would re-mark a discarded file, or write the records' ids onto the file in turn).
 
 The record side also checks the identity layer `refresh` writes: the record id in `kMDItemInformation` (where `repair` looks first), the same id in `com.fileregister.id#S`, and ★ on a record in a binder. A file that lacks any of them is reported as **missing id**, with `register refresh` as the remedy.
 
-Output is plain text. Decisions stay with the user. Exit status is 1 while something needs the user: a broken bookmark, a missing file, a missing binder xattr or id, a file in the Trash or a backup, a shared file, a ghost entry, or a broken, dead or malformed bookmark entry. Copies, orphan bookmarks and entries on an absent volume are reported but do not count, so a monitor can rely on the exit status.
+Output is plain text. Decisions stay with the user. Exit status is 1 while something needs the user: a broken bookmark, a missing file, a missing binder xattr or id, a file in the Trash or a backup, a shared file, a ghost entry, or an orphan, broken, dead or malformed bookmark entry. Copies and entries on an absent volume are reported but do not count, so a monitor can rely on the exit status.
 
 ### `register forget <id|aka>... [--dry-run]`
 
@@ -433,7 +436,7 @@ The steps run in this order, so that an interruption leaves nothing `reindex` co
 
 1. **The notes**: every ref block whose `id:` names the record (its id, or a handle written in the id slot) loses that line. The block stays (heading, fields, prose), since what a note says belongs to the note. Without the id, `reindex` no longer rebuilds the record from it, and `promote` can reattach it should the file return (see above).
 2. **The index**: the record's line, in the index file it lives in.
-3. **The bookmark store**: its entry in `~/.local/share/bookmarks.json`.
+3. **The bookmark store**: its entry in `~/.local/share/fileregister/bookmarks.json`.
 4. **The file**, when its bookmark still resolves: the id leaves `kMDItemInformation` (other ids stay) and the `com.fileregister.id#S` copy, so adding the file again gives it a fresh id. A failure here is a warning; the record is gone either way.
 
 `--dry-run` lists what would go. URL records have no bookmark and no file; their index line and blocks go the same way.
@@ -470,9 +473,9 @@ Surfaces, for the user to decide:
 - **Stale context blocks**: a per-binder annotation block whose binder is *not* in the index record's `binder` set (e.g. an annotated block kept by `remove`). Either delete it (the context is obsolete) or re-add the binder (the membership was dropped by mistake).
 - **Unindexed annotations**: a `type: ref` block whose `id` has no index record at all (legacy data, hand-written refs). Usually resolved by `register reindex`, which pulls them into the index; cleanup flags any that should instead be deleted.
 - **Records in no binder, for review**: records with an empty `binder` set, listed so the user can prune ones no longer wanted. **Listed, never auto-deleted.** Pruning one is `register forget <id>`.
-- **Unrepairable bookmark entries**: entries in the shared bookmark store that no repair can fix, because the file is gone or the key was never a minted id. The verdicts that are *not* cruft stay out of this section. An orphan that resolves may be held on purpose, a broken one belongs to `repair`, and one whose volume is away or unindexed was never judged. `register audit` shows all five; the judging is one implementation shared by both commands.
+- **Bookmark entries no record needs**: entries in the bookmark store that no record claims (orphan), whose file is gone (dead), or whose key was never a minted id (malformed). Since the store is register's alone, an orphan is a leftover, not something another tool may hold. A broken entry belongs to `repair`, and one whose volume is away or unindexed was never judged; both stay out of this section. `register audit` shows all five; the judging is one implementation shared by both commands.
 
-`--prune` drops the unrepairable entries without asking and **refuses to run while any entry could not be judged**, naming the volume or the missing engine capability. "Dead" means the blob does not resolve and no file carries the id, which is only true if the question could be asked. An unmounted volume, or a mounted one Spotlight does not index, makes every bookmark on it look dead. The mode acts only on a condition it has checked, not on what the system happens to report. `--dry-run` says what it would drop.
+`--prune` drops these entries without asking and **refuses to run while any entry could not be judged**, naming the volume or the missing engine capability. "Dead" means the blob does not resolve and no file carries the id, which is only true if the question could be asked. An unmounted volume, or a mounted one Spotlight does not index, makes every bookmark on it look dead. The mode acts only on a condition it has checked, not on what the system happens to report. `--dry-run` says what it would drop.
 
 Duplicates do not appear here. With one record per file and `binder` as a set, duplicate `(id, binder)` registrations are structurally impossible.
 
@@ -667,7 +670,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 ## Implementation Notes
 
 - **The unified `register` CLI** follows the conventions of its sibling shell tools in the stack (`mark-twin`, etc.): a single dispatcher (`main.go`) plus one `cmd_*.go` per subcommand, few dependencies (the Go standard library plus `gopkg.in/yaml.v3`, `golang.org/x/text` and `golang.org/x/sys`), JSONL or simple text stdio where applicable, no shared state beyond the bookmarks JSON file.
-- **Metadata via the fileanchor engine**: the bookmark, ItemProjects, Tags, and locator clients (in `bookmarks.go`, `meta.go`, `locator.go`) are thin clients of the **fileanchor** engine ([its own project](https://github.com/rhsev/fileanchor)), a native binary that performs all macOS metadata work in-process (bookmarks, Finder tags, Spotlight, xattrs) over a batch stdio protocol. A single fileanchor client (`fileanchor.go`) holds one engine process open for the run, so there is no fork+exec per file. `register` keeps the id→blob map in `~/.local/share/bookmarks.json`; the engine is stateless about it (`save path→blob`, `resolve blob→path`). The engine is the one external dependency and the single macOS-coupling / portability seam.
+- **Metadata via the fileanchor engine**: the bookmark, ItemProjects, Tags, and locator clients (in `bookmarks.go`, `meta.go`, `locator.go`) are thin clients of the **fileanchor** engine ([its own project](https://github.com/rhsev/fileanchor)), a native binary that performs all macOS metadata work in-process (bookmarks, Finder tags, Spotlight, xattrs) over a batch stdio protocol. A single fileanchor client (`fileanchor.go`) holds one engine process open for the run, so there is no fork+exec per file. `register` keeps the id→blob map in `~/.local/share/fileregister/bookmarks.json`; the engine is stateless about it (`save path→blob`, `resolve blob→path`). The engine is the one external dependency and the single macOS-coupling / portability seam.
 - **Xattr backend dispatch**: in `meta.go`, the add/remove/includes helpers route to ItemProjects, Tags, or skip (`none`) based on the record's `xattr:` field. Per-record granularity; mixed-backend setups are supported.
 - **register add is the user-facing entry point** for adding. It is invoked from the shell, not from matterbase; matterbase's file list shows only Markdown notes, while the typical Add target (PDF/Pages/Mail/etc.) lives elsewhere on disk. No `matterbase add` subcommand needs to exist.
 - **register remove is a set-delete**: it removes the named binder from the index record's `binder` set; annotation blocks are left untouched (`register cleanup` reviews the now-stale ones). It never removes the record; with an emptied set it stays in no binder. Re-adding is a set-insert on the same record (one batched index append); there is no reclaim and no duplicate to avoid.
@@ -714,7 +717,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | Backend | The xattr layer chosen per record via the `xattr:` field: `itemprojects` (default), `tags`, or `none`. |
 | ItemProjects | The macOS `kMDItemProjects` xattr, default backend for membership. Quiet, Spotlight-only. |
 | Tags | The macOS `kMDItemUserTags` xattr (Finder Tags), opt-in backend per record. Visible in Finder, syncs to iOS Files via iCloud Drive. |
-| Bookmark | The macOS bookmark that finds a record's file again. The built-in manager (`bookmarks.go`) keeps `~/.local/share/bookmarks.json` (record id→blob) and delegates bookmark save/resolve + `kMDItemInformation` to the fileanchor engine. `repair` re-binds it under the same id, `unmarshal` re-creates it, `refresh` renews a stale one. |
+| Bookmark | The macOS bookmark that finds a record's file again. The built-in manager (`bookmarks.go`) keeps `~/.local/share/fileregister/bookmarks.json` (record id→blob) and delegates bookmark save/resolve + `kMDItemInformation` to the fileanchor engine. `repair` re-binds it under the same id, `unmarshal` re-creates it, `refresh` renews a stale one. |
 
 ### `register` subcommands
 
@@ -729,7 +732,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | `audit` | Read-only consistency report: dangling records, broken bookmarks, mismatched/ghost xattr in both layers. |
 | `repair` | Re-binds a moved file's broken bookmark under its **unchanged** `id`; locates the file via Spotlight (id lookup first, backend-agnostic). |
 | `rename` | Renames a binder across both stores (index + annotations), the ordering config, the canonical note file, and the per-record xattr backend. |
-| `cleanup` | Interactive, human-judged review of layer drift: stale context blocks, unindexed annotations, records in no binder (listed for review), unrepairable bookmark entries; per-item accept/reject. Never auto-deletes a record. |
+| `cleanup` | Interactive, human-judged review of layer drift: stale context blocks, unindexed annotations, records in no binder (listed for review), bookmark entries no record needs; per-item accept/reject. Never auto-deletes a record. |
 | `reindex` | Rebuild the index from Markdown ref blocks so every record has an index entry. Idempotent; `--dry-run` previews. |
 | `write` | Internal helper: idempotent append of one ref record per input. Shares its index writer with `add`; available as a subcommand for advanced use. |
 | `marshal` | Packs a binder into a portable `tar.gz` container (manifest of index records, the files, the annotation notes). Carries no xattrs; `unmarshal` rebuilds metadata from the manifest. |

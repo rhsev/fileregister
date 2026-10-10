@@ -153,16 +153,16 @@ func cmdCleanup(args []string) int {
 		fmt.Println("(none)")
 	}
 
-	// The identity layer. The three sections above are about records and
-	// Markdown; this one is about ~/.local/share/bookmarks.json, which no other
-	// section can see into. Only the verdicts beyond repair are offered: an
-	// orphan may be held on purpose, a broken one belongs to `repair`, and an
+	// The bookmark store. The three sections above are about records and
+	// Markdown; this one is about ~/.local/share/fileregister/bookmarks.json,
+	// which no other section can see into. Entries no record needs are offered
+	// (orphan, dead, malformed); a broken one belongs to `repair`, and an
 	// unreachable one was never judged. `register audit` shows all five.
 	db, dbErr := index.LoadDB()
 	var prunable, unreachable []bookmarkFinding
 	if dbErr != nil {
 		fmt.Println("")
-		fmt.Println("=== Unrepairable bookmark entries ===")
+		fmt.Println("=== Bookmark entries no record needs ===")
 		fmt.Printf("    bookmarks.json unreadable: %v\n", dbErr)
 	} else if len(db) > 0 {
 		rep, cerr := classifyBookmarks(db, refs)
@@ -174,10 +174,10 @@ func cmdCleanup(args []string) int {
 			}
 		}
 		fmt.Println("")
-		fmt.Printf("=== Unrepairable bookmark entries (%d) ===\n", len(prunable))
-		fmt.Println("    Entries in bookmarks.json that no repair can fix: the file is gone,")
-		fmt.Println("    or the key was never a minted id. Orphans and repairable ones are")
-		fmt.Println("    left out — see 'register audit' for the full picture.")
+		fmt.Printf("=== Bookmark entries no record needs (%d) ===\n", len(prunable))
+		fmt.Println("    Entries in bookmarks.json that no record claims, whose file is gone,")
+		fmt.Println("    or whose key was never a minted id. Repairable ones are left out;")
+		fmt.Println("    see 'register audit' for the full picture.")
 		if cerr != nil {
 			fmt.Printf("    Engine error: %v — not checked\n", cerr)
 		}
@@ -196,7 +196,7 @@ func cmdCleanup(args []string) int {
 	if prune {
 		if dryRun {
 			fmt.Println("")
-			fmt.Printf("[dry-run] would drop %d unrepairable bookmark entry(ies).\n", len(prunable))
+			fmt.Printf("[dry-run] would drop %d bookmark entry(ies) no record needs.\n", len(prunable))
 			return 0
 		}
 		return cleanupPrune(unreachable, prunable)
@@ -217,7 +217,7 @@ func cmdCleanup(args []string) int {
 	return 0
 }
 
-// cleanupReviewBookmarks walks the unrepairable entries and drops the ones the
+// cleanupReviewBookmarks walks the entries no record needs and drops the ones the
 // user confirms. One save at the end: the store is a single JSON file, and a
 // write per answer would rewrite it dozens of times for no gain.
 func cleanupReviewBookmarks(stdin *bufio.Reader, items []bookmarkFinding) int {
@@ -231,7 +231,7 @@ func cleanupReviewBookmarks(stdin *bufio.Reader, items []bookmarkFinding) int {
 		return 0
 	}
 	fmt.Println("")
-	fmt.Printf("=== Unrepairable bookmark entries (%d) ===\n", len(items))
+	fmt.Printf("=== Bookmark entries no record needs (%d) ===\n", len(items))
 	dropped := 0
 	for i, f := range items {
 		fmt.Println("")
@@ -328,7 +328,7 @@ func orNone(rec map[string]any, key string) string {
 
 const cleanupUsage = "Usage: register cleanup [--interactive] [--prune] [--dry-run]"
 
-// cleanupPrune removes the unrepairable bookmark entries without asking, and
+// cleanupPrune removes the bookmark entries no record needs without asking, and
 // refuses to do so while any entry could not be judged.
 //
 // The refusal is the whole point. "Dead" means the blob does not resolve and no
@@ -381,7 +381,7 @@ func cleanupPrune(unreachable, prunable []bookmarkFinding) int {
 		return 1
 	}
 	fmt.Println("")
-	fmt.Printf("Pruned %d unrepairable bookmark entry(ies).\n", len(prunable))
+	fmt.Printf("Pruned %d bookmark entry(ies) no record needs.\n", len(prunable))
 	return 0
 }
 

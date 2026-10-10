@@ -3,7 +3,7 @@ package main
 // bookmark_health — the identity layer judged against the index.
 //
 // One classifier, two readers: `audit` prints every finding, `cleanup` offers
-// the two that are beyond repair. Keeping it in one place is deliberate — the
+// the three no record needs. Keeping it in one place is deliberate — the
 // two commands disagreeing about what counts as an orphan is a bug this
 // codebase has already had once, when cleanup judged against every ref record
 // and audit against the bindered ones alone.
@@ -32,12 +32,12 @@ type bookmarkFinding struct {
 	kind, id, label, path, hint string
 }
 
-// prunable reports whether a verdict is beyond repair, and so safe to offer for
-// deletion. Orphans are excluded on purpose: a resolving bookmark no record
-// claims may be held deliberately. Broken belongs to `repair`, and unreachable
-// was never judged.
+// prunable reports whether no record needs the entry, and so whether it is
+// offered for deletion. Since 2.1 the store is register's alone, so an orphan
+// is a leftover like a dead entry, not something another tool may hold. Broken
+// belongs to `repair`, and unreachable was never judged.
 func (f bookmarkFinding) prunable() bool {
-	return f.kind == bmDead || f.kind == bmMalformed
+	return f.kind == bmDead || f.kind == bmMalformed || f.kind == bmOrphan
 }
 
 // classifyBookmarks judges every entry of the identity store. `records` must be
@@ -115,7 +115,7 @@ func classifyBookmarks(db map[string]string, records []map[string]any) (bookmark
 		case r.Path != "":
 			if !known[id] {
 				out = append(out, bookmarkFinding{bmOrphan, id, label, r.Path,
-					"resolves, but no index record claims this id"})
+					"resolves, but no index record claims this id — register cleanup --prune drops it"})
 			}
 		case len(index.ByDescriptionID(id)) > 0:
 			out = append(out, bookmarkFinding{bmBroken, id, label, r.LastPath,
@@ -139,7 +139,7 @@ func classifyBookmarks(db map[string]string, records []map[string]any) (bookmark
 }
 
 // isMintedID reports whether a bookmarks.json key has the shape register gives
-// an id. A foreign writer on the shared store can leave anything there.
+// an id. A hand edit can leave anything there.
 func isMintedID(s string) bool {
 	if s == "" {
 		return false

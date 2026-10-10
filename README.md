@@ -29,7 +29,7 @@ files into a self-documenting binder, such as a workbook for a project or a
 photo album.
 
 Each file is anchored by a macOS bookmark, kept in its own store
-(`~/.local/share/bookmarks.json`). The bookmark finds the file again after a
+(`~/.local/share/fileregister/bookmarks.json`). The bookmark finds the file again after a
 rename or a move to another disk. When it breaks, `register repair` binds it anew
 under the same id, and on a second Mac `register unmarshal` does the same. What
 is written onto the file itself (xattrs for the id, the binder names and Finder
@@ -139,7 +139,7 @@ register <subcommand> [args...]
 | `audit` | Read-only consistency report in three directions: record → file, file → record, and bookmark → record; exits 1 while something needs you |
 | `repair` | Re-bind a moved file's broken bookmark under its unchanged id, located via Spotlight |
 | `rename` | Rename a binder across all records and xattrs; onto an existing name needs `--merge` |
-| `cleanup` | Review drift between the layers (stale blocks, unindexed annotations, records in no binder, unrepairable bookmark entries) and decide per item; `--prune` drops the unrepairable ones without asking, and refuses while an entry cannot be judged (its volume is away) |
+| `cleanup` | Review drift between the layers (stale blocks, unindexed annotations, records in no binder, bookmark entries no record needs) and decide per item; `--prune` drops those entries without asking, and refuses while an entry cannot be judged (its volume is away) |
 | `write` | Read JSONL from stdin, write ref records to Markdown or JSONL |
 | `list` | All binders with counts, or the files in one; `--inbox`/`--curated` filter by annotation status, `--paths` (with `--print0` for NUL-separated) and `--json` for piping; without a binder, `--json` lists the binders (`name`, `count`) |
 | `resolve` | Turn an id or `aka` handle into a path; `--record` prints the full record |
