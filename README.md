@@ -136,7 +136,7 @@ register <subcommand> [args...]
 | `remove` | Take files out of a binder; a record whose binder set runs empty stays, in no binder |
 | `forget` | Delete a record in no binder for good: index line, bookmark entry, its id in the notes and on the file; the notes' blocks stay, and `promote` reattaches one if the file returns |
 | `refresh` | Rebuild the attributes on each file from the index, and renew stale bookmarks |
-| `audit` | Read-only consistency report in three directions: record → file, file → record, and bookmark → record |
+| `audit` | Read-only consistency report in three directions: record → file, file → record, and bookmark → record; exits 1 while something needs you |
 | `repair` | Re-bind a moved file's broken bookmark under its unchanged id, located via Spotlight |
 | `rename` | Rename a binder across all records and xattrs; onto an existing name needs `--merge` |
 | `cleanup` | Review drift between the layers (stale blocks, unindexed annotations, records in no binder, unrepairable bookmark entries) and decide per item; `--prune` drops the unrepairable ones without asking, and refuses while an entry cannot be judged (its volume is away) |

@@ -415,13 +415,15 @@ resolves to a file.
 
 Read-only consistency report. Three directions:
 
-- **Record → File**: records whose bookmark does not resolve, or whose target file lacks the expected xattr value in the record's chosen backend (ItemProjects, UserTags, or no check for `none`). Records in no binder are included, with a resolution check only and no xattr expectations.
+- **Record → File**: records whose bookmark does not resolve, or whose target file lacks the expected xattr value in the record's chosen backend (ItemProjects, UserTags, or no check for `none`). Records in no binder are included, with the resolution check and the id check below but no binder xattr expectations.
 - **File → Record**: files in scope that carry a binder name in their binder xattr (`kMDItemProjects` or Finder tags) but no corresponding `type: ref` record. Scans both `kMDItemProjects` and `kMDItemUserTags` to catch ghost entries regardless of backend (e.g. record was deleted, xattr manually edited, `refresh` ran with stale state)
 - **Bookmark → Record**: entries in `~/.local/share/bookmarks.json` judged against the index. Needs fileanchor **1.2.0** for the `last_path` of a failed resolve; without it the dead verdict is withheld and every unresolvable entry is reported as unreachable, because a gone file could not be told from an absent volume. The capability is measured, not read off a version number. The bookmark store is the one store the other two directions cannot see into. They start from records, so an entry no record claims is invisible to them, and the store would only grow. One batch resolve covers it; Spotlight is asked only about entries that failed to resolve. Four outcomes: **orphan** (resolves, no record claims the id), **broken** (does not resolve, but a file still carries the id, so `register repair` can re-bind it), **dead** (neither, so there is nothing to repair), **malformed** (the key is not a minted id at all, which a foreign writer on the shared store can leave behind). Skipped under `--binder`, since the bookmark store has no binder and an orphan has no record to filter by. Judged against *every* ref record, including those in no binder, since a record kept in no binder on purpose is a record like any other.
 
 Two more findings on the record side: a file whose bookmark followed it into the **Trash or a backup** (a bookmark tracks its file wherever it moves), and a **shared file** that several records resolve to (two identities on one file, the trace a bad re-bind leaves). `refresh` marks neither kind (it would re-mark a discarded file, or write the records' ids onto the file in turn).
 
-Output is plain text. Decisions stay with the user.
+The record side also checks the identity layer `refresh` writes: the record id in `kMDItemInformation` (where `repair` looks first), the same id in `com.fileregister.id#S`, and ★ on a record in a binder. A file that lacks any of them is reported as **missing id**, with `register refresh` as the remedy.
+
+Output is plain text. Decisions stay with the user. Exit status is 1 while something needs the user: a broken bookmark, a missing file, a missing binder xattr or id, a file in the Trash or a backup, a shared file, a ghost entry, or a broken, dead or malformed bookmark entry. Copies, orphan bookmarks and entries on an absent volume are reported but do not count, so a monitor can rely on the exit status.
 
 ### `register forget <id|aka>... [--dry-run]`
 

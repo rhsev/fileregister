@@ -545,6 +545,9 @@ func SetSyncXattr(path, id string) bool {
 	return resp["action"] != "noop"
 }
 
+// SyncID reads the record id from com.fileregister.id#S, or "" if absent.
+func SyncID(path string) string { return syncID(path) }
+
 // syncID reads the record id from com.fileregister.id#S, or "" if absent.
 func syncID(path string) string {
 	resp, err := fileAnchor().request(map[string]any{"op": "get_meta", "path": path, "key": "sync"})

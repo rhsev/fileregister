@@ -112,8 +112,8 @@ func cmdAudit(args []string) int {
 		if len(binders) > 0 {
 			active = append(active, r)
 		} else {
-			// Binderless bookmarks are first-class: their bookmark must still
-			// resolve, they just carry no xattr expectations.
+			// A record in no binder still needs a bookmark that resolves and
+			// its id on the file; it carries no binder xattr and no ★.
 			bookmarks = append(bookmarks, r)
 		}
 	}
@@ -141,6 +141,12 @@ func cmdAudit(args []string) int {
 	type missingXattrT struct {
 		binder, noteFile, refPath, label, backend, layer string
 	}
+	type missingIdentityT struct {
+		binders        []string
+		refPath, label string
+		missing        []string
+	}
+	var missingIdentity []missingIdentityT
 	var brokenBookmark []brokenT
 	var missingFile []missingFileT
 	var inTrash []missingFileT
@@ -176,13 +182,30 @@ func cmdAudit(args []string) int {
 			inTrash = append(inTrash, missingFileT{binders, noteFile, refPath, label})
 			continue
 		}
+		// The identity layer refresh writes: the id where Spotlight searches it
+		// (repair's first lookup), the copy that travels, ★ on members.
+		var lacks []string
+		if !index.HasDescriptionID(refPath, id) {
+			lacks = append(lacks, "kMDItemInformation")
+		}
+		if index.SyncID(refPath) != id {
+			lacks = append(lacks, "com.fileregister.id#S")
+		}
+		if len(binders) > 0 && !index.ManagedMarked(refPath) {
+			lacks = append(lacks, "★")
+		}
+		if len(lacks) > 0 {
+			missingIdentity = append(missingIdentity, missingIdentityT{binders, refPath, label, lacks})
+		}
 		if len(binders) == 0 || backend == "none" {
-			okCount++
+			if len(lacks) == 0 {
+				okCount++
+			}
 			continue
 		}
 		// A record counts once, and only when every membership is on the file:
 		// the summary speaks of records, not of memberships.
-		allPresent := true
+		allPresent := len(lacks) == 0
 		for _, binder := range binders {
 			if !index.XattrBackendIncludes(refPath, binder, backend) {
 				allPresent = false
@@ -198,7 +221,8 @@ func cmdAudit(args []string) int {
 		}
 	}
 
-	if len(brokenBookmark) == 0 && len(missingFile) == 0 && len(missingXattr) == 0 && len(inTrash) == 0 && len(shared) == 0 {
+	needsYou := len(brokenBookmark)+len(missingFile)+len(missingXattr)+len(missingIdentity)+len(inTrash)+len(shared) > 0
+	if !needsYou {
 		fmt.Printf("All %d record(s) are consistent.\n", okCount)
 	} else {
 		if okCount > 0 {
@@ -255,6 +279,16 @@ func cmdAudit(args []string) int {
 				fmt.Println("    → run: register refresh")
 			}
 		}
+		if len(missingIdentity) > 0 {
+			fmt.Println("")
+			fmt.Printf("MISSING ID (%d) — the file lacks what refresh writes:\n", len(missingIdentity))
+			for _, mi := range missingIdentity {
+				fmt.Printf("  [%s] %s\n", binderTag(mi.binders), mi.label)
+				fmt.Printf("    file: %s\n", mi.refPath)
+				fmt.Printf("    missing: %s\n", strings.Join(mi.missing, ", "))
+				fmt.Println("    → run: register refresh")
+			}
+		}
 	}
 
 	// Direction 2: File → Record (ghost xattr scan via mdfind).
@@ -273,10 +307,10 @@ func cmdAudit(args []string) int {
 		}
 	}
 	if len(binderNames) == 0 {
-		if !hasBinderFilter {
-			auditBookmarkDirection(db, checked)
+		if !hasBinderFilter && auditBookmarkDirection(db, checked) {
+			needsYou = true
 		}
-		return 0
+		return auditExit(needsYou)
 	}
 
 	fmt.Println("")
@@ -315,17 +349,31 @@ func cmdAudit(args []string) int {
 		fmt.Printf("%d ghost entry(ies), %d copy(ies) of registered files found.\n", found["ghost"], found["copy"])
 	}
 
-	if !hasBinderFilter {
-		auditBookmarkDirection(db, checked)
+	if found["ghost"] > 0 {
+		needsYou = true
+	}
+	if !hasBinderFilter && auditBookmarkDirection(db, checked) {
+		needsYou = true
+	}
+	return auditExit(needsYou)
+}
+
+// auditExit is 1 while something needs the user, so a monitor can tell, as with
+// refresh and repair. Copies, orphan bookmarks and entries on an absent volume
+// are reported but do not count: there is nothing to fix, or not yet.
+func auditExit(needsYou bool) int {
+	if needsYou {
+		return 1
 	}
 	return 0
 }
 
-// auditBookmarkDirection prints Direction 3: the identity layer against the
-// index. The judging lives in bookmark_health.go, shared with cleanup.
-func auditBookmarkDirection(db map[string]string, records []map[string]any) {
+// auditBookmarkDirection prints Direction 3: the bookmark store against the
+// index, and reports whether an entry needs the user (broken, dead or
+// malformed). The judging lives in bookmark_health.go, shared with cleanup.
+func auditBookmarkDirection(db map[string]string, records []map[string]any) bool {
 	if len(db) == 0 {
-		return
+		return false
 	}
 	rep, err := classifyBookmarks(db, records)
 	findings, ids := rep.findings, rep.ids
@@ -333,14 +381,14 @@ func auditBookmarkDirection(db map[string]string, records []map[string]any) {
 	if err != nil {
 		fmt.Println("=== Direction 3: Bookmark → Record ===")
 		fmt.Println("")
-		fmt.Printf("  Engine error: %v — the identity layer was not checked\n", err)
-		return
+		fmt.Printf("  Engine error: %v — the bookmark store was not checked\n", err)
+		return true
 	}
 	fmt.Printf("=== Direction 3: Bookmark → Record (%d entry(ies)) ===\n", len(ids))
 	fmt.Println("")
 	if len(findings) == 0 {
 		fmt.Printf("All %d bookmark(s) are claimed by a record and resolve.\n", len(ids))
-		return
+		return false
 	}
 	tally := map[string]int{}
 	for _, f := range findings {
@@ -361,4 +409,5 @@ func auditBookmarkDirection(db map[string]string, records []map[string]any) {
 			fmt.Println("Unreachable ones were not judged — mount the volume and run again.")
 		}
 	}
+	return tally[bmBroken]+tally[bmDead]+tally[bmMalformed] > 0
 }

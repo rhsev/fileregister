@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -68,7 +70,9 @@ func setupAuditConsistent(t *testing.T, anchor string) (notes, home string) {
 	engineExec(t, anchor,
 		`{"op":"set_meta","path":"`+real+`","key":"id","value":"810000001","mode":"add"}`,
 		`{"op":"set_meta","path":"`+real+`","key":"groups","value":"AudBndOne","mode":"add"}`,
-		`{"op":"set_meta","path":"`+real+`","key":"groups","value":"AudBndThree","mode":"add"}`)
+		`{"op":"set_meta","path":"`+real+`","key":"groups","value":"AudBndThree","mode":"add"}`,
+		`{"op":"set_meta","path":"`+real+`","key":"sync","value":"810000001","mode":"set"}`,
+		`{"op":"tag","path":"`+real+`","value":"★"}`)
 
 	writeFile(t, filepath.Join(notes, "collections", "inbox.jsonl"),
 		`{"type":"ref","id":"810000001","binder":["AudBndOne","AudBndThree"],"filename":"doc.txt"}`+"\n"+
@@ -98,4 +102,25 @@ func TestAudit(t *testing.T) {
 	os.MkdirAll(filepath.Join(eN, "collections"), 0755)
 	eOut, eErr, eCode := runGoAudit(t, auditEnv(t, eN, t.TempDir(), anchor))
 	assertGolden(t, "audit_empty", cliResult(eOut, eErr, eCode))
+}
+
+// A file that lost the id Spotlight searches (iCloud strips it) is reported,
+// and audit exits 1 so a monitor sees it; refresh is the remedy it names.
+func TestAuditReportsMissingID(t *testing.T) {
+	anchor := engineBin(t)
+	notes, home := setupAuditConsistent(t, anchor)
+	env := auditEnv(t, notes, home, anchor)
+	restore := setEnv(t, env)
+	path, _ := index.BookmarkGet("810000001")
+	restore()
+	if path == "" {
+		t.Fatal("fixture bookmark does not resolve")
+	}
+	if out, err := exec.Command("xattr", "-d", "com.apple.metadata:kMDItemInformation", path).CombinedOutput(); err != nil {
+		t.Fatalf("strip id: %v %s", err, out)
+	}
+	out, _, code := runGoAudit(t, env)
+	if code != 1 || !strings.Contains(out, "MISSING ID (1)") || !strings.Contains(out, "missing: kMDItemInformation") {
+		t.Errorf("exit %d, want 1 with MISSING ID:\n%s", code, out)
+	}
 }
