@@ -9,7 +9,7 @@ package main
 // frontmatter field arrives without anyone having to look it up.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"bytes"
 	"encoding/json"

@@ -3,7 +3,7 @@ package main
 // resolve_paths — the one shared "collect unique ids → BatchGet" prelude.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 )
 
 // resolveRecordPaths resolves every non-URL record's bookmark in one engine

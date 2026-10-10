@@ -17,7 +17,7 @@ package main
 // unmarshal (order-insensitive), so this is a deliberate, harmless deviation.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"io"

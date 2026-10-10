@@ -8,7 +8,7 @@ package main
 import (
 	"sort"
 
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 )
 
 func containsStr(xs []string, s string) bool {

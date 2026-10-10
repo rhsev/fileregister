@@ -5,7 +5,7 @@ package main
 // annotation block per record. Idempotent.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

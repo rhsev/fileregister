@@ -11,7 +11,7 @@ package main
 // the only Markdown writer of the family — see SPEC §register annotate.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"io"

@@ -6,7 +6,7 @@ package main
 // Markdown context blocks are left untouched (register cleanup reviews them).
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

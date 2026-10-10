@@ -7,7 +7,7 @@ package main
 // cycles of a growing file.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"bufio"
 	"fmt"

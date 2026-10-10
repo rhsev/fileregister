@@ -7,7 +7,7 @@ package main
 // to delete stale/unindexed blocks. Records in no binder are never deleted.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"bufio"
 	"fmt"

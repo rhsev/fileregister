@@ -5,7 +5,7 @@ package main
 // placement, and reindex membership folding.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"encoding/json"
 	"os"

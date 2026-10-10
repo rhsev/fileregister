@@ -8,7 +8,7 @@ package main
 // already-managed id is never touched — conflicts are parked in the import folder.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

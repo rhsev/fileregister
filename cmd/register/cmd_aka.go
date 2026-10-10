@@ -14,7 +14,7 @@ package main
 // an id no index record knows) is ambiguous: both directions refuse on it.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

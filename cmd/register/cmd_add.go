@@ -4,7 +4,7 @@ package main
 // optionally with a Markdown annotation (--md / .md --target).
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

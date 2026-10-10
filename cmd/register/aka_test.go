@@ -4,7 +4,7 @@ package main
 // byte-identity of every block line the edit does not own.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"bytes"
 	"io"

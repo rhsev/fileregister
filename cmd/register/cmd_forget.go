@@ -10,7 +10,7 @@ package main
 // which also takes the membership marks off the file; forget is the last step.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

@@ -4,7 +4,7 @@ package main
 // ref blocks, so every annotated record has an authoritative index entry. Idempotent: ids already in the index are skipped.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

@@ -5,7 +5,7 @@ package main
 // `sort:` key places them. Membership stays global (the index).
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

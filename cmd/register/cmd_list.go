@@ -5,7 +5,7 @@ package main
 // --inbox/--curated filter.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

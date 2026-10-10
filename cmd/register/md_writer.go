@@ -7,7 +7,7 @@ package main
 // not normative — any YAML parser round-trips it to the same record.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

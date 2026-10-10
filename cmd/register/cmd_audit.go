@@ -3,7 +3,7 @@ package main
 // cmd_audit — read-only consistency report (index ↔ files ↔ xattr).
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"os"

@@ -8,7 +8,7 @@ package main
 // not be found.
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
 	"path/filepath"

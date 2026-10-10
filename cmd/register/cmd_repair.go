@@ -3,7 +3,7 @@ package main
 // cmd_repair — restore broken bookmarks via Spotlight (register repair).
 
 import (
-	"github.com/rhsev/fileregister/internal/index"
+	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"bufio"
 	"fmt"

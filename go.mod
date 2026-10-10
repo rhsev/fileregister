@@ -1,4 +1,4 @@
-module github.com/rhsev/fileregister
+module github.com/rhsev/fileregister/v2
 
 go 1.26.4
 

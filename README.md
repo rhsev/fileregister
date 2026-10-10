@@ -191,7 +191,7 @@ register reindex --dry-run
 Or build it yourself. If you already have `fileanchor` on your `PATH`:
 
 ```sh
-go install github.com/rhsev/fileregister/cmd/register@latest
+go install github.com/rhsev/fileregister/v2/cmd/register@latest
 ```
 
 Otherwise build both from a checkout:
