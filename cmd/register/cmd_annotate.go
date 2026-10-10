@@ -143,7 +143,7 @@ func cmdAnnotate(args []string) int {
 		return 1
 	}
 	for _, r := range annos {
-		if blockMatchesKeys(r, keys) && index.AsString(r["binder"]) == binder {
+		if blockMatchesKeys(r, keys) && index.SameBinder(index.AsString(r["binder"]), binder) {
 			f := index.AsString(r["_note_file"])
 			if f != "" && !seen[f] {
 				seen[f] = true
@@ -260,7 +260,7 @@ func annotateEditBlocks(content string, keys map[string]bool, binder string, set
 		if t, _ := parsed["type"].(string); t != "ref" {
 			return match
 		}
-		if !blockMatchesKeys(parsed, keys) || index.AsString(parsed["binder"]) != binder {
+		if !blockMatchesKeys(parsed, keys) || !index.SameBinder(index.AsString(parsed["binder"]), binder) {
 			return match
 		}
 
@@ -451,7 +451,7 @@ func annotateReplaceProse(content string, keys map[string]bool, binder, prose st
 		if yaml.Unmarshal([]byte(body), &parsed) == nil && parsed != nil {
 			if t, _ := parsed["type"].(string); t == "ref" &&
 				blockMatchesKeys(parsed, keys) &&
-				index.AsString(parsed["binder"]) == binder {
+				index.SameBinder(index.AsString(parsed["binder"]), binder) {
 				matched = true
 			}
 		}

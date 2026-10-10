@@ -194,7 +194,7 @@ func promoteRecords(records []map[string]any, mdTarget, binder string) (int, int
 	existing := map[string]bool{}
 	if index.FileExists(mdTarget) {
 		for _, r := range mdAllRefs(mdTarget) {
-			if index.AsString(r["binder"]) != binder {
+			if !index.SameBinder(index.AsString(r["binder"]), binder) {
 				continue
 			}
 			if id := index.AsString(r["id"]); id != "" {
@@ -343,7 +343,7 @@ func mdTransformFile(path string, fn func(lines []string, parsed map[string]any)
 // mdRenameBinder rewrites the binder: line in every block whose binder == oldName.
 func mdRenameBinder(path, oldName, newName string) (int, error) {
 	return mdTransformFile(path, func(lines []string, parsed map[string]any) (string, bool) {
-		if index.AsString(parsed["binder"]) != oldName {
+		if !index.SameBinder(index.AsString(parsed["binder"]), oldName) {
 			return "", false
 		}
 		out := make([]string, len(lines))
@@ -359,7 +359,7 @@ func mdRenameBinder(path, oldName, newName string) (int, error) {
 		// Verify the surgery still parses to the renamed record before
 		// accepting it (a binder: key with a multi-line value, say).
 		var check map[string]any
-		if yaml.Unmarshal([]byte(body), &check) != nil || index.AsString(check["binder"]) != newName {
+		if yaml.Unmarshal([]byte(body), &check) != nil || !index.SameBinder(index.AsString(check["binder"]), newName) {
 			fmt.Fprintf(os.Stderr, "  Warning: block for id %s in %s left unrenamed (nested binder: key) — edit by hand\n",
 				index.AsString(parsed["id"]), filepath.Base(path))
 			return "", false
@@ -387,7 +387,7 @@ func mdRenameOrderingBinder(path, oldName, newName string) (int, error) {
 		if t, _ := parsed["type"].(string); t != blockType {
 			return match
 		}
-		if index.AsString(parsed["binder"]) != oldName {
+		if !index.SameBinder(index.AsString(parsed["binder"]), oldName) {
 			return match
 		}
 		lines := strings.Split(body, "\n")
@@ -498,7 +498,7 @@ func mdAlreadyPresent(rec index.RefRecord, content string) bool {
 		if t, _ := parsed["type"].(string); t != "ref" {
 			continue
 		}
-		if index.AsString(parsed["binder"]) != rec.Binder {
+		if !index.SameBinder(index.AsString(parsed["binder"]), rec.Binder) {
 			continue
 		}
 		for _, k := range append([]string{index.AsString(parsed["id"])}, index.AsStrings(parsed["aka"])...) {
@@ -591,7 +591,7 @@ func mdDeleteBlock(path, id, binder string) (int, error) {
 		if yaml.Unmarshal([]byte(body), &parsed) == nil && parsed != nil {
 			if t, _ := parsed["type"].(string); t == "ref" &&
 				index.AsString(parsed["id"]) == id &&
-				index.AsString(parsed["binder"]) == binder {
+				index.SameBinder(index.AsString(parsed["binder"]), binder) {
 				del = true
 			}
 		}

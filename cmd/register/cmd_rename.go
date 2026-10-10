@@ -31,7 +31,7 @@ func annotationsForBinder(notesDir, binder string) ([]map[string]any, error) {
 	}
 	var out []map[string]any
 	for _, r := range annos {
-		if index.AsString(r["binder"]) == binder {
+		if index.SameBinder(index.AsString(r["binder"]), binder) {
 			out = append(out, r)
 		}
 	}
@@ -270,7 +270,7 @@ func noteHoldsOtherBinder(note, oldName, newName string) (string, error) {
 	}
 	for _, b := range blocks {
 		name := index.AsString(b["binder"])
-		if name != "" && name != oldName && name != newName {
+		if name != "" && !index.SameBinder(name, oldName) && !index.SameBinder(name, newName) {
 			return name, nil
 		}
 	}

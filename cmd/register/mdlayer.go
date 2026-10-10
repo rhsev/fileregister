@@ -3,6 +3,9 @@ package main
 // mdlayer — the Markdown annotation layer as register's own commands need it:
 // which ref blocks exist, for which id and binder, in which note. Read through
 // grubber, the one reader of the Markdown layer; register only writes notes.
+// Every ref block carries type and binder itself (promote writes both): read
+// without inheritance, a block that took either from the note's header would
+// not be found.
 
 import (
 	"github.com/rhsev/fileregister/internal/index"
@@ -27,16 +30,18 @@ func importDir(notesDir string) string { return filepath.Join(notesDir, "collect
 // grubber run, ref blocks in *.md notes, none in hidden files or the import
 // staging folder.
 //
-// A block carries what grubber gives it, including what its note's frontmatter
-// hands down, the same view album and matterbase have. One consequence for
-// reindex, which takes url, filename and kind from a block: those keys belong
-// in blocks, not in the frontmatter of a note that holds ref blocks.
+// Here a block is a record (reindex rebuilds index lines from it, rename and
+// cleanup act on it), so it is read as it stands: --inherit= passes nothing
+// down from the frontmatter, where a note's url: would otherwise become every
+// block's. -b keeps out notes without blocks, whose frontmatter grubber would
+// return as a record of its own. The album reads with inheritance; see
+// grubberRecordsFor.
 func readAnnotations(notesDir string) ([]map[string]any, error) {
 	bin, err := grubberBin()
 	if err != nil {
 		return nil, err
 	}
-	blocks, err := grubberExtract(bin, notesDir, "-a", "--no-fill", "--extensions=.md", "-f", "type=ref")
+	blocks, err := grubberExtract(bin, notesDir, "-b", "--no-fill", "--inherit=", "--extensions=.md", "-f", "type=ref")
 	if err != nil {
 		return nil, fmt.Errorf("grubber failed reading the notes: %w", err)
 	}

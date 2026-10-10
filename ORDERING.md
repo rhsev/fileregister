@@ -50,8 +50,9 @@ against a note that orders another binder.
 2. The rest follow in document order: the order their blocks stand in the note.
 3. Members without a block come last, by file name, then id.
 
-The note is read through grubber, which returns blocks in document order; a
-binder without a note needs no grubber.
+The note is read through grubber, which returns blocks in document order, and
+without inheritance (`--inherit=`): a `sort:` in the note's frontmatter would
+otherwise place every member alike. A binder without a note needs no grubber.
 
 ## Keys
 

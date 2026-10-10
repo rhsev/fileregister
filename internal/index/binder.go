@@ -17,6 +17,16 @@ import (
 // MaxBinderBytes is fileanchor's label limit, measured NFC as it is stored.
 const MaxBinderBytes = 255
 
+// SameBinder reports whether two binder names name the same binder: equal
+// once both are NFC, case kept. A name typed by hand or pasted from the Finder
+// can stand in a note decomposed (NFD); it looks the same and is the same
+// binder, and grubber's filters already find it so. Every comparison of a
+// block's binder with a binder name goes through here, the readers' and the
+// writers' alike, or a reader would find a block the writer then misses.
+func SameBinder(a, b string) bool {
+	return a == b || norm.NFC.String(a) == norm.NFC.String(b)
+}
+
 // BinderNameProblem says why name cannot be a new binder, or "" if it can.
 // Only names being introduced are checked (add, rename's new name, write,
 // unmarshal); existing binders stay usable, so one with a comma can still be

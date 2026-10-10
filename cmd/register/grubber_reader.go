@@ -48,21 +48,23 @@ func grubberBin() (string, error) {
 //
 // Fields a record carries beyond the index: the curation (title, comment, place,
 // lat/lon, map, sort) and whatever the note's frontmatter passes down, which is
-// how a member learns which album it is in. --no-fill keeps each record to what
-// its block says; without it grubber pads every record with every key any
-// block has, as null.
+// how a member learns which album it is in: this reading inherits everything.
+// -b keeps out notes without blocks, whose frontmatter grubber would otherwise
+// return as a record of its own; --no-fill keeps each record to what its block
+// and note say, where grubber would pad it with every key any block has, as
+// null.
 func grubberRecordsFor(notesDir, binder string) (map[string]map[string]any, error) {
 	bin, err := grubberBin()
 	if err != nil {
 		return nil, err
 	}
-	records, err := grubberExtract(bin, notesDir, "-a", "--no-fill", "-f", "binder="+binder)
+	records, err := grubberExtract(bin, notesDir, "-b", "--no-fill", "--extensions=.md", "-f", "binder="+binder)
 	if err != nil {
 		return nil, fmt.Errorf("grubber failed for binder %q: %w", binder, err)
 	}
 	byID := map[string]map[string]any{}
 	for _, r := range records {
-		if index.AsString(r["binder"]) != binder {
+		if !index.SameBinder(index.AsString(r["binder"]), binder) {
 			continue
 		}
 		id := index.AsString(r["id"])
@@ -98,8 +100,9 @@ func grubberExtract(bin string, args ...string) ([]map[string]any, error) {
 }
 
 // grubberNoteBlocks returns the blocks of one note, in the order they stand
-// in the document, each with the note's frontmatter passed down. A note that
-// does not exist has no blocks, and grubber is not asked.
+// in the document, each as the block says it: nothing inherited from the
+// frontmatter, where a sort: would otherwise place every member alike. A note
+// that does not exist has no blocks, and grubber is not asked.
 func grubberNoteBlocks(path string) ([]map[string]any, error) {
 	if !index.FileExists(path) {
 		return nil, nil
@@ -108,7 +111,7 @@ func grubberNoteBlocks(path string) ([]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	records, err := grubberExtract(bin, path, "-a", "--no-fill")
+	records, err := grubberExtract(bin, path, "-b", "--no-fill", "--inherit=")
 	if err != nil {
 		return nil, fmt.Errorf("grubber failed for %s: %w", filepath.Base(path), err)
 	}

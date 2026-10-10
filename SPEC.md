@@ -155,6 +155,8 @@ is the managed marker, and removing such a binder would strip the marker from
 files still in other binders. Spaces, colons (`2024:berlin`) and any other
 Unicode are fine.
 
+Two names name the same binder when they are equal in NFC (`index.SameBinder`): a name typed by hand or pasted from the Finder can stand in a note decomposed (NFD), looks the same, and is found by grubber's filters. Case is kept — `Trip` and `trip` are two binders. Readers and writers compare alike, or a reader would find a block the writer then misses.
+
 The rule is checked where a name is introduced — `add --binder` (and
 `REGISTER_BINDER`), the new name of `rename`, `write`, and `unmarshal`, which
 refuses the whole container before importing anything. Existing binders are
@@ -238,7 +240,7 @@ Editing stays unambiguous regardless of file count: each record's injected `_not
 
 ### The core read path
 
-The core (`list`, `audit`, `refresh`, `repair`) reads the index directly via `read_index` — the `*.jsonl` files under `collections/`. It does **not** scan Markdown. The annotation layer is read where a command has to know which blocks exist, and always through grubber: `read_annotations` is `grubber extract <notes> -a --no-fill --extensions=.md -f type=ref`; one run. A block carries what grubber gives it, including what its note's frontmatter hands down, the same view `album` and matterbase have; since `reindex` takes `url`, `filename` and `kind` from a block, those keys belong in blocks, not in the frontmatter of a note that holds ref blocks. Notes parked under `collections/import/` and hidden files are not annotations. register only writes notes; it has no reader of its own.
+The core (`list`, `audit`, `refresh`, `repair`) reads the index directly via `read_index` — the `*.jsonl` files under `collections/`. It does **not** scan Markdown. The annotation layer is read where a command has to know which blocks exist, and always through grubber: `read_annotations` is `grubber extract <notes> -a --no-fill --extensions=.md -f type=ref`; one run, with `-b` and `--inherit=`: a block is a record here and is read as it stands, nothing passed down from the note's frontmatter (a note's `url:` or `sort:` would otherwise become every block's), and a note without blocks is no record. `album` reads the same blocks *with* inheritance (no `--inherit`), because there the header is the point. Every ref block therefore carries `type` and `binder` itself, as `promote` writes them: read without inheritance, a block that took either from the header would not be found. grubber's own config must not set `inherit` in `defaults:` (only in sets): the album's reading has no switch to undo it. Notes parked under `collections/import/` and hidden files are not annotations. register only writes notes; it has no reader of its own.
 
 - **Editing commands** (`rename`, `cleanup`, `annotate`, `aka`, `reindex`) read annotations, so a record's `binder` set is updated in both the index and any per-binder annotation blocks, a block can be found to edit, a handle change is checked against the blocks that carry it, and the index can be rebuilt. (`remove` deliberately does not: it set-deletes in the index only, and `cleanup` reviews the stale blocks.)
 - **`marshal`** reads them to pack each record's notes into the container.

@@ -97,7 +97,7 @@ func buildOrderContext(binder, noteOpt string) (*orderCtx, bool) {
 		} else if t != "ref" {
 			continue
 		}
-		if index.AsString(r["binder"]) != binder {
+		if !index.SameBinder(index.AsString(r["binder"]), binder) {
 			continue
 		}
 		id := identToID[index.AsString(r["id"])]
@@ -121,7 +121,7 @@ func buildOrderContext(binder, noteOpt string) (*orderCtx, bool) {
 	}
 	// An ordering block from before the order became the document's: its
 	// binder: still says which binder the note orders; a rule: line is inert.
-	if config != nil && index.AsString(config["binder"]) != "" && index.AsString(config["binder"]) != binder {
+	if config != nil && index.AsString(config["binder"]) != "" && !index.SameBinder(index.AsString(config["binder"]), binder) {
 		fmt.Fprintf(os.Stderr, "Error: %s orders binder '%s', not '%s'\n", filepath.Base(note), index.AsString(config["binder"]), binder)
 		return nil, false
 	}
@@ -374,7 +374,7 @@ func orderWriteOverride(note, binder string, rec map[string]any, field string, v
 	found := false
 	if index.FileExists(note) {
 		_, terr := mdTransformFile(note, func(lines []string, parsed map[string]any) (string, bool) {
-			if index.AsString(parsed["binder"]) != binder {
+			if !index.SameBinder(index.AsString(parsed["binder"]), binder) {
 				return "", false
 			}
 			pid := index.AsString(parsed["id"])
@@ -461,7 +461,7 @@ func orderWriteOverrides(note, binder string, byID map[string]map[string]any, fi
 	written := map[string]bool{}
 	if index.FileExists(note) {
 		_, terr := mdTransformFile(note, func(lines []string, parsed map[string]any) (string, bool) {
-			if index.AsString(parsed["binder"]) != binder {
+			if !index.SameBinder(index.AsString(parsed["binder"]), binder) {
 				return "", false
 			}
 			mid := identToID[index.AsString(parsed["id"])]

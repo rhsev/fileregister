@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	unorm "golang.org/x/text/unicode/norm"
 )
 
 // A hand-written block may carry its id unquoted. That is a YAML integer, and
@@ -72,5 +74,41 @@ func TestRenameKeepsNoteWhenGrubberFails(t *testing.T) {
 	}
 	if mustRead(t, filepath.Join(n, "collections", "inbox.jsonl")) != before {
 		t.Errorf("the index changed although rename stopped")
+	}
+}
+
+// A binder written decomposed (NFD) in a note is the same binder as the NFC
+// name in the index. grubber's filter finds the block; register must not throw
+// it out again, and the writer must find the block the reader found instead of
+// adding a second one.
+func TestBinderInNFDIsTheSameBinder(t *testing.T) {
+	anchor := engineBin(t)
+	nfc := "Rückblick"
+	nfd := unorm.NFD.String(nfc)
+	dir := t.TempDir()
+	col := filepath.Join(dir, "collections")
+	if err := os.MkdirAll(col, 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(col, "inbox.jsonl"),
+		`{"type":"ref","id":"100000001","binder":["`+nfc+`"],"url":"https://example.com/a","filename":"a.md","kind":"web"}`+"\n"+
+			`{"type":"ref","id":"100000002","binder":["`+nfc+`"],"url":"https://example.com/z","filename":"z.md","kind":"web"}`+"\n")
+	note := filepath.Join(col, "binder_"+nfc+".md")
+	writeFile(t, note, "### z\n```yaml\ntype: ref\nid: '100000002'\nbinder: "+nfd+"\ntitle: Hand\nsort: a\n```\n")
+	env := albumEnv(t, dir, anchor)
+
+	so, se, code := runGoAlbum(t, env, nfc)
+	if code != 0 {
+		t.Fatalf("album: exit %d: %s", code, se)
+	}
+	if !strings.HasPrefix(so, `{"id":"100000002"`) || !strings.Contains(so, `"title":"Hand"`) {
+		t.Errorf("album lost the NFD block (fields or order):\n%s", so)
+	}
+
+	if _, se, code := runGoOrder(t, env, "move", nfc, "100000002", "--to", "2"); code != 0 {
+		t.Fatalf("order move: exit %d: %s", code, se)
+	}
+	if got := mustRead(t, note); strings.Count(got, "id: '100000002'") != 1 {
+		t.Errorf("the writer missed the NFD block and added another:\n%s", got)
 	}
 }
