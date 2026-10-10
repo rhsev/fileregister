@@ -263,6 +263,7 @@ the set. See SPEC §Bookmarks.
 ## Documentation
 
 - [SPEC.md](SPEC.md) — on-disk format, data model, design decisions
+- [WHO-WRITES-WHAT.md](WHO-WRITES-WHAT.md) — which command writes what, where: index, bookmarks, file attributes, notes
 - [WORKFLOWS.md](WORKFLOWS.md) — organizing and querying collections
 - [ORDERING.md](ORDERING.md) — `sort:` keys and `register order`
 - [ALBUM.md](ALBUM.md) — albums: a binder in order, as data
