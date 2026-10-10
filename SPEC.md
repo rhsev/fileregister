@@ -71,11 +71,11 @@ Fields:
 | Field | Required | Meaning |
 |---|---|---|
 | `type` | yes | Always `ref` for file-reference records |
-| `id` | yes | Bookmark identifier (random 9-digit). The file's **permanent identity** — assigned once, travels with the file, never changes (repair re-binds the blob under the same id). |
-| `binder` | optional | **Set (JSON array)** of binder names this file belongs to. An empty or absent set is a [bookmark](#bookmarks-binderless-records) — a tracked file in no binder. Add/remove are set operations on this one field. A new binder name may hold no comma, no control character and no leading or trailing whitespace, and is at most 255 bytes (see [Binder names](#binder-names)). |
+| `id` | yes | Record identifier (random 9-digit). The file's **permanent identity** — assigned once, travels with the file, never changes (repair re-binds the blob under the same id). |
+| `binder` | optional | **Set (JSON array)** of binder names this file belongs to. An empty or absent set leaves the record [in no binder](#records-in-no-binder), tracked by identity alone. Add/remove are set operations on this one field. A new binder name may hold no comma, no control character and no leading or trailing whitespace, and is at most 255 bytes (see [Binder names](#binder-names)). |
 | `filename` | recommended | Basename of the referenced file at add-time (e.g. `brief.pdf`). Plain-text anchor that survives bookmark breakage and xattr loss. Set by `register add`; not maintained when the underlying file is later renamed. |
-| `kind` | optional | Coarse classification used for display and filtering (e.g. `pdf`, `image`, `mail`, `video`). Auto-detected from the file's extension on `register add` (jpg/png/heic/… → `image`, mp4/mov/… → `video`, eml/mbox/… → `mail`, md/markdown → `md`, typ → `typst`; unknown extensions fall back to the extension itself, no-extension to `file`). `--kind` overrides the auto-detect. For URL refs, derived from the scheme (`https` → `web`, `x-devonthink-item` → `devonthink`, `message` → `mail`; unknown schemes fall back to the scheme itself). |
-| `url` | optional | Locator alternative to the bookmark: the record references a URL (e.g. `x-devonthink-item://…`) instead of a file. Mutually exclusive with the bookmark identity — see [URL refs](#url-refs). |
+| `kind` | optional | Coarse classification used for display and filtering (e.g. `pdf`, `image`, `mail`, `video`). Auto-detected from the file's extension on `register add` (jpg/png/heic/… → `image`, mp4/mov/… → `video`, eml/mbox/… → `mail`, md/markdown → `md`, typ → `typst`; unknown extensions fall back to the extension itself, no-extension to `file`). `--kind` overrides the auto-detect. For URL records, derived from the scheme (`https` → `web`, `x-devonthink-item` → `devonthink`, `message` → `mail`; unknown schemes fall back to the scheme itself). |
+| `url` | optional | Locator alternative to the bookmark: the record references a URL (e.g. `x-devonthink-item://…`) instead of a file. Mutually exclusive with the bookmark; see [URL records](#url-records). |
 | `aka` | optional | Array of human-chosen handles that also resolve to this record (resolution matches `id` ∪ `aka`). For referencing a file by name — e.g. behind a `milan://` URL via `register resolve`. Must be unique across the index. |
 | `kept_tags` | optional | Set by register, never by hand. Binder names whose Finder tag was already on the file when it joined that binder with the `tags` backend: the user's own tags, which only happen to match a binder. `remove` and `rename` never take them off the file, and `audit` does not report them as ghosts. Absent means every binder tag on the file is register's. |
 | `xattr` | optional | xattr backend for this **file**: `itemprojects` (default), `tags`, or `none`. One choice per record; determines which macOS metadata field caches the binder names — see [macOS metadata layer](#macos-metadata-layer-derived). |
@@ -101,7 +101,7 @@ The section every consumer of `collections/*.jsonl` relies on. Producers and con
 **Record form (`type: "ref"`):**
 
 - `id` is always a JSON **string**, unique across the index — one record per id.
-- `binder` is always a JSON **array of strings** (the membership set); an empty array is a bookmark. The legacy scalar form is still *read* but warned about — the write path never emits it; fix stragglers by hand.
+- `binder` is always a JSON **array of strings** (the membership set); an empty array is a record [in no binder](#records-in-no-binder). The legacy scalar form is still *read* but warned about — the write path never emits it; fix stragglers by hand.
 - `aka` is an array of strings; `filename`, `kind`, `url`, `xattr` are strings.
 - **Custom keys are the user's sphere**: any key not named above may appear and MUST be preserved verbatim by rewriters (register keeps unchanged lines byte-identical).
 - Objects with other `type` values (or none) are foreign records: readers skip them, rewriters pass them through untouched.
@@ -162,26 +162,26 @@ refuses the whole container before importing anything. Existing binders are
 not checked, so one that breaks the rule can still be listed, removed from,
 and renamed away.
 
-### Bookmarks (binderless records)
+### Records in no binder
 
-A record whose `binder` set is **empty** (absent or `[]`) is a **bookmark**: a file tracked by identity alone — resolvable by `id` or `aka` (e.g. behind a `milan://` URL), in no binder. This is a first-class state, not a leftover. Binders are an *optional* facet of a record, not its essence; a file can live in the register by reference only.
+A record whose `binder` set is **empty** (absent or `[]`) is **in no binder**, tracked by identity alone and resolvable by `id` or `aka` (e.g. behind a `milan://` URL). The short form is a **loose** record. This is a first-class state, not a leftover. Binders are an *optional* facet of a record, not its essence; a file can live in the register by reference only.
 
-A bookmark arises two ways, indistinguishable and both legitimate:
+A record in no binder arises two ways, indistinguishable and both legitimate:
 
-- **Created directly** — `register add <file>` with no `--binder` registers the file as a pure bookmark (id + optional `aka`, empty set, no binder xattr cache, no ★).
-- **Emptied by removal** — `register remove` deletes a binder from the set; when the last one goes, what remains is a bookmark. Removal never destroys the record or its annotations.
+- **Created directly** — `register add <file>` with no `--binder` registers the file in no binder (id + optional `aka`, empty set, no binder xattr cache, no ★).
+- **Emptied by removal** — `register remove` deletes a binder from the set; when the last one goes, the record remains in no binder. Removal never destroys the record or its annotations.
 
-**A bookmark is never deleted automatically.** The record disappears only by explicit human choice: `register forget`. Re-adding a binder is a plain set-insert on the existing record — there is nothing to "reclaim" and no duplicate to avoid.
+**A record in no binder is never deleted automatically.** The record disappears only by explicit human choice: `register forget`. Re-adding a binder is a plain set-insert on the existing record — there is nothing to "reclaim" and no duplicate to avoid.
 
-Bookmarks are inert for membership queries: `grubber -f type=ref -f binder=X` never returns a record that lacks `X` in its set. A bookmark surfaces only in the per-file view (no binder filter) or by `id`/`aka` lookup.
+Records in no binder are inert for membership queries: `grubber -f type=ref -f binder=X` never returns a record that lacks `X` in its set. Such a record surfaces only in the per-file view (no binder filter) or by `id`/`aka` lookup.
 
 In Markdown, an annotation block must be preceded by a heading at any level. matterbase uses that heading to display the record's context in the preview pane. `register promote` writes H3 (the filename) by convention; matterbase reads any level.
 
-### URL refs
+### URL records
 
-A `type: ref` record may reference a **URL** instead of a file — a DEVONthink item link (`x-devonthink-item://UUID`), a web page, a `message:` link. The bookmark was never the essence of a ref; it is the macOS accelerator for the *file* locator. A URL ref is the same record with a different locator: identity (`id`), membership (`binder`), aka, annotations, and promote all work identically, and `register resolve` returns the URL — `open "$(register resolve <key>)"` is uniform for both (milan needs no change).
+A `type: ref` record may reference a **URL** instead of a file — a DEVONthink item link (`x-devonthink-item://UUID`), a web page, a `message:` link. The bookmark was never the essence of a record; it is the macOS anchor for the *file* locator. A record either points to a file (a **file record**) or to a URL (a **URL record**). A URL record is the same record with a different locator: identity (`id`), membership (`binder`), aka, annotations, and promote all work identically, and `register resolve` returns the URL — `open "$(register resolve <key>)"` is uniform for both (milan needs no change).
 
-What does **not** apply is the entire derived layer: no bookmark, no xattr cache, no ★, no Spotlight, no `repair`, no `of`. URL refs are implicitly `xattr: none` — index + annotation citizens, the same standing `none`-backend files already have. `refresh`/`audit`/`repair` skip them (counted); `marshal` carries them as pure data (no file payload). Created with `register add --url <URL> --binder <name> [--label <name>]`; `filename` holds the optional display label (its human-recognition role — the repair-anchor role is moot). Removed with `register remove <url> --binder <name>`. Idempotent over `(url, binder)`.
+What does **not** apply is the entire derived layer: no bookmark, no xattr cache, no ★, no Spotlight, no `repair`, no `of`. URL records are implicitly `xattr: none` — index + annotation citizens, the same standing `none`-backend files already have. `refresh`/`audit`/`repair` skip them (counted); `marshal` carries them as pure data (no file payload). Created with `register add --url <URL> --binder <name> [--label <name>]`; `filename` holds the optional display label (its human-recognition role — the repair-anchor role is moot). Removed with `register remove <url> --binder <name>`. Idempotent over `(url, binder)`.
 
 ### macOS metadata layer (derived)
 
@@ -189,8 +189,8 @@ When `register refresh` (or `register add` at write time) runs, the referenced f
 
 | xattr / metadata field | Content | Set by |
 |---|---|---|
-| `com.apple.metadata:kMDItemInformation` | Bookmark `id` (multiple IDs space-separated, stored as a binary-plist string — Spotlight indexes nothing else once there are two) | The `Bookmarks` module on `add`/`repair`, via the **fileanchor** engine; `refresh` restores a missing id |
-| `com.fileregister.id#S` | Bookmark `id` (single value) — the cross-device file→record key | The `Bookmarks` module on `add`/`repair`; `refresh` backfills |
+| `com.apple.metadata:kMDItemInformation` | Record `id` (multiple IDs space-separated, stored as a binary-plist string — Spotlight indexes nothing else once there are two) | The `Bookmarks` module on `add`/`repair`, via the **fileanchor** engine; `refresh` restores a missing id |
+| `com.fileregister.id#S` | Record `id` (single value) — the cross-device file→record key | The `Bookmarks` module on `add`/`repair`; `refresh` backfills |
 | `com.apple.metadata:_kMDItemUserTags` == ★ | The managed marker (U+2605) — one status tag fileregister owns | `add` (any backend); removed by `remove` on last membership; `refresh` backfills |
 | `com.apple.metadata:kMDItemProjects` | Binder names — a real array (Spotlight matches per element; names may contain spaces) | default backend (`itemprojects`) |
 | `com.apple.metadata:_kMDItemUserTags` == \<binder\> | Binder name (Finder Tag, binary plist array) | Tags backend — opt-in per record |
@@ -289,9 +289,9 @@ No watchers, no auto-sync. Reconciliation is explicit, invoked when the user wan
 
 ### `register add <file>... [--binder <name>] [--aka KEY] [--kind K] [--md] [--target F] [--xattr BACKEND]`
 
-(URL form: `register add --url <URL> [--binder <name>] [--label NAME] [--aka KEY]` — no bookmark, no xattr; see [URL refs](#url-refs).)
+(URL form: `register add --url <URL> [--binder <name>] [--label NAME] [--aka KEY]` — no bookmark, no xattr; see [URL records](#url-records).)
 
-The user-facing entry point for registering one or more files. With `--binder` the files join that binder (set-insert); **without `--binder` each file is registered as a [bookmark](#bookmarks-binderless-records)** — an empty `binder` set, no binder xattr cache, no ★. This folds in the former `link` subcommand: a binderless add *is* a link. Wraps the full flow:
+The user-facing entry point for registering one or more files. With `--binder` the files join that binder (set-insert); **without `--binder` each file is registered [in no binder](#records-in-no-binder)**: an empty `binder` set, no binder xattr cache, no ★. This folds in the former `link` subcommand: a binderless add *is* a link. Wraps the full flow:
 
 1. **Register** every file with the internal `Bookmarks` module — creates `id`, writes `kMDItemInformation` to the file. For batches this goes through `Bookmarks.add_many`, which loads and saves the bookmark DB **once** for the whole batch (the `bookmark save` subprocess still runs per file — each file needs its own blob — but the DB write is O(1) instead of one full rewrite per file)
 2. **Write the index record** — via `write_many`, which reads the target (`collections/inbox.jsonl`, or the `--target *.jsonl` index file) **once**, indexes existing records by `id`, then for each file **set-inserts** the binder into the matching record's `binder` array (or creates a new record — with an empty set when no `--binder` was given), and writes the target **once**. One record per file; a binder already in the set is a no-op, so no duplicate can arise. The chosen backend is recorded as `xattr:` in the record (omitted when default `itemprojects`)
@@ -305,7 +305,7 @@ The `--xattr` flag selects the backend; the default is `itemprojects`. The index
 
 The `kind` field is auto-detected from the file's extension (e.g. `.jpg` → `image`, `.pdf` → `pdf`, `.eml` → `mail`). Use `--kind` to override when a finer classification matters (e.g. `--kind invoice` for a PDF that's an invoice). Pass `--kind ""` to suppress the field entirely.
 
-Idempotent: re-adding the same file to the same binder is a set-insert of a value already present — a no-op, no duplicate record and no duplicate xattr entry. If the file was previously **removed** from that binder, re-adding re-inserts it into the existing record's set; if the file was a [bookmark](#bookmarks-binderless-records) (empty set), it gains its first binder. Either way: one record, edited in place — there is nothing to reclaim.
+Idempotent: re-adding the same file to the same binder is a set-insert of a value already present — a no-op, no duplicate record and no duplicate xattr entry. If the file was previously **removed** from that binder, re-adding re-inserts it into the existing record's set; if the record was [in no binder](#records-in-no-binder) (empty set), it gains its first binder. Either way: one record, edited in place — there is nothing to reclaim.
 
 **Batch adds.** Multiple file arguments (`register add *.pdf --binder x`) are processed in one pass. Batch-wide options — `--binder`, `--kind`, `--target`/`--md`, `--xattr` — apply to every file. The per-file option `--aka` only makes sense for a single file and is rejected when more than one file is given (`kind` defaults to the extension-derived value). Files that don't exist are reported and skipped; a per-file `bookmark save` failure is reported and skipped; the rest still go through. The command exits non-zero only when nothing at all was written. The batch I/O is linear, not quadratic: one bookmark-DB load/save and one target read/write for the whole batch (see steps 1 and 3 above).
 
@@ -405,9 +405,9 @@ resolves to nothing.
 
 Read-only consistency report. Three directions:
 
-- **Record → File**: records whose bookmark does not resolve, or whose target file lacks the expected xattr value in the record's chosen backend (ItemProjects, UserTags, or — for `none` — no check). Binderless bookmarks are included — resolution check only, no xattr expectations.
+- **Record → File**: records whose bookmark does not resolve, or whose target file lacks the expected xattr value in the record's chosen backend (ItemProjects, UserTags, or — for `none` — no check). Records in no binder are included, with a resolution check only and no xattr expectations.
 - **File → Record**: files in scope that carry a Spotlight tag matching a known binder but no corresponding `type: ref` record. Scans both `kMDItemProjects` and `kMDItemUserTags` to catch ghost entries regardless of backend (e.g. record was deleted, xattr manually edited, `refresh` ran with stale state)
-- **Bookmark → Record**: entries in `~/.local/share/bookmarks.json` judged against the index. Needs fileanchor **1.2.0** for the `last_path` of a failed resolve; without it the dead verdict is withheld and every unresolvable entry is reported as unreachable, because a gone file could not be told from an absent volume. The capability is measured, not read off a version number. The identity layer is the one store the other two directions cannot see into — they start from records, so an entry no record claims is invisible to them, and the store would only grow. One batch resolve covers it; Spotlight is asked only about entries that failed to resolve. Four outcomes: **orphan** (resolves, no record claims the id), **broken** (does not resolve, but a file still carries the id — `register repair` can re-bind it), **dead** (neither, so there is nothing to repair), **malformed** (the key is not a minted id at all, which a foreign writer on the shared store can leave behind). Skipped under `--binder`: the identity layer has no binder, and an orphan has no record to filter by. Judged against *every* ref record including binderless ones — a bookmark held on purpose is a first-class record with no binder.
+- **Bookmark → Record**: entries in `~/.local/share/bookmarks.json` judged against the index. Needs fileanchor **1.2.0** for the `last_path` of a failed resolve; without it the dead verdict is withheld and every unresolvable entry is reported as unreachable, because a gone file could not be told from an absent volume. The capability is measured, not read off a version number. The identity layer is the one store the other two directions cannot see into — they start from records, so an entry no record claims is invisible to them, and the store would only grow. One batch resolve covers it; Spotlight is asked only about entries that failed to resolve. Four outcomes: **orphan** (resolves, no record claims the id), **broken** (does not resolve, but a file still carries the id — `register repair` can re-bind it), **dead** (neither, so there is nothing to repair), **malformed** (the key is not a minted id at all, which a foreign writer on the shared store can leave behind). Skipped under `--binder`: the identity layer has no binder, and an orphan has no record to filter by. Judged against *every* ref record, including those in no binder, since a record kept in no binder on purpose is a record like any other.
 
 Two more findings on the record side: a file whose bookmark followed it into the **Trash or a backup** (a bookmark tracks its file wherever it moves), and a **shared file** that several records resolve to — two identities on one file, the trace a bad re-bind leaves. `refresh` marks neither kind (it would re-mark a discarded file, or write the records' ids onto the file in turn).
 
@@ -424,22 +424,22 @@ In this order, so that an interruption leaves nothing `reindex` could bring back
 3. **The bookmark store**: its entry in `~/.local/share/bookmarks.json`.
 4. **The file**, when its bookmark still resolves: the id leaves `kMDItemInformation` (other ids stay) and the `com.fileregister.id#S` copy, so adding the file again gives it a fresh id. A failure here is a warning; the record is gone either way.
 
-`--dry-run` lists what would go. URL refs have no bookmark and no file; their index line and blocks go the same way.
+`--dry-run` lists what would go. URL records have no bookmark and no file; their index line and blocks go the same way.
 
 ### `register remove <file> --binder <name>`
 
 The inverse of `register add` — removes a file from a binder without destroying its annotations. It reads only the index (`read_index`); Markdown context blocks are never touched.
 
-For the record whose `id` matches the file's bookmark id:
+For the record whose `id` matches the file's id:
 
-1. **Set-delete the binder** from the `binder` array in the index line. The record's other binders and all annotations stay intact. When the last binder is removed, the record becomes a [bookmark](#bookmarks-binderless-records).
+1. **Set-delete the binder** from the `binder` array in the index line. The record's other binders and all annotations stay intact. When the last binder is removed, the record remains [in no binder](#records-in-no-binder).
 2. **Remove the binder name** from the appropriate xattr layer per record's `xattr:` backend (`kMDItemProjects` or `kMDItemUserTags`; `none`-backend records have no xattr to touch). The backend is taken from the index record.
 
 Idempotent: removing from a binder the file isn't in is a no-op.
 
 Per-binder annotation blocks for the removed membership stay where they are — now stale against the index, which is exactly what `register cleanup` reviews (bare blocks are one keystroke to drop there; annotated ones get a human decision).
 
-Note: this does **not** remove the bookmark blob or the record. When the last binder is removed the record remains as a [bookmark](#bookmarks-binderless-records), addressable by `id`. Re-adding a binder is a plain set-insert on that same record.
+Note: this does **not** remove the bookmark blob or the record. When the last binder is removed the record remains [in no binder](#records-in-no-binder), addressable by `id`. Re-adding a binder is a plain set-insert on that same record.
 
 ### `register rename <old> <new>`
 
@@ -451,7 +451,7 @@ Not atomic across many files. A subsequent `register refresh` reconciles any res
 
 ### `register cleanup [--interactive] [--prune] [--dry-run]`
 
-Human-judged review of drift between the layers. Reads both stores (`read_index` + `read_annotations`); writes only on user confirmation. It **never deletes a record automatically** — a binderless record is a bookmark, not cruft (Principle 4).
+Human-judged review of drift between the layers. Reads both stores (`read_index` + `read_annotations`); writes only on user confirmation. It **never deletes a record automatically** — a record in no binder is not cruft (Principle 4).
 
 Surfaces, for the user to decide:
 
@@ -478,7 +478,7 @@ writes nothing (but the name, with `--title`). Each line is the member's
 |---|---|
 | `position` | 1-based, in the order `register order show` resolves (`sort:` keys first, then the order of the blocks in the note, then members without a block by file name). One source of order: the album cannot disagree with the ordering it is made of. |
 | `fields` | The member's block as grubber returns it (`--no-fill`), frontmatter inherited, minus `type`, `id`, `binder`, `sort` and grubber's `_`-prefixed keys. Open set; omitted when empty. |
-| `file` | What the file carries: `size`, `modified` (file system); `type`, `title`, `comment`, `place`, `date`, `lat`, `lon`, `camera`, `width`, `height`, `pages`, `duration` (Spotlight, `mdls`, one call per file on a worker pool). Keys that mean what a field means take its name, so the shown value is `file` overlaid with `fields`. A `title` that only repeats the file name (Spotlight's default for images) is dropped. Omitted for URL refs and broken members. |
+| `file` | What the file carries: `size`, `modified` (file system); `type`, `title`, `comment`, `place`, `date`, `lat`, `lon`, `camera`, `width`, `height`, `pages`, `duration` (Spotlight, `mdls`, one call per file on a worker pool). Keys that mean what a field means take its name, so the shown value is `file` overlaid with `fields`. A `title` that only repeats the file name (Spotlight's default for images) is dropped. Omitted for URL records and broken members. |
 
 Absent values are omitted, never `""`/`null`. Broken members keep their line and
 position with `"broken":true`, as in `list --json`. The album name is the `album`
@@ -563,7 +563,7 @@ Collection lifecycle (add, remove, refresh, audit, repair, rename, cleanup, rein
 
 The `write` subcommand (`register write`) is the record-write helper. It reads JSONL records from stdin and ensures each one exists in its target file, dispatching on the target extension: a YAML block appended to a Markdown note, or one JSON line appended to an JSONL store. `register add` invokes it internally; the other lifecycle subcommands modify records in place via the Markdown editor (`md_writer.go`) or the JSONL editor (`jsonl_editor.go`) — chosen by the record's `_note_file` extension — when more surgical edits (drop a field, rename within a record) are needed.
 
-`register write` also handles the membership layer as an opt-in side-effect via the `_ref_path` input field, the way `add` does: the binder goes to the file through the record's backend (the stored one for an existing record, else the input's `xattr`; `none` writes nothing), plus the ★ marker. Only a write to an index `.jsonl` is a membership — a Markdown block is annotation — and a record without binder (a bookmark) has none.
+`register write` also handles the membership layer as an opt-in side-effect via the `_ref_path` input field, the way `add` does: the binder goes to the file through the record's backend (the stored one for an existing record, else the input's `xattr`; `none` writes nothing), plus the ★ marker. Only a write to an index `.jsonl` is a membership — a Markdown block is annotation — and a record in no binder has none.
 
 A `.jsonl` target inside a `collections/` folder is part of an index, and `write` keeps its rules: a record whose id is recorded in *another* file of the index, or whose aka belongs to another record, is refused (the status line says where). `SCHEMA` is stamped only there. `binder` must be a single string — the stream is one membership per line.
 
@@ -657,12 +657,12 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 - **Metadata via the fileanchor engine**: the bookmark, ItemProjects, Tags, and locator clients (in `bookmarks.go`, `meta.go`, `locator.go`) are thin clients of the **fileanchor** engine ([its own project](https://github.com/rhsev/fileanchor)) — a native binary that performs all macOS metadata in-process (bookmarks, Finder tags, Spotlight, xattrs) over a batch stdio protocol. A single fileanchor client (`fileanchor.go`) holds one engine process open for the run, so there is no fork+exec per file. `register` keeps the id→blob map in `~/.local/share/bookmarks.json`; the engine is stateless about it (`save path→blob`, `resolve blob→path`). The engine is the one external dependency and the single macOS-coupling / portability seam.
 - **Xattr backend dispatch**: in `meta.go`, the add/remove/includes helpers route to ItemProjects, Tags, or skip (`none`) based on the record's `xattr:` field. Per-record granularity; mixed-backend setups are supported.
 - **register add is the user-facing entry point** for adding. It is invoked from the shell, not from matterbase — matterbase's file list shows only Markdown notes, while the typical Add target (PDF/Pages/Mail/etc.) lives elsewhere on disk. No `matterbase add` subcommand needs to exist.
-- **register remove is a set-delete**: it removes the named binder from the index record's `binder` set; annotation blocks are left untouched (`register cleanup` reviews the now-stale ones). It never removes the record — an emptied set is a bookmark. Re-adding is a set-insert on the same record (one batched index append); there is no reclaim and no duplicate to avoid.
+- **register remove is a set-delete**: it removes the named binder from the index record's `binder` set; annotation blocks are left untouched (`register cleanup` reviews the now-stale ones). It never removes the record; with an emptied set it stays in no binder. Re-adding is a set-insert on the same record (one batched index append); there is no reclaim and no duplicate to avoid.
 - **JSONL edits are parse/mutate/serialize**: the JSONL editor mirrors the Markdown editor's surface (read all refs, update id, delete block, rename/add/remove binder) but operates on whole JSON lines rather than block regex, so index mutations are robust by construction. The record's `_note_file` extension picks which editor runs. Injected provenance fields (`_note_file`, `_mtime`) are stripped before a line is rewritten, so they never persist into the store. When multiple `*.jsonl` files exist, edits group records by `_note_file` and rewrite only the file each record came from.
 - **Path identity is filesystem truth**: whether two paths name the same file is decided by the filesystem where possible — existing files compare by device:inode (`os.SameFile`), which is exact on case-sensitive APFS and Linux alike and immune to Unicode form and symlinks, because the `stat` lookup applies the filesystem's own rules. Only two nonexistent paths fall back to string comparison (NFC-normalized everywhere; case-folded on macOS only). Used by `remove`'s path fallback and `audit`'s ghost keys.
 - **Container names are form-folded for uniqueness**: payload and note names are allocated unique on a lower-cased, NFC-normalized key, so staging dirs and unpacked containers stay collision-free on case- and normalization-insensitive filesystems — regardless of the filesystem the container was built on. Basenames colliding only in case or Unicode form get a `-N` suffix instead of silently overwriting each other.
 - **unmarshal confines manifest paths**: a container's `file` and `origin` are manifest strings, not tar members, so tar's own traversal defense doesn't cover them. Both are joined and then re-checked *after* `filepath.Clean` (interior `..` collapses first): the staged `file` must stay inside the extracted container, and the `origin` write target must stay inside `collections/` unless `--scatter` is given. A foreign container therefore can't read/delete host files or write above the vault — the threat `--scatter` exists to gate.
-- **kMDItemInformation is multi-valued**: multiple bookmark IDs are space-separated in this string field, which fileanchor stores as a binary plist — Spotlight parses `com.apple.metadata:*` values as plists, and a raw `"id1 id2"` is not indexed at all ([FINDINGS-attributes.md](FINDINGS-attributes.md)). `register repair`'s most reliable file-location strategy is an id Spotlight lookup (engine `query by:id`) — backend-agnostic, since the id xattr carries the bookmark ID regardless of which xattr layer the binder lives in.
+- **kMDItemInformation is multi-valued**: multiple record ids are space-separated in this string field, which fileanchor stores as a binary plist — Spotlight parses `com.apple.metadata:*` values as plists, and a raw `"id1 id2"` is not indexed at all ([FINDINGS-attributes.md](FINDINGS-attributes.md)). `register repair`'s most reliable file-location strategy is an id Spotlight lookup (engine `query by:id`) — backend-agnostic, since the id xattr carries the record id regardless of which xattr layer the binder lives in.
 - **The locator is the portability seam for file discovery**: `repair` does not query Spotlight directly; its lookups go through the locator (`locator.go`), which calls the engine's `query {by, value}` op (covering id, filename, and the groups/tags xattr layers). On Linux the engine grows a second implementation of the same op (e.g. `plocate`, `locate`, or the index) — no other code changes. The finder strategy is injectable in tests, so the ordering/fallback can be unit-tested without a live engine.
 - **`REGISTER_BINDER` env var**: `add`, `remove`, and `promote` fall back to `ENV["REGISTER_BINDER"]` when `--binder` is not given. Useful for session-oriented workflows (e.g. `export REGISTER_BINDER=berlin-2024; register add *.jpg --kind image`). Explicit `--binder` always wins.
 - **`promote --edit`**: after a successful promote (at least one record moved), the target note is opened in `$VISUAL` / `$EDITOR` / `vi` via `exec`, replacing the `register` process. Only fires when `--edit` is given and `promoted > 0`; a pure noop promote does not open the editor.
@@ -707,9 +707,9 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 
 | Subcommand | Purpose |
 |---|---|
-| `add` | Bookmark + write/update the index record (set-insert the binder). With `--binder` joins a binder; **without `--binder` creates a bookmark** (empty set — folds in the former `link`). `--md`/`--target *.md` also writes an annotation. `--xattr` selects backend. |
+| `add` | Bookmark + write/update the index record (set-insert the binder). With `--binder` joins a binder; **without `--binder` the record is in no binder** (empty set; folds in the former `link`). `--md`/`--target *.md` also writes an annotation. `--xattr` selects backend. |
 | `promote` | Adds a per-binder Markdown context block for a binder's records (binder- or record-granularity). Additive; the index entry stays. |
-| `remove` | Set-deletes the binder from the index record and removes the binder name from the xattr layer; annotation blocks stay (`cleanup` reviews stale ones). An emptied set is a bookmark — the record stays. |
+| `remove` | Set-deletes the binder from the index record and removes the binder name from the xattr layer; annotation blocks stay (`cleanup` reviews stale ones). With an emptied set the record stays, in no binder. |
 | `forget` | Deletes a record in no binder: index line, bookmark entry, its id in the notes' blocks (the blocks stay) and on the file. The only command that deletes a record. |
 | `refresh` | Reconciles index state to the xattr layer (ItemProjects, Tags, or skipped for `none`). Idempotent. |
 | `audit` | Read-only consistency report — dangling records, broken bookmarks, mismatched/ghost xattr in both layers. |

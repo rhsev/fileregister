@@ -118,7 +118,7 @@ func removeTarget(nd, binder, targetArg string) int {
 		return 0
 	}
 
-	// URL refs match on url; files match by the id stamped on the file, falling
+	// URL records match on url; files match by the id stamped on the file, falling
 	// back to a batched resolve + path compare when the file carries no id xattr.
 	var matching []map[string]any
 	if urlMode {
@@ -184,7 +184,7 @@ func removeTarget(nd, binder, targetArg string) int {
 		return 1
 	}
 
-	// URL refs carry no xattr layer and no ★ — the set-delete is everything.
+	// URL records carry no xattr layer and no ★ — the set-delete is everything.
 	if !urlMode {
 		for _, backend := range backendsUsed {
 			// A tag the user had set before the file joined the binder stays.

@@ -11,9 +11,8 @@ exit: 0
     Usually: run 'register reindex'. Or delete here if obsolete.
 (none)
 
-=== Bookmarks (0) ===
-    Records in no binder. A bookmark is not cruft — listed for review only,
-    never deleted automatically.
+=== Records in no binder (0) ===
+    Not cruft. Listed for review only, never deleted automatically.
 (none)
 === stderr ===
 Collecting index records and annotations…

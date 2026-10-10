@@ -40,7 +40,7 @@ register album safari --title "Safari, Namibia 2026"
 
 | Key | From | Meaning |
 |---|---|---|
-| `id` … `path`/`url` | the index | exactly as in `list <binder> --json`: `id`, `binder` (the member's binders, a list), `filename`, `kind`, `aka`, then `path` for a file, `url` for a URL ref, or `"broken": true` when the bookmark does not resolve |
+| `id` … `path`/`url` | the index | exactly as in `list <binder> --json`: `id`, `binder` (the member's binders, a list), `filename`, `kind`, `aka`, then `path` for a file, `url` for a URL record, or `"broken": true` when the bookmark does not resolve |
 | `position` | the ordering | 1-based, the order `register order show` resolves |
 | `fields` | the note, via grubber | everything the member's block says, and everything the note's frontmatter hands down to it |
 | `file` | the file | what the file carries: file system and Spotlight |

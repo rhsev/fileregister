@@ -21,11 +21,13 @@ grubber and matterbase query; the note is for you. That is what turns a plain
 set of files into a self-documenting binder: a workbook for a project, a
 photo album, a collection that explains itself.
 
-Everything written onto the file itself (the id in its xattr, a macOS bookmark,
-Finder tags, Spotlight fields) is a cache derived from the index. It keeps a
-reference working as the file is renamed, moved to another disk, or copied to a
-second Mac, and `register refresh` rebuilds it from the index whenever it drifts
-or a copy strips it.
+Each file is anchored by a macOS bookmark, kept in its own store
+(`~/.local/share/bookmarks.json`). The bookmark finds the file again after a
+rename or a move to another disk. When it breaks, `register repair` binds it anew
+under the same id, and on a second Mac `register unmarshal` does the same. What
+is written onto the file itself (xattrs for the id, the binder names and Finder
+tags) is a cache derived from the index, and `register refresh` rebuilds it
+whenever it drifts or a copy strips it.
 
 `register` itself is portable Go; the OS-specific work lives behind the
 [fileanchor](https://github.com/rhsev/fileanchor) engine, today built for macOS.
@@ -92,11 +94,11 @@ container from someone else can't write anywhere it likes. The container is OS-n
 the trip may go through exFAT, rsync without `-E`, or a cloud folder that
 eats xattrs.
 
-**Keep macOS Spotlight up to date.** `register refresh` pushes record state back
-into tags, Spotlight fields and xattrs. `register audit` reports drift in both
-directions, `register repair` re-binds files that moved, and `register cleanup`
-walks you through anything that needs a human decision. None of them delete a
-record on their own.
+**Keep macOS Spotlight up to date.** `register refresh` rewrites the xattrs from
+the index, and Spotlight indexes them from there. `register audit` reports drift
+in both directions, `register repair` re-binds the bookmark of a file that moved,
+and `register cleanup` walks you through anything that needs a decision. None of
+them delete a record on their own.
 
 **Query everything.** The index is JSONL and the notes are YAML in
 Markdown, so [grubber](https://github.com/rhsev/grubber) can query both and
@@ -114,16 +116,16 @@ register <subcommand> [args...]
 
 | Subcommand | Purpose |
 |---|---|
-| `add` | Record files in the index (bookmark + xattr + record). With `--binder` the file joins that binder, without it you get a bookmark: a permanent id and an optional `aka`, no binder. `--md` also writes an annotation note |
+| `add` | Record files in the index (bookmark + xattr + record). With `--binder` the file joins that binder, without it the record is in no binder, with a permanent id and an optional `aka`. `--md` also writes an annotation note |
 | `promote` | Write the per-binder Markdown block for a binder's records; `--edit` opens the note in `$EDITOR` |
 | `annotate` | Edit an existing block's fields or note from the command line (`--set`, `--unset`, `--prose`) |
-| `remove` | Take files out of a binder; a record whose binder set runs empty stays as a bookmark |
+| `remove` | Take files out of a binder; a record whose binder set runs empty stays, in no binder |
 | `forget` | Delete a record in no binder for good: index line, bookmark entry, its id in the notes and on the file; the notes' blocks stay, and `promote` reattaches one if the file returns |
 | `refresh` | Push record state into macOS metadata |
 | `audit` | Read-only consistency report in three directions: record → file, file → record, and bookmark → record |
 | `repair` | Re-bind a moved file's broken bookmark under its unchanged id, located via Spotlight |
 | `rename` | Rename a binder across all records and xattrs; onto an existing name needs `--merge` |
-| `cleanup` | Review drift between the layers (stale blocks, unindexed annotations, bookmarks, unrepairable bookmark entries) and decide per item; `--prune` drops the unrepairable ones without asking, and refuses while anything could not be judged |
+| `cleanup` | Review drift between the layers (stale blocks, unindexed annotations, records in no binder, unrepairable bookmark entries) and decide per item; `--prune` drops the unrepairable ones without asking, and refuses while anything could not be judged |
 | `write` | Read JSONL from stdin, write ref records to Markdown or JSONL |
 | `list` | All binders with counts, or the files in one; `--inbox`/`--curated` filter by annotation status, `--paths` (with `--print0` for NUL-separated) and `--json` for piping — without a binder, `--json` lists the binders (`name`, `count`) |
 | `resolve` | Turn an id or `aka` handle into a path; `--record` prints the full record |
@@ -143,7 +145,7 @@ export REGISTER_BINDER=project-alpha
 
 register add document.pdf --kind pdf
 register add ~/scans/*.pdf --kind pdf        # one batch: one bookmark write, one append
-register add document.pdf --aka alpha-brief  # no binder: a bookmark with a handle
+register add document.pdf --aka alpha-brief  # no binder: a loose record with a handle
 register aka alpha-brief --add brief         # a second handle, later
 register add document.pdf --md               # and write the annotation note
 
@@ -255,10 +257,10 @@ notes are an optional annotation layer on top: `register promote` adds a block
 linked by id, and the index entry stays where it is. A record with no
 annotation is perfectly normal, which is what `register list --inbox` is for.
 
-A record whose binder set is empty is a **bookmark**: a file tracked by identity
-alone, in no binder. It is first-class and never auto-deleted, created either by
-`register add` without `--binder` or left behind when `register remove` empties
-the set. See SPEC §Bookmarks.
+A record whose binder set is empty is **in no binder**, tracked by identity
+alone (a loose record, for short). It is never deleted automatically. It comes
+from `register add` without `--binder`, or stays behind when `register remove`
+empties the set. See SPEC §Records in no binder.
 
 ## Documentation
 

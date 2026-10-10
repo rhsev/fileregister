@@ -127,8 +127,8 @@ func cmdRefresh(args []string) int {
 		}
 
 		// Identity layer for every record (idempotent): the id in both its
-		// carriers, ★ for members only (a bookmark, empty binder set, does not
-		// get it). kMDItemInformation is the one Spotlight searches and iCloud
+		// carriers, ★ for members only (a record in no binder does not get
+		// it). kMDItemInformation is the one Spotlight searches and iCloud
 		// strips; the #S copy is the one that travels.
 		if dryRun {
 			if !index.HasDescriptionID(refPath, id) {
@@ -150,7 +150,7 @@ func cmdRefresh(args []string) int {
 		}
 
 		if len(binders) == 0 {
-			continue // bookmark: identity refreshed, no binder layer
+			continue // in no binder: identity refreshed, no binder layer
 		}
 		if backend == "none" {
 			skippedNone++

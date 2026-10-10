@@ -77,7 +77,7 @@ func setupAuditConsistent(t *testing.T, anchor string) (notes, home string) {
 func TestAudit(t *testing.T) {
 	anchor := engineBin(t)
 
-	// consistent: bookmarked + group-stamped file + url ref → all consistent (path-free).
+	// consistent: bookmarked + group-stamped file + URL record → all consistent (path-free).
 	cN, cH := setupAuditConsistent(t, anchor)
 	cOut, cErr, cCode := runGoAudit(t, auditEnv(t, cN, cH, anchor))
 	assertGolden(t, "audit_consistent", cliResult(cOut, cErr, cCode))

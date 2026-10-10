@@ -151,7 +151,7 @@ func cmdMarshal(args []string) int {
 		return 0
 	}
 
-	// Resolve every record's bookmark (url refs carry no path and are handled
+	// Resolve every record's bookmark (URL records carry no path and are handled
 	// without a file payload below).
 	resolved, rerr := resolveRecordPaths(records)
 	if rerr != nil {
@@ -358,7 +358,7 @@ func cmdMarshal(args []string) int {
 	fmt.Printf("  records      : %d\n", len(records))
 	fmt.Printf("  files packed : %d\n", len(records)-missing-urls)
 	if urls > 0 {
-		fmt.Printf("  url refs     : %d\n", urls)
+		fmt.Printf("  url records  : %d\n", urls)
 	}
 	if notesPacked > 0 {
 		fmt.Printf("  notes packed : %d\n", notesPacked)

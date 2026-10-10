@@ -82,7 +82,7 @@ func dropUnderscoreKeys(m map[string]any) map[string]any {
 }
 
 // JSONLRemoveBinder set-deletes binder from the record with the given id, keeping
-// the record (an emptied set is a bookmark). Returns the number of records changed.
+// the record (an emptied set leaves it in no binder). Returns the number of records changed.
 func JSONLRemoveBinder(path, id, binder string) (int, error) {
 	return JSONLRemoveBinderMany(path, map[string]bool{id: true}, binder)
 }

@@ -92,7 +92,7 @@ func ItemProjectsAdd(path, value string) string {
 }
 
 // XattrBackend reads the backend from a record: "itemprojects", "tags", or
-// "none". URL refs have no file to cache membership on → implicitly "none".
+// "none". URL records have no file to cache membership on → implicitly "none".
 func XattrBackend(rec map[string]any) string {
 	if URLRef(rec) {
 		return "none"

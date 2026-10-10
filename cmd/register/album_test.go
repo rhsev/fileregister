@@ -46,7 +46,7 @@ func seedAlbumFixture(t *testing.T) string {
 	if err := os.MkdirAll(col, 0755); err != nil {
 		t.Fatal(err)
 	}
-	// Two URL refs and a file ref whose bookmark does not exist: no Spotlight
+	// Two URL records and a file ref whose bookmark does not exist: no Spotlight
 	// involved, so the lines are the same on every machine.
 	writeFile(t, filepath.Join(col, "inbox.jsonl"),
 		`{"type":"ref","id":"1","binder":["Alb"],"url":"x-devonthink-item://A","filename":"one.pdf","kind":"pdf","aka":["eins"]}`+"\n"+

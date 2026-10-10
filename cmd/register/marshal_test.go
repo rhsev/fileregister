@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-// makeMarshalFixture builds binder "Ship": two url refs, both annotated by one
+// makeMarshalFixture builds binder "Ship": two URL records, both annotated by one
 // binder note inside collections/, plus a scattered note in the notes root.
 func makeMarshalFixture(t *testing.T) string {
 	t.Helper()

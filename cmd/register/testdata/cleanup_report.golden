@@ -11,9 +11,8 @@ exit: 0
     Usually: run 'register reindex'. Or delete here if obsolete.
   • 2 (Docs) in binder_Docs.md
 
-=== Bookmarks (1) ===
-    Records in no binder. A bookmark is not cruft — listed for review only,
-    never deleted automatically.
+=== Records in no binder (1) ===
+    Not cruft. Listed for review only, never deleted automatically.
   • c.pdf (3) (id=3)
 === stderr ===
 Collecting index records and annotations…

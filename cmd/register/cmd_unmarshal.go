@@ -238,7 +238,7 @@ func cmdUnmarshal(args []string) int {
 	var reasons []string
 	var indexRefs []index.RefRecord
 
-	// Local URL refs never enter the bookmark db — an imported file ref with
+	// Local URL records never enter the bookmark db — an imported file record with
 	// the same id would fuse two identities, so their ids park the entry.
 	localURLByID := map[string]string{}
 	localRefs, refsOK := loadRefs(notesDir)
@@ -276,9 +276,9 @@ func cmdUnmarshal(args []string) int {
 			label = index.AsString(fn)
 		}
 
-		// URL refs are pure data — no file, no bookmark, no xattr. But an id
+		// URL records are pure data — no file, no bookmark, no xattr. But an id
 		// held by a local FILE record must not be grafted with a url (the
-		// backfill would flip that record into a URL ref).
+		// backfill would flip that record into a URL record).
 		if index.AsString(entry["url"]) != "" {
 			if _, isLocalFile := db[id]; isLocalFile {
 				parked++
@@ -298,7 +298,7 @@ func cmdUnmarshal(args []string) int {
 		}
 		if u, taken := localURLByID[id]; taken {
 			parked++
-			reasons = append(reasons, fmt.Sprintf("%s — id %s belongs to a local URL ref (%s)", label, id, u))
+			reasons = append(reasons, fmt.Sprintf("%s — id %s belongs to a local URL record (%s)", label, id, u))
 			continue
 		}
 		origin := entry["origin"]

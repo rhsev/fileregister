@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// makeResolveFixture builds an index with a url ref (deterministic resolve, no
+// makeResolveFixture builds an index with a URL record (deterministic resolve, no
 // bookmark needed) and a file ref (whose bookmark is absent → broken).
 func makeResolveFixture(t *testing.T) string {
 	t.Helper()
@@ -107,8 +107,8 @@ func assertResolve(t *testing.T, label string, notes string, args ...string) {
 func TestResolve(t *testing.T) {
 	fx := makeResolveFixture(t)
 
-	assertResolve(t, "url-by-aka", fx, "mylink")             // url ref by aka → URL
-	assertResolve(t, "url-by-id", fx, "500000001")           // url ref by id
+	assertResolve(t, "url-by-aka", fx, "mylink")             // URL record by aka → URL
+	assertResolve(t, "url-by-id", fx, "500000001")           // URL record by id
 	assertResolve(t, "url-record", fx, "mylink", "--record") // --record block
 	assertResolve(t, "broken-bookmark", fx, "600000001")     // file ref, no bookmark → broken
 	assertResolve(t, "broken-record", fx, "report", "--record")

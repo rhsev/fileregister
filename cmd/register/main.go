@@ -165,10 +165,10 @@ func listAll(notesDir string) error {
 
 const registerUsage = `Usage: register <subcommand> [args...]
 
-Register — bookmark index (identity & membership):
+Register — the index (identity & membership):
   add       <file>... [--binder <name>] [--aka <key>] [--kind <k>] [--md] [--xattr itemprojects|tags|none]
-            (no --binder registers a bookmark: binderless ref, id + optional aka)
-  add       --url <URL> [--binder <name>] [--label <name>] [--aka <key>]  (URL ref, e.g. x-devonthink-item://…)
+            (no --binder: a record in no binder, id + optional aka)
+  add       --url <URL> [--binder <name>] [--label <name>] [--aka <key>]  (URL record, e.g. x-devonthink-item://…)
   remove    <file>...|<url> --binder <name>
   forget    <id|aka>... [--dry-run]   (a record in no binder, for good: index, bookmark, id in notes and on the file; blocks stay)
   list      [<binder>] [--inbox|--curated]  (all binders with counts, or files in one)

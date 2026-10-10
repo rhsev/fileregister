@@ -40,9 +40,9 @@ system-special-cased.
 |---|---|---|---|---|---|---|
 | `com.apple.metadata:_kMDItemUserTags` | `kMDItemUserTags` | Finder Tags — ★ marker, optional binder tags | binary plist array | **yes** | yes | **yes** |
 | `com.apple.metadata:kMDItemProjects` | `kMDItemProjects` | quiet binder cache (default backend) | binary plist array (per-element Spotlight match) | no | yes | no |
-| `com.apple.metadata:kMDItemInformation` | `kMDItemInformation` | bookmark id (local mdfind repair) | space-separated string, **as a binary-plist string** (see below) | no | yes (local) | **no** |
-| `com.apple.metadata:kMDItemInformation#S` | — | bookmark id + sync flag — **does NOT sync** (Apple `kMDItem*` prefix blocked regardless of `#S`) | string | no | no | **no** |
-| `com.fileregister.id#S` | — | bookmark id, cross-device — **syncs** (custom namespace + `#S`) | string | no | no | **yes — verified** |
+| `com.apple.metadata:kMDItemInformation` | `kMDItemInformation` | record id (local mdfind repair) | space-separated string, **as a binary-plist string** (see below) | no | yes (local) | **no** |
+| `com.apple.metadata:kMDItemInformation#S` | — | record id + sync flag — **does NOT sync** (Apple `kMDItem*` prefix blocked regardless of `#S`) | string | no | no | **no** |
+| `com.fileregister.id#S` | — | record id, cross-device — **syncs** (custom namespace + `#S`) | string | no | no | **yes — verified** |
 
 ### Spotlight reads `com.apple.metadata:*` as property lists
 
@@ -65,7 +65,7 @@ macOS 15.8 and 27.2.
 - Appending **`#S`** to the xattr *name* (`kMDItemInformation#S`) makes FileProvider
   sync it, **but** it is then **not** Spotlight-indexed and **not** Finder-shown
   (the `#S` is treated as part of the type name by Spotlight/Finder). Useful only
-  for self-resolved data (e.g. a bookmark id), never for searchable or visible
+  for self-resolved data (e.g. a record id), never for searchable or visible
   metadata.
 - The `#S` behaviour is undocumented and has shifted between releases.
 
@@ -203,7 +203,7 @@ the (separately-synced) records.
   `kMDItemUserTags`.
 - `kMDItemProjects` (quiet binder cache) → not Finder-visible, not synced; fine,
   it is a regenerable local cache.
-- Bookmark id → for cross-device, stored with `#S` (syncs, not searchable —
+- Record id → for cross-device, stored with `#S` (syncs, not searchable —
   resolved via the index, enumerated via the ★ marker).
 
 See also: [SPEC.md](SPEC.md) §macOS metadata layer.

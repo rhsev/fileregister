@@ -4,7 +4,7 @@ package main
 // and the optional per-binder Markdown context blocks.
 //
 // Report mode (default) lists findings; --interactive (without --dry-run) prompts
-// to delete stale/unindexed blocks. Bookmarks (empty binder set) are never deleted.
+// to delete stale/unindexed blocks. Records in no binder are never deleted.
 
 import (
 	"github.com/rhsev/fileregister/internal/index"
@@ -115,10 +115,10 @@ func cmdCleanup(args []string) int {
 		}
 	}
 
-	var bookmarks []map[string]any
+	var loose []map[string]any
 	for _, r := range refs {
 		if len(nonEmptyBinders(r)) == 0 {
-			bookmarks = append(bookmarks, r)
+			loose = append(loose, r)
 		}
 	}
 
@@ -144,13 +144,12 @@ func cmdCleanup(args []string) int {
 	}
 
 	fmt.Println("")
-	fmt.Printf("=== Bookmarks (%d) ===\n", len(bookmarks))
-	fmt.Println("    Records in no binder. A bookmark is not cruft — listed for review only,")
-	fmt.Println("    never deleted automatically.")
-	for _, r := range bookmarks {
+	fmt.Printf("=== Records in no binder (%d) ===\n", len(loose))
+	fmt.Println("    Not cruft. Listed for review only, never deleted automatically.")
+	for _, r := range loose {
 		fmt.Printf("  • %s (id=%s)\n", refLabel(r), index.AsString(r["id"]))
 	}
-	if len(bookmarks) == 0 {
+	if len(loose) == 0 {
 		fmt.Println("(none)")
 	}
 

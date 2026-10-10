@@ -66,7 +66,7 @@ func cmdResolve(args []string) int {
 		return 1
 	}
 
-	// Locator dispatch: a url ref resolves to its URL, a file ref via bookmark.
+	// Locator dispatch: a URL record resolves to its URL, a file ref via bookmark.
 	var path string
 	if u := index.RefURL(rec); u != "" {
 		path = u

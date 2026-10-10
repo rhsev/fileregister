@@ -236,8 +236,8 @@ func cmdWrite(args []string) int {
 			}
 			// Membership on the file for _ref_path (idempotent), as add does it:
 			// through the record's backend, with ★. Only an index write is a
-			// membership — a Markdown block is annotation — and a bookmark
-			// (no binder) has none.
+			// membership — a Markdown block is annotation — and a record
+			// in no binder has none.
 			xattrStatus := "skipped"
 			rec := items[i].rec
 			if items[i].refPath != "" && items[i].isJSONL && rec.Binder != "" {

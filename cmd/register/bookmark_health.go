@@ -41,8 +41,8 @@ func (f bookmarkFinding) prunable() bool {
 }
 
 // classifyBookmarks judges every entry of the identity store. `records` must be
-// every ref record, binderless ones included: a bookmark held on purpose is a
-// first-class record with no binder, and judging against the bindered set alone
+// every ref record, those in no binder included: a record kept in no binder on
+// purpose is a record like any other, and judging against the bindered set alone
 // would call every one of them an orphan.
 // bookmarkReport is what one pass over the identity store yields.
 type bookmarkReport struct {

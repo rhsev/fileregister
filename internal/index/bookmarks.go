@@ -388,7 +388,7 @@ type BookmarkResult struct {
 // file (reuses an existing id). The engine's save runs once per file. A failed
 // db save is returned as an error — the caller must NOT record the new ids
 // anywhere (their blobs were never persisted). reserved holds ids taken
-// outside the db (URL refs live only in the index) that fresh ids must avoid.
+// outside the db (URL records live only in the index) that fresh ids must avoid.
 // byName (FileIDsByName) finds a file whose id xattr could never be written.
 func AddMany(paths []string, reserved map[string]bool, byName map[string][]string) ([]BookmarkResult, error) {
 	if err := LockBookmarks(); err != nil {
@@ -545,7 +545,7 @@ func SetSyncXattr(path, id string) bool {
 	return resp["action"] != "noop"
 }
 
-// syncID reads the bookmark id from com.fileregister.id#S, or "" if absent.
+// syncID reads the record id from com.fileregister.id#S, or "" if absent.
 func syncID(path string) string {
 	resp, err := fileAnchor().request(map[string]any{"op": "get_meta", "path": path, "key": "sync"})
 	if err != nil {

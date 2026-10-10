@@ -50,8 +50,8 @@ notes or not.
   a copy's); `repair`, `refresh` and `unmarshal` add it; only `forget` takes it
   off. `add` on a file that already has its id takes it over without rewriting
   the carriers; `refresh` restores what is missing.
-- **Only `forget` deletes a record**, and only one in no binder. `remove` leaves
-  a bookmark.
+- **Only `forget` deletes a record**, and only one in no binder. `remove` keeps
+  the record, in no binder once its last binder goes.
 - **★ leaves a file** only with its last binder (`remove`). A record in no
   binder carries none, so `forget` has none to take off.
 

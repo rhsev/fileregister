@@ -474,11 +474,7 @@ func cmdAdd(args []string) int {
 		}
 		fmt.Printf("Added to '%s' → %s [%s]\n", opts.binder, targetLabel, shown)
 	} else {
-		s := ""
-		if len(records) != 1 {
-			s = "s"
-		}
-		fmt.Printf("Registered bookmark%s → %s\n", s, targetLabel)
+		fmt.Printf("Registered in no binder → %s\n", targetLabel)
 	}
 	fmt.Printf("  appended : %d\n", appended)
 	if noop > 0 {
@@ -651,7 +647,7 @@ func addURLRecord(opts addOptions, binderSet bool) int {
 	if len(actions) > 0 {
 		action = actions[0]
 	}
-	label := "as bookmark"
+	label := "in no binder"
 	if binderSet {
 		label = "to '" + opts.binder + "'"
 	}

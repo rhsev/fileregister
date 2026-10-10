@@ -78,7 +78,7 @@ func TestListAll(t *testing.T) {
 	assertList(t, "empty-json", eenv, "--json") // no sentence, no lines, exit 0
 }
 
-// makeMixFixture builds one binder "Mix" with two url refs and one file ref whose
+// makeMixFixture builds one binder "Mix" with two URL records and one file ref whose
 // bookmark is absent (→ broken). Deterministic without real bookmarks.
 func makeMixFixture(t *testing.T) string {
 	t.Helper()

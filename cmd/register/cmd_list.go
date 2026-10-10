@@ -219,7 +219,7 @@ func listBinder(notesDir, binder string, pathsOnly, jsonOnly, print0 bool) error
 		fmt.Fprintf(os.Stderr, "Warning: fileanchor batch resolve failed: %v — paths shown as broken\n", rerr)
 	}
 
-	// The record's openable locator: URL for url refs, bookmark path for files.
+	// The record's openable locator: URL for URL records, bookmark path for files.
 	locator := func(r map[string]any) string {
 		if u := index.RefURL(r); u != "" {
 			return u

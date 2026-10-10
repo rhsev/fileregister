@@ -37,7 +37,7 @@ func runGoRefresh(t *testing.T, env []string, args ...string) (string, string, i
 }
 
 // setupRefreshCase seeds an index with a resolvable file ref, a broken ref, and a
-// url ref, plus a bookmarks.json (under home) that resolves only the first.
+// URL record, plus a bookmarks.json (under home) that resolves only the first.
 func setupRefreshCase(t *testing.T, anchor string) (notes, home string) {
 	home = t.TempDir()
 	notes = t.TempDir()

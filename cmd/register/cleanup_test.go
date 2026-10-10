@@ -35,7 +35,7 @@ func runGoCleanup(t *testing.T, env []string, args ...string) (string, string, i
 	return ob.String(), eb.String(), code
 }
 
-// seedCleanupFixture: an index with a bookmark + a Docs member, and an annotation
+// seedCleanupFixture: an index with a record in no binder + a Docs member, and an annotation
 // file with an ok block, a stale block (binder removed), and an unindexed block.
 func seedCleanupFixture(t *testing.T) string {
 	t.Helper()

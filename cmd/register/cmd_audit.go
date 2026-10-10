@@ -45,10 +45,10 @@ func shellQuote(s string) string {
 }
 
 // binderTag renders a record's binder list for a report line; a binderless
-// record shows as "bookmark".
+// record shows as "no binder".
 func binderTag(binders []string) string {
 	if len(binders) == 0 {
-		return "bookmark"
+		return "no binder"
 	}
 	return strings.Join(binders, ", ")
 }
