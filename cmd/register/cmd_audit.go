@@ -180,16 +180,21 @@ func cmdAudit(args []string) int {
 			okCount++
 			continue
 		}
+		// A record counts once, and only when every membership is on the file:
+		// the summary speaks of records, not of memberships.
+		allPresent := true
 		for _, binder := range binders {
-			if index.XattrBackendIncludes(refPath, binder, backend) {
-				okCount++
-			} else {
+			if !index.XattrBackendIncludes(refPath, binder, backend) {
+				allPresent = false
 				layer := "kMDItemProjects"
 				if backend == "tags" {
 					layer = "kMDItemUserTags"
 				}
 				missingXattr = append(missingXattr, missingXattrT{binder, noteFile, refPath, label, backend, layer})
 			}
+		}
+		if allPresent {
+			okCount++
 		}
 	}
 

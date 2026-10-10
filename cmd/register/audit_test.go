@@ -44,8 +44,9 @@ func auditEnv(t *testing.T, notes, home, anchor string) []string {
 	return append(env, "GRUBBER_NOTES="+notes, "HOME="+home, "FILEANCHOR="+anchor)
 }
 
-// setupAuditConsistent creates a bookmarked, group-stamped file ref plus a url
-// ref, so audit reports everything consistent (no paths in the output).
+// setupAuditConsistent creates a bookmarked file record in two binders, both
+// stamped, plus a URL record, so audit reports everything consistent (no paths
+// in the output) and counts two records, not three memberships.
 func setupAuditConsistent(t *testing.T, anchor string) (notes, home string) {
 	home = t.TempDir()
 	notes = t.TempDir()
@@ -66,10 +67,11 @@ func setupAuditConsistent(t *testing.T, anchor string) (notes, home string) {
 
 	engineExec(t, anchor,
 		`{"op":"set_meta","path":"`+real+`","key":"id","value":"810000001","mode":"add"}`,
-		`{"op":"set_meta","path":"`+real+`","key":"groups","value":"AudBndOne","mode":"add"}`)
+		`{"op":"set_meta","path":"`+real+`","key":"groups","value":"AudBndOne","mode":"add"}`,
+		`{"op":"set_meta","path":"`+real+`","key":"groups","value":"AudBndThree","mode":"add"}`)
 
 	writeFile(t, filepath.Join(notes, "collections", "inbox.jsonl"),
-		`{"type":"ref","id":"810000001","binder":["AudBndOne"],"filename":"doc.txt"}`+"\n"+
+		`{"type":"ref","id":"810000001","binder":["AudBndOne","AudBndThree"],"filename":"doc.txt"}`+"\n"+
 			`{"type":"ref","id":"810000002","binder":["AudBndTwo"],"url":"x-devonthink-item://AUD","filename":"u.md"}`+"\n")
 	return notes, home
 }
