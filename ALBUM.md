@@ -2,7 +2,7 @@
 
 An album is a binder with an order: its members in sequence, with what the
 note says about each of them and what each file says about itself. It is not
-only for photos: a report, a reading list, the pages of a guide are albums
+only for photos. A report, a reading list and the pages of a guide are albums
 too. `register album` prints one as data, and nothing else. Whoever wants a
 gallery, a printed report or a web page builds it from that data, with
 whatever tool and look suits the purpose.
@@ -25,6 +25,7 @@ register add ~/documents/entry-ticket.pdf --binder safari
 
 # 2. Create the annotation note and say something about the members
 register promote --binder safari
+register aka 210322647 --add waterhole   # a handle for one photo (its id from `register list safari --json`)
 register annotate safari waterhole --set title="At the waterhole" --set place="Etosha National Park, Namibia"
 
 # 3. Put them in order, and name the album (the name stays in the note)
@@ -35,7 +36,7 @@ register album safari --title "Safari, Namibia 2026"
 ## The line
 
 ```json
-{"id":"210322647","binder":["safari"],"filename":"waterhole.png","kind":"image","aka":["waterhole"],"path":"/Users/me/photos/namibia/waterhole.png","position":1,"fields":{"album":"Safari, Namibia 2026","title":"At the waterhole","place":"Etosha National Park, Namibia"},"file":{"date":"2026-10-03T07:12:00Z","lat":-18.85,"lon":16.32,"size":2481152,"modified":"2026-10-03T19:40:11Z","type":"public.jpeg","width":4000,"height":3000}}
+{"id":"210322647","binder":["safari"],"filename":"waterhole.jpg","kind":"image","aka":["waterhole"],"path":"/Users/me/photos/namibia/waterhole.jpg","position":1,"fields":{"album":"Safari, Namibia 2026","title":"At the waterhole","place":"Etosha National Park, Namibia"},"file":{"date":"2026-10-03T07:12:00Z","lat":-18.85,"lon":16.32,"size":2481152,"modified":"2026-10-03T19:40:11Z","type":"public.jpeg","width":4000,"height":3000}}
 ```
 
 | Key | From | Meaning |
@@ -50,8 +51,8 @@ reader ignores keys it does not know; new keys may appear, and existing ones
 keep their name and meaning.
 
 A member whose bookmark does not resolve keeps its line and its position, with
-`"broken": true` instead of a path, as in `list --json`: dropping it would be
-indistinguishable from "not a member". `register repair` fixes it.
+`"broken": true` instead of a path, as in `list --json`, because dropping it
+would be indistinguishable from "not a member". `register repair` fixes it.
 
 ## Naming the album
 
@@ -80,9 +81,9 @@ Any name works: colons, quotes, emoji, words YAML would otherwise read as a
 number or `yes`; the field is quoted where it has to be. `--title` stores it in
 NFC, the composed Unicode form, so a name pasted from the Finder (which can
 arrive decomposed and looks the same) is still found by a search typed on the
-keyboard. A name is one line: line breaks and tabs are refused.
+keyboard. A name is one line, so line breaks and tabs are refused.
 
-Nothing looks the value up. grubber passes every frontmatter key down into each
+No lookup is needed. grubber passes every frontmatter key down into each
 block of the file, so it arrives in every line's `fields`, and so does any
 other key the frontmatter carries (a period, an author, a client). A reader
 takes the album's name from any line, and the binder name when there is none.
@@ -92,8 +93,9 @@ The same inheritance makes the album searchable:
 grubber extract ~/notes -a -f album~Safari -f type=ref   # every member of that album
 ```
 
-`type=ref` keeps the rest out: any other note with an `album` key in its header
-matches too, and so does an ordering block written by earlier versions.
+`type=ref` keeps the rest out. Without it, any other note with an `album` key
+in its header matches too, and so does an ordering block written by earlier
+versions.
 
 The name belongs to the note, not to the binder. A note may hold blocks of
 several binders (`promote --target` writes into any note), and then they all
@@ -104,7 +106,7 @@ default.
 ## Fields
 
 `fields` is the member's block minus what the line already has (`type`, `id`,
-`binder`; `sort` is what `position` is made of). The set is open: any key you
+`binder`, and `sort`, which `position` already reflects). The set is open: any key you
 put in a block arrives as it stands, so a report can carry `amount` or `due`
 and a reading list `status`. These names are a convention between you and
 whatever reads the album; fileregister gives none of them a meaning:
@@ -139,8 +141,8 @@ working notes; it does not reach the line.
 | `duration` | seconds, for audio and video |
 
 Where a key means what a field means, it has the field's name. So the value a
-reader shows is `file` overlaid with `fields`: the curation wins, the file is
-the fallback, and one line of code does it:
+reader shows is `file` overlaid with `fields`. The curation wins and the file
+is the fallback. One line of jq does it:
 
 ```sh
 register album safari | jq -c '{position, shown: ((.file // {}) + (.fields // {}))}'
@@ -151,7 +153,8 @@ A reader that wants only what was curated reads `fields` and ignores `file`.
 ## Order
 
 `position` is the order `register order show safari` prints, and that is the
-note's: members follow their blocks in the order they stand in the document.
+note's order. Members follow their blocks in the order they stand in the
+document.
 Moving a block in the editor moves the member. A `sort` key, which `register
 order move` writes, places a member ahead of the document order; members
 without a block come last, by file name. See [ORDERING.md](ORDERING.md).
@@ -167,7 +170,7 @@ Versions up to 1.4 rendered HTML themselves (`--out`, `--css`, `--milan`,
 
 ## Limits
 
-- `file` needs Spotlight for everything but `size` and `modified`: a file on a
+- `file` needs Spotlight for everything but `size` and `modified`. A file on a
   volume Spotlight does not index, or one copied a moment ago, may carry less.
   The curated `fields` do not depend on it.
 - Each file costs one `mdls` call; they run in parallel, but a four-digit album

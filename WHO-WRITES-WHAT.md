@@ -3,12 +3,25 @@
 fileregister keeps its data in up to four places: the **index**
 (`collections/*.jsonl`), the **bookmark store** (`~/.local/share/bookmarks.json`),
 the **attributes on the file**, and, if you use them, the **notes** (Markdown
-sidecars). Without notes, fileregister is the index and what hangs off it: the
-first table is all of it, and it runs without grubber. Notes add the second
-table, and they are read through grubber.
+sidecars). This page shows which command writes to which of them.
 
-Both tables are derived from the code (the calls each command makes), not from
-intent; where the two disagree, the code is what they show.
+## Key points
+
+- **Only `forget` deletes a record**, and only one in no binder. `remove` keeps
+  the record, in no binder once its last binder goes.
+- **A note block is deleted only by `cleanup --interactive`**, and only when you
+  confirm it. `forget` takes the id out of a block and leaves the block itself.
+- **Every attribute on a file can be rebuilt.** The id, ★ and the binder tags
+  derive from the index and the bookmark store, and `refresh` writes them back.
+  A run with nothing to restore changes no file.
+- **★ leaves a file only with its last binder** (`remove`).
+- **A note's frontmatter has one writer**, `album --title`, and it touches one
+  field, `album:`.
+- **`list`, `resolve`, `of`, `audit`, `album` (without `--title`), `order show`
+  and `marshal` only read.** They write nothing to any of the four places.
+
+The tables below give the detail. They are derived from the code (the calls each
+command makes), not from intent.
 
 Legend: **new** creates · **set** writes or overwrites · **add** adds a value
 and keeps the others · **restore** writes only where missing · **edit** changes
@@ -16,12 +29,18 @@ in place · **out** removes · — leaves alone
 
 ## Without notes: the register
 
-On the file: `kMDItemInformation` holds the id where Spotlight searches it,
-`com.fileregister.id#S` the same id where iCloud Drive leaves it; ★ is the
-managed marker (members only); binder tags are the binder names in
-`kMDItemProjects` or Finder tags, per the record's `xattr:` backend.
-`kept_tags` is an index field: Finder tags the user had before a binder of that
-name.
+Without notes, fileregister is the index and what hangs off it. This table is
+all of it, and it runs without grubber.
+
+The columns for the file and the index:
+
+- `kMDItemInformation`: the id, where Spotlight searches it
+- `id#S` (`com.fileregister.id#S`): the same id, where iCloud Drive leaves it
+- ★: the managed marker, on members only
+- Binder tags: the binder names, in `kMDItemProjects` or in Finder tags, per the
+  record's `xattr:` backend
+- `kept_tags`, an index field: Finder tags the user had before a binder of that
+  name
 
 | Command | Index | Bookmark store | `kMDItemInformation` | `id#S` | ★ | Binder tags | `kept_tags` |
 |---|---|---|---|---|---|---|---|
@@ -42,20 +61,16 @@ Read only: `list`, `resolve`, `of`, `audit`.
 binder. † Also has a part in the notes (second table), and needs grubber for it,
 notes or not.
 
-- **Every attribute on the file has a restorer.** The id in both carriers, ★
-  and the binder tags are derived from index and bookmark store; `refresh` and
-  `repair` write them back. `refresh` restores `kMDItemInformation` only where
-  it is missing, so a run with nothing to restore writes nothing.
-- **The id**: a new file gets it from `add` (set: other ids on a fresh file are
-  a copy's); `repair`, `refresh` and `unmarshal` add it; only `forget` takes it
-  off. `add` on a file that already has its id takes it over without rewriting
-  the carriers; `refresh` restores what is missing.
-- **Only `forget` deletes a record**, and only one in no binder. `remove` keeps
-  the record, in no binder once its last binder goes.
-- **★ leaves a file** only with its last binder (`remove`). A record in no
-  binder carries none, so `forget` has none to take off.
+- **The id.** A new file gets it from `add`, which sets it, because any other
+  id on a newly added file came with a copy. `repair`, `refresh` and `unmarshal`
+  add it, and only `forget` takes it off. `add` on a file that already has its
+  id takes it over without rewriting the carriers. `refresh` restores what is
+  missing, and writes `kMDItemInformation` only where the id is not there yet.
+- **A record in no binder carries no ★**, so `forget` has none to take off.
 
 ## With notes
+
+Notes are read through grubber.
 
 | Command | Index | Note blocks | Frontmatter |
 |---|---|---|---|
@@ -74,19 +89,8 @@ notes or not.
 
 Read only: `album`, `order show`, `marshal`, `list --inbox/--curated`.
 
-² `promote` and `add --md` first look for a block `forget` left: one id-less
-block of the binder under a heading naming the file gets the id back, instead of
-a second block being written.
+² `promote` and `add --md` first look for a block that `forget` left behind. If
+exactly one id-less block of the binder sits under a heading naming the file, it
+gets the id back, and no second block is written.
 
-grubber reads the notes in two ways, always with `--no-config`, so the user's grubber config does not change what register sees. As records, blocks as they stand
-(`-b --inherit=`): `annotate`, `aka`, `cleanup`, `forget`, `marshal`, `reindex`,
-`rename`, `list --inbox/--curated` and `order` (the binder's note). For the
-album, with the note's frontmatter inherited into every block (`-b`). A writer
-parses the one note it edits itself (`promote`, `annotate`, `order move`,
-`rename`, `forget`, `album --title`): to change a block it needs the text around
-it, which grubber does not give.
-
-- **Blocks are created** by `promote`, `add --md`, `order move` and `write`;
-  **deleted** only by `cleanup --interactive`, on the user's word; their **id is
-  taken out** only by `forget`, which leaves the block.
-- **The frontmatter has one writer** and one field: `album --title`.
+- **Blocks are created** by `promote`, `add --md`, `order move` and `write`.
