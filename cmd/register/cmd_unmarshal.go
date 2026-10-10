@@ -391,12 +391,20 @@ func cmdUnmarshal(args []string) int {
 
 	// Annotation notes. Binder notes (origin inside collections/) mirror into the
 	// local collections/; a local note of the same name wins (kept staged).
-	// Scattered notes stay staged.
+	// Scattered notes stay staged. When every record was parked, the notes stay
+	// staged too: placed alone, their blocks would point at ids the index does
+	// not have, and the rerun that imports the records would then find the note
+	// already there and leave a second copy behind.
+	allParked := imported == 0 && parked > 0
 	placedNotes := 0
 	var keptNotes, scatteredNotes []string
 	for _, n := range noteLines {
 		src, why := stagedFile(inner, index.AsString(n["file"]))
 		if why != "" {
+			continue
+		}
+		if allParked {
+			keptNotes = append(keptNotes, fmt.Sprintf("%s — no record imported, so the note waits for them (kept staged)", filepath.Base(src)))
 			continue
 		}
 		// A note is Markdown; anything else placed in collections/ could be
@@ -445,6 +453,7 @@ func cmdUnmarshal(args []string) int {
 	}
 	if parked == 0 && len(keptNotes) == 0 && len(scatteredNotes) == 0 {
 		os.RemoveAll(staging) // nothing left behind → clean up
+		os.Remove(importDir)  // and import/ itself once no other container waits there
 	}
 	if bookmarkFailed > 0 {
 		return 1

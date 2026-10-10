@@ -160,3 +160,50 @@ func TestUnmarshalFileRef(t *testing.T) {
 		t.Errorf("placed file not stamped with id; get_meta returned: %s", got)
 	}
 }
+
+// A container whose files all lie outside collections/ imports nothing without
+// --scatter. Its note then waits in staging rather than landing alone, with
+// blocks that point at ids the index lacks; the rerun with --scatter places
+// records, file and note together and leaves nothing behind.
+func TestUnmarshalNoteWaitsForItsRecords(t *testing.T) {
+	anchor := engineBin(t)
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "Pack")
+	os.MkdirAll(filepath.Join(root, "files"), 0755)
+	os.MkdirAll(filepath.Join(root, "notes"), 0755)
+	writeFile(t, filepath.Join(root, "files", "doc.txt"), "hello")
+	writeFile(t, filepath.Join(root, "notes", "binder_Docs.md"),
+		"### doc.txt\n```yaml\ntype: ref\nid: '900000002'\nbinder: Docs\n```\n")
+	writeFile(t, filepath.Join(root, "manifest.jsonl"),
+		`{"type":"ref","id":"900000002","binder":["Docs"],"filename":"doc.txt","kind":"txt","file":"files/doc.txt","origin":"../outside/doc.txt"}`+"\n"+
+			`{"type":"note","file":"notes/binder_Docs.md","origin":"binder_Docs.md"}`+"\n")
+	container := filepath.Join(t.TempDir(), "pack.tar.gz")
+	if o, err := exec.Command("tar", "--no-mac-metadata", "-czf", container, "-C", tmp, "Pack").CombinedOutput(); err != nil {
+		t.Fatalf("build container: %v\n%s", err, o)
+	}
+
+	base := t.TempDir()
+	dest := filepath.Join(base, "notes")
+	os.MkdirAll(filepath.Join(dest, "collections"), 0755)
+	env := unmarshalEnv(t, dest, anchor)
+	note := filepath.Join(dest, "collections", "binder_Docs.md")
+
+	out, _, code := runGoUnmarshal(t, env, container)
+	if code != 0 || !strings.Contains(out, "Imported 0 record(s)") {
+		t.Fatalf("first run: exit %d\n%s", code, out)
+	}
+	if index.FileExists(note) {
+		t.Errorf("note placed although no record was imported:\n%s", out)
+	}
+
+	out, _, code = runGoUnmarshal(t, env, container, "--scatter")
+	if code != 0 || !strings.Contains(out, "Imported 1 record(s)") || !strings.Contains(out, "Placed 1 annotation note(s)") {
+		t.Fatalf("rerun with --scatter: exit %d\n%s", code, out)
+	}
+	if !index.FileExists(note) || !index.FileExists(filepath.Join(dest, "outside", "doc.txt")) {
+		t.Errorf("note or file missing after --scatter:\n%s", out)
+	}
+	if index.FileExists(filepath.Join(dest, "collections", "import", "pack")) {
+		t.Errorf("staging left behind after a complete import:\n%s", out)
+	}
+}
