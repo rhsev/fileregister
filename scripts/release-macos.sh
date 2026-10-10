@@ -107,6 +107,9 @@ developer cannot be verified, clear the quarantine flag once:
   xattr -dr com.apple.quarantine register libexec
 
 Point register at a notes directory first: export GRUBBER_NOTES=~/notes (README).
+
+Upgrading from 2.0: the bookmark store moved. Once, before the first run:
+  mkdir -p ~/.local/share/fileregister && mv ~/.local/share/bookmarks.json ~/.local/share/fileregister/
 Intel Mac? Build from source instead (go install + `make fileanchor` +
 `make grubber`).
 Tested with fileanchor 1.3.0 and grubber v0.19.0.
