@@ -1,4 +1,4 @@
 exit: 0
 === stdout ===
-No active binders found (inbox only).
+No binder has records without a note block.
 === stderr ===

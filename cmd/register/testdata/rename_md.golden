@@ -1,16 +1,17 @@
 exit: 0
 === stdout ===
-Found 2 ref(s). Renaming 'Old' → 'New'…
+Found 1 record(s) and 1 note block(s). Renaming 'Old' → 'New'…
 
-  inbox.jsonl: 1 block(s) updated
+  inbox.jsonl: 1 record(s) updated
   binder_Old.md: 1 block(s) updated
   binder_Old.md → binder_New.md
 
   kMDItemProjects updated: doc.txt
 
 Rename complete:
-  YAML blocks updated : 2
-  xattr files updated : 1
+  Index records updated : 1
+  Note blocks updated   : 1
+  xattr files updated   : 1
 
 === stderr ===
 Collecting refs for binder 'Old'…

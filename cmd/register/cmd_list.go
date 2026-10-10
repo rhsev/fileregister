@@ -134,15 +134,22 @@ func listAllFiltered(notesDir, filter string, jsonOnly bool) error {
 		}
 		active = kept
 		if filter == "inbox" {
-			label = " (inbox only)"
+			label = "inbox"
 		} else {
-			label = " (annotated only)"
+			label = "curated"
 		}
 	}
 
 	if len(active) == 0 {
 		if !jsonOnly {
-			fmt.Printf("No active binders found%s.\n", label)
+			switch label {
+			case "inbox":
+				fmt.Println("No binder has records without a note block.")
+			case "curated":
+				fmt.Println("No binder has records with a note block.")
+			default:
+				fmt.Println("No active binders found.")
+			}
 		}
 		return nil
 	}

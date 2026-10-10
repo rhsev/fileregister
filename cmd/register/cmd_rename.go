@@ -110,15 +110,16 @@ func cmdRename(args []string) int {
 		return 1
 	}
 
-	fmt.Printf("Found %d ref(s). Renaming '%s' → '%s'…\n", len(records), oldName, newName)
+	fmt.Printf("Found %d record(s) and %d note block(s). Renaming '%s' → '%s'…\n", len(records)-len(annos), len(annos), oldName, newName)
 	fmt.Println("")
 
-	recordChanges := 0
+	recordChanges, blockChanges := 0, 0
 	writeFailed := false
 	for _, note := range groupByNoteFile(records) {
 		var count int
 		var werr error
-		if strings.HasSuffix(strings.ToLower(note.file), ".jsonl") {
+		isIndex := strings.HasSuffix(strings.ToLower(note.file), ".jsonl")
+		if isIndex {
 			count, werr = index.JSONLRenameBinder(note.file, oldName, newName)
 		} else {
 			count, werr = mdRenameBinder(note.file, oldName, newName)
@@ -128,9 +129,15 @@ func cmdRename(args []string) int {
 			writeFailed = true
 			continue
 		}
-		recordChanges += count
+		unit := "block(s)"
+		if isIndex {
+			recordChanges += count
+			unit = "record(s)"
+		} else {
+			blockChanges += count
+		}
 		if count > 0 {
-			fmt.Printf("  %s: %d block(s) updated\n", filepath.Base(note.file), count)
+			fmt.Printf("  %s: %d %s updated\n", filepath.Base(note.file), count, unit)
 		}
 	}
 
@@ -245,10 +252,11 @@ func cmdRename(args []string) int {
 
 	fmt.Println("")
 	fmt.Println("Rename complete:")
-	fmt.Printf("  YAML blocks updated : %d\n", recordChanges)
-	fmt.Printf("  xattr files updated : %d\n", xattrChanges)
+	fmt.Printf("  Index records updated : %d\n", recordChanges)
+	fmt.Printf("  Note blocks updated   : %d\n", blockChanges)
+	fmt.Printf("  xattr files updated   : %d\n", xattrChanges)
 	if xattrFailed > 0 {
-		fmt.Printf("  xattr failures      : %d\n", xattrFailed)
+		fmt.Printf("  xattr failures        : %d\n", xattrFailed)
 	}
 	fmt.Println("")
 	if xattrFailed > 0 {

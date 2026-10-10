@@ -147,7 +147,7 @@ func cmdCleanup(args []string) int {
 	fmt.Printf("=== Records in no binder (%d) ===\n", len(loose))
 	fmt.Println("    Not cruft. Listed for review only, never deleted automatically.")
 	for _, r := range loose {
-		fmt.Printf("  • %s (id=%s)\n", refLabel(r), index.AsString(r["id"]))
+		fmt.Printf("  • %s\n", refLabel(r))
 	}
 	if len(loose) == 0 {
 		fmt.Println("(none)")

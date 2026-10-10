@@ -1,4 +1,4 @@
 exit: 0
 === stdout ===
-No active binders found (annotated only).
+No binder has records with a note block.
 === stderr ===
