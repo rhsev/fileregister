@@ -1,10 +1,12 @@
 exit: 1
 === stdout ===
+Restored id 800000001 → kMDItemInformation of doc.txt
 Refreshed (itemprojects): doc.txt → Docs
 
 Refresh complete:
   Refreshed    : 1
   Already ok   : 0
+  IDs restored : 1 (kMDItemInformation, so Spotlight finds them again)
   Skipped (url) : 1
 
 Broken bookmarks (1) — run 'register repair' to fix:

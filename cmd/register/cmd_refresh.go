@@ -1,7 +1,8 @@
 package main
 
-// cmd_refresh — push index (Markdown/JSONL) state back to macOS metadata:
-// the syncable id xattr, the ★ managed marker, and the binder xattr layer.
+// cmd_refresh — push index (Markdown/JSONL) state back to macOS metadata: the
+// id (kMDItemInformation, Spotlight's, and its syncable copy), the ★ managed
+// marker, and the binder xattr layer.
 //
 
 import (
@@ -83,7 +84,7 @@ func cmdRefresh(args []string) int {
 	var missing []missingEntry
 	var skippedTrash, skippedShared []string
 	shared := sharedPaths(allRefs, resolved)
-	refreshed, noop, failed, skippedNone, skippedURL := 0, 0, 0, 0, 0
+	refreshed, noop, failed, skippedNone, skippedURL, restoredIDs := 0, 0, 0, 0, 0, 0
 
 	for _, rec := range allRefs {
 		id := index.AsString(rec["id"])
@@ -125,10 +126,24 @@ func cmdRefresh(args []string) int {
 			}
 		}
 
-		// Identity layer for every record (idempotent): syncable id xattr; ★ for
-		// members only (a bookmark, empty binder set, does not get it).
-		if !dryRun {
+		// Identity layer for every record (idempotent): the id in both its
+		// carriers, ★ for members only (a bookmark, empty binder set, does not
+		// get it). kMDItemInformation is the one Spotlight searches and iCloud
+		// strips; the #S copy is the one that travels.
+		if dryRun {
+			if !index.HasDescriptionID(refPath, id) {
+				fmt.Printf("[dry-run] id %s → kMDItemInformation of %s\n", id, filepath.Base(refPath))
+				restoredIDs++
+			}
+		} else {
 			index.SetSyncXattr(refPath, id)
+			if restored, why := index.RestoreDescriptionID(refPath, id); why != "" {
+				failed++
+				fmt.Fprintf(os.Stderr, "Warning: writing the id to kMDItemInformation failed for %s: %s\n", filepath.Base(refPath), why)
+			} else if restored {
+				restoredIDs++
+				fmt.Printf("Restored id %s → kMDItemInformation of %s\n", id, filepath.Base(refPath))
+			}
 			if len(binders) > 0 {
 				index.ManagedMark(refPath)
 			}
@@ -171,6 +186,9 @@ func cmdRefresh(args []string) int {
 	fmt.Printf("  Already ok   : %d\n", noop)
 	if renewed > 0 {
 		fmt.Printf("  Bookmarks renewed (stale): %d\n", renewed)
+	}
+	if restoredIDs > 0 {
+		fmt.Printf("  IDs restored : %d (kMDItemInformation, so Spotlight finds them again)\n", restoredIDs)
 	}
 	if skippedNone > 0 {
 		fmt.Printf("  Skipped (none): %d\n", skippedNone)

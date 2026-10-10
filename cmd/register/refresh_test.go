@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -87,4 +88,41 @@ func TestRefresh(t *testing.T) {
 	os.MkdirAll(filepath.Join(empty, "collections"), 0755)
 	gOut, gErr, gCode := runGoRefresh(t, refreshEnv(t, empty, t.TempDir(), anchor))
 	assertGolden(t, "refresh_empty", cliResult(gOut, gErr, gCode))
+}
+
+// iCloud Drive strips kMDItemInformation and keeps the #S copy; refresh puts
+// the id back where Spotlight searches it, so repair's id lookup finds the
+// file again. Present, it is left alone; other ids on the file stay.
+func TestRefreshRestoresSearchableID(t *testing.T) {
+	anchor := engineBin(t)
+	home, notes := t.TempDir(), t.TempDir()
+	os.MkdirAll(filepath.Join(notes, "collections"), 0755)
+	f := filepath.Join(t.TempDir(), "doc.txt")
+	writeFile(t, f, "x")
+	real, _ := filepath.EvalSymlinks(f)
+	share := filepath.Join(home, ".local", "share")
+	os.MkdirAll(share, 0755)
+	dbJSON, _ := json.Marshal(map[string]string{"800000011": engineSave(t, anchor, real)})
+	writeFile(t, filepath.Join(share, "bookmarks.json"), string(dbJSON))
+	writeFile(t, filepath.Join(notes, "collections", "inbox.jsonl"),
+		`{"type":"ref","id":"800000011","binder":["Docs"],"filename":"doc.txt"}`+"\n")
+	// A copy's id on the file, as cp leaves it: refresh must not take it away.
+	engineExec(t, anchor, `{"op":"set_meta","path":"`+real+`","key":"id","value":"700000099","mode":"add"}`)
+	env := refreshEnv(t, notes, home, anchor)
+
+	out, _, code := runGoRefresh(t, env)
+	if code != 0 || !strings.Contains(out, "IDs restored : 1") {
+		t.Fatalf("first refresh: exit %d\n%s", code, out)
+	}
+	restore := setEnv(t, env)
+	has, other := index.HasDescriptionID(real, "800000011"), index.HasDescriptionID(real, "700000099")
+	restore()
+	if !has || !other {
+		t.Errorf("kMDItemInformation after refresh: own id %v, the other id %v", has, other)
+	}
+
+	out, _, _ = runGoRefresh(t, env)
+	if strings.Contains(out, "IDs restored") {
+		t.Errorf("a present id was written again:\n%s", out)
+	}
 }

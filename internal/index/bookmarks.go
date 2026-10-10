@@ -467,6 +467,42 @@ func setDescriptionXattr(path, id, mode string) string {
 	return ""
 }
 
+// RestoreDescriptionID puts id back into the file's kMDItemInformation ids when
+// it is missing there, and leaves the file alone when it is present (the engine
+// answers noop and writes nothing). iCloud Drive strips kMDItemInformation;
+// without it Spotlight cannot find the file by its id, which is the one lookup
+// in repair that identifies the file rather than a file of the same name. Other
+// ids on the file stay: deciding which ids are its own is add's and repair's.
+// Returns whether it was restored, and why it failed ("" on success).
+func RestoreDescriptionID(path, id string) (bool, string) {
+	resp, err := fileAnchor().request(map[string]any{"op": "set_meta", "path": path, "key": "id", "value": id, "mode": "add"})
+	if err != nil {
+		return false, err.Error()
+	}
+	if ok, _ := resp["ok"].(bool); !ok {
+		why, _ := resp["error"].(string)
+		return false, why
+	}
+	return resp["action"] == "added", ""
+}
+
+// HasDescriptionID reports whether id is among the file's kMDItemInformation
+// ids. Unlike OfFileIDs it does not fall back to the #S copy, which is exactly
+// what is left when iCloud stripped the searchable one.
+func HasDescriptionID(path, id string) bool {
+	resp, err := fileAnchor().request(map[string]any{"op": "get_meta", "path": path, "key": "id"})
+	if err != nil {
+		return false
+	}
+	values, _ := resp["values"].([]any)
+	for _, v := range values {
+		if strings.TrimSpace(AsString(v)) == id {
+			return true
+		}
+	}
+	return false
+}
+
 // SetSyncXattr writes id to the syncable cross-device alias (com.fileregister.id#S),
 // single-valued. Returns true if the value changed, false if already current or on
 // failure.

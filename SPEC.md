@@ -189,7 +189,7 @@ When `register refresh` (or `register add` at write time) runs, the referenced f
 
 | xattr / metadata field | Content | Set by |
 |---|---|---|
-| `com.apple.metadata:kMDItemInformation` | Bookmark `id` (multiple IDs space-separated, stored as a binary-plist string — Spotlight indexes nothing else once there are two) | The `Bookmarks` module, via the **fileanchor** engine |
+| `com.apple.metadata:kMDItemInformation` | Bookmark `id` (multiple IDs space-separated, stored as a binary-plist string — Spotlight indexes nothing else once there are two) | The `Bookmarks` module on `add`/`repair`, via the **fileanchor** engine; `refresh` restores a missing id |
 | `com.fileregister.id#S` | Bookmark `id` (single value) — the cross-device file→record key | The `Bookmarks` module on `add`/`repair`; `refresh` backfills |
 | `com.apple.metadata:_kMDItemUserTags` == ★ | The managed marker (U+2605) — one status tag fileregister owns | `add` (any backend); removed by `remove` on last membership; `refresh` backfills |
 | `com.apple.metadata:kMDItemProjects` | Binder names — a real array (Spotlight matches per element; names may contain spaces) | default backend (`itemprojects`) |
@@ -347,12 +347,13 @@ Pushes index state to macOS metadata. Reads all active `type: ref` records from 
 
 Exit status is 1 when a metadata write failed, a bookmark is broken or a file is missing — anything that needs the user.
 
-Direction is always index → xattr. Records are the source; xattr is the cache. The bookmark blob and `kMDItemInformation` are maintained by `register add` and `register repair`; refresh does not touch them — but it does backfill the regenerable id xattr (`com.fileregister.id#S`) on each resolved file, since that value derives entirely from the record's `id`.
+Direction is always index → xattr. Records are the source; xattr is the cache. The bookmark blob is maintained by `register add` and `register repair`; refresh does not touch it. The id it puts back on each resolved file, in both carriers, since both derive entirely from the record's `id`: `com.fileregister.id#S` (the copy that travels), and `kMDItemInformation` (the one Spotlight searches) when the id is missing there — iCloud Drive strips it, and without it `repair` cannot find the file by its id. The id is added, never set: other ids on the file stay, which ids are its own is `add`'s and `repair`'s to decide. Present, it is not written again (the engine answers noop).
 
 Reports:
 - Records whose bookmark does not resolve (candidates for `register repair`)
 - Records whose referenced file no longer exists (dangling — for `register audit` review)
 - Count of `none`-backend records (skipped intentionally)
+- Count of ids restored to `kMDItemInformation`, when any (`--dry-run` lists them)
 
 Idempotent. Safe to run repeatedly.
 
