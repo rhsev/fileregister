@@ -180,8 +180,14 @@ func XattrBackendIncludes(path, binder, backend string) bool {
 	default:
 		members = itemProjectsMembers(path)
 	}
+	// SameBinder, not ==: the engine stores every value NFC (fileanchor
+	// Values.swift), so a binder the index still holds decomposed would never
+	// match its own xattr. That made `audit` report a present kMDItemProjects
+	// as MISSING XATTR and send the user to `register refresh`, which asks the
+	// engine, gets "noop" because the name is already there, and reports
+	// "Already ok" — a warning no run could clear.
 	for _, m := range members {
-		if m == binder {
+		if SameBinder(m, binder) {
 			return true
 		}
 	}

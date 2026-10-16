@@ -99,7 +99,7 @@ func JSONLRemoveBinderMany(path string, ids map[string]bool, binder string) (int
 		found := false
 		newBinder := []any{}
 		for _, b := range arr {
-			if b == binder {
+			if SameBinder(b, binder) {
 				found = true
 				continue
 			}
@@ -124,7 +124,7 @@ func JSONLRenameBinder(path, oldName, newName string) (int, error) {
 		arr := AsStrings(rec["binder"])
 		has := false
 		for _, b := range arr {
-			if b == oldName {
+			if SameBinder(b, oldName) {
 				has = true
 				break
 			}
@@ -136,11 +136,13 @@ func JSONLRenameBinder(path, oldName, newName string) (int, error) {
 		nb := []any{}
 		for _, b := range arr {
 			v := b
-			if b == oldName {
+			if SameBinder(b, oldName) {
 				v = newName
 			}
-			if !seen[v] {
-				seen[v] = true
+			// Keyed NFC, so renaming onto a name the record already holds in
+			// the other form collapses the pair instead of keeping both.
+			if k := NFC(v); !seen[k] {
+				seen[k] = true
 				nb = append(nb, v)
 			}
 		}

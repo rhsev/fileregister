@@ -80,10 +80,16 @@ func (r RefRecord) IndexRecord() map[string]any {
 // NormalizeBinders mirrors Array(v).map(&:to_s).reject(&:empty?).uniq as []any.
 // Always returns a non-nil slice — nil would serialize as JSON null, and the
 // schema promises `binder` is always an array.
+// Names come out NFC, which is the form the index is written in (normalize.go)
+// and the form the engine stores a binder's xattr in. That makes this the one
+// place a binder set is canonicalized: every writer that merges or re-emits a
+// set goes through here, so a name that arrived decomposed is not kept as a
+// second member beside its own precomposed spelling.
 func NormalizeBinders(v any) []any {
 	seen := map[string]bool{}
 	out := []any{}
 	for _, s := range AsStrings(v) {
+		s = CanonLabel(s)
 		if s == "" || seen[s] {
 			continue
 		}
@@ -93,9 +99,11 @@ func NormalizeBinders(v any) []any {
 	return out
 }
 
-func containsAnyStr(arr []any, s string) bool {
+// containsBinder reports whether the binder set already holds this binder,
+// comparing through SameBinder.
+func containsBinder(arr []any, s string) bool {
 	for _, e := range arr {
-		if AsString(e) == s {
+		if SameBinder(AsString(e), s) {
 			return true
 		}
 	}
@@ -162,11 +170,14 @@ func JSONLWriteMany(records []RefRecord, targetPath string) ([]string, error) {
 		if at, ok := byID[id]; ok {
 			existing := lines[at].rec
 			binders := NormalizeBinders(existing["binder"])
-			if b == "" || containsAnyStr(binders, b) {
+			// SameBinder, not a raw set lookup: adding a file to a binder it is
+			// already in, with the name given in the other Unicode form, used
+			// to report "appended" and leave the record in one binder twice.
+			if b == "" || containsBinder(binders, b) {
 				actions[i] = "noop"
 				continue
 			}
-			existing["binder"] = append(binders, b)
+			existing["binder"] = append(binders, CanonLabel(b))
 			backfillIndexFields(existing, record)
 			lines[at].dirty = true
 			dirty = true

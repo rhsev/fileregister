@@ -66,8 +66,14 @@ func detectURLKind(url string) string {
 // slugs must agree.
 var binderSanitizeRe = regexp.MustCompile("[/\\\\\x00-\x1f\x7f]")
 
+// sanitizeBinderName turns a binder name into the file-name part of its note
+// (collections/binder_<name>.md). NFC first: that note is created inside the
+// notes directory, which is a synced vault, and iOS does not reconstruct a
+// decomposed path — a note written under a decomposed name is simply invisible
+// on the iPhone and iPad. A binder name arrives decomposed whenever it was
+// pasted from the Finder or picked from a list this index had stored that way.
 func sanitizeBinderName(binder string) string {
-	return binderSanitizeRe.ReplaceAllString(strings.TrimSpace(binder), "-")
+	return binderSanitizeRe.ReplaceAllString(index.CanonLabel(strings.TrimSpace(binder)), "-")
 }
 
 type addOptions struct {
@@ -91,7 +97,7 @@ func parseAddArgs(args []string) (opts addOptions, files []string, help, version
 	opts.url = vals["--url"]
 	opts.label = vals["--label"]
 	opts.kind, opts.hasKind = vals["--kind"]
-	opts.aka = vals["--aka"]
+	opts.aka = index.CanonLabel(vals["--aka"])
 	opts.target = vals["--target"]
 	opts.xattr, opts.hasXattr = vals["--xattr"]
 	opts.md = bools["--md"]
@@ -116,6 +122,9 @@ func cmdAdd(args []string) int {
 		opts.binder = os.Getenv("REGISTER_BINDER")
 		opts.hasBinder = opts.binder != ""
 	}
+	// Canonicalized once, here, so the index record, the Markdown block, the
+	// note's own file name and the xattr all carry the same form.
+	opts.binder = index.CanonLabel(opts.binder)
 	binderSet := opts.binder != ""
 	if binderSet {
 		if p := index.BinderNameProblem(opts.binder); p != "" {
@@ -505,7 +514,7 @@ func buildRefRecord(filePath, id string, opts addOptions, backend string) map[st
 		"type":     "ref",
 		"id":       id,
 		"binder":   opts.binder,
-		"filename": filepath.Base(filePath),
+		"filename": index.CanonLabel(filepath.Base(filePath)),
 	}
 	if kind != "" {
 		rec["kind"] = kind
@@ -612,7 +621,7 @@ func addURLRecord(opts addOptions, binderSet bool) int {
 	}
 	rec := map[string]any{"type": "ref", "id": id, "binder": opts.binder, "url": url}
 	if opts.label != "" {
-		rec["filename"] = opts.label
+		rec["filename"] = index.CanonLabel(opts.label)
 	}
 	if kind != "" {
 		rec["kind"] = kind

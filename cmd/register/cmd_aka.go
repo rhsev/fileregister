@@ -40,7 +40,12 @@ func cmdAka(args []string) int {
 		fmt.Println("register aka " + registerVersion)
 		return 0
 	}
+	// A handle being introduced is stored canonical; one being removed or
+	// looked up is matched in either form through akaStored.
 	adds, removes := uniqStrings(vals["--add"], false), uniqStrings(vals["--remove"], false)
+	for i, h := range adds {
+		adds[i] = index.CanonLabel(h)
+	}
 	if len(pos) != 1 || (len(adds) == 0 && len(removes) == 0) {
 		fmt.Fprintln(os.Stderr, akaUsage)
 		return 1
@@ -85,8 +90,8 @@ func cmdAka(args []string) int {
 	// Plan: sort each handle into apply / noop, refusing index clashes.
 	var toAdd, toRemove []string
 	for _, h := range adds {
-		if containsStr(current, h) {
-			fmt.Printf("aka '%s' already on %s\n", h, label)
+		if s := akaStored(current, h); s != "" {
+			fmt.Printf("aka '%s' already on %s\n", s, label)
 			continue
 		}
 		if clash := index.ResolveKey(refs, h); clash != nil {
@@ -101,11 +106,13 @@ func cmdAka(args []string) int {
 		toAdd = append(toAdd, h)
 	}
 	for _, h := range removes {
-		if !containsStr(current, h) {
+		// The stored spelling, so the comparisons further down stay exact.
+		s := akaStored(current, h)
+		if s == "" {
 			fmt.Printf("aka '%s' not on %s — nothing to remove\n", h, label)
 			continue
 		}
-		toRemove = append(toRemove, h)
+		toRemove = append(toRemove, s)
 	}
 	if len(toAdd) == 0 && len(toRemove) == 0 {
 		return 0
@@ -334,4 +341,15 @@ func warnAkaNotApplied(nd, handle, id string) {
 	}
 	fmt.Fprintf(os.Stderr, "  Note: record %s already existed — --aka '%s' not applied; use: register aka %s --add %s\n",
 		id, handle, id, handle)
+}
+
+// akaStored returns the handle as the record stores it, matching h in either
+// Unicode form, or "" when the record does not carry it.
+func akaStored(current []string, h string) string {
+	for _, a := range current {
+		if index.SameLabel(a, h) {
+			return a
+		}
+	}
+	return ""
 }

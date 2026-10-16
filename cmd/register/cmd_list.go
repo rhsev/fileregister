@@ -154,11 +154,15 @@ func listAllFiltered(notesDir, filter string, jsonOnly bool) error {
 		return nil
 	}
 
-	// Group by binder — count each membership in a record's set.
+	// Group by binder — count each membership in a record's set. Keyed NFC, or
+	// a binder whose records were added partly from the keyboard and partly
+	// from a Finder path stands in the list twice under one visible name, each
+	// line counting only its own half. The key doubles as the name printed,
+	// which is also the name the Finder Quick Action offers back from here.
 	byBinder := make(map[string]int)
 	for _, r := range active {
 		for _, b := range r.Binders {
-			byBinder[b]++
+			byBinder[index.NFC(b)]++
 		}
 	}
 
@@ -209,7 +213,7 @@ func listBinder(notesDir, binder string, pathsOnly, jsonOnly, print0 bool) error
 	var records []map[string]any
 	for _, r := range all {
 		for _, b := range index.AsStrings(r["binder"]) {
-			if b == binder {
+			if index.SameBinder(b, binder) {
 				records = append(records, r)
 				break
 			}

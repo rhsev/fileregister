@@ -21,11 +21,13 @@ const MaxBinderBytes = 255
 // once both are NFC, case kept. A name typed by hand or pasted from the Finder
 // can stand in a note decomposed (NFD); it looks the same and is the same
 // binder, and grubber's filters already find it so. Every comparison of a
-// block's binder with a binder name goes through here, the readers' and the
-// writers' alike, or a reader would find a block the writer then misses.
-func SameBinder(a, b string) bool {
-	return a == b || norm.NFC.String(a) == norm.NFC.String(b)
-}
+// binder name goes through here — the Markdown layer's and the index layer's
+// alike, readers' and writers' — or one of them finds a binder the other
+// misses, and the same binder shows up twice in `register list`.
+//
+// SameLabel (normalize.go) is the same rule; this name stays because the
+// binder is what the callers talk about.
+func SameBinder(a, b string) bool { return SameLabel(a, b) }
 
 // BinderNameProblem says why name cannot be a new binder, or "" if it can.
 // Only names being introduced are checked (add, rename's new name, write,

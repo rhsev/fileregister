@@ -140,7 +140,7 @@ func cmdMarshal(args []string) int {
 	var records []map[string]any
 	for _, r := range all {
 		for _, b := range index.AsStrings(r["binder"]) {
-			if b == binder {
+			if index.SameBinder(b, binder) {
 				records = append(records, r)
 				break
 			}

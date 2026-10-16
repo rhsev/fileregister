@@ -250,7 +250,7 @@ func recordsForBinder(all []map[string]any, binder string) []map[string]any {
 	var out []map[string]any
 	for _, r := range all {
 		for _, b := range index.AsStrings(r["binder"]) {
-			if b == binder {
+			if index.SameBinder(b, binder) {
 				out = append(out, r)
 				break
 			}

@@ -67,7 +67,9 @@ func cmdRename(args []string) int {
 		fmt.Fprintln(os.Stderr, "Usage: register rename <old-name> <new-name>")
 		return 1
 	}
-	oldName, newName := pos[0], pos[1]
+	// The new name is being introduced, so it is stored canonical. The old one
+	// is only looked up, and SameBinder finds it in either form.
+	oldName, newName := pos[0], index.CanonLabel(pos[1])
 
 	nd, err := notesDir()
 	if err != nil {
@@ -103,8 +105,12 @@ func cmdRename(args []string) int {
 	}
 
 	// Renaming onto an existing binder merges two sets — irreversible, so it
-	// has to be asked for explicitly.
-	if existing := recordsForBinder(refs, newName); len(existing) > 0 && !merge {
+	// has to be asked for explicitly. Renaming a decomposed name onto its own
+	// precomposed spelling is not that: it is the same binder either way
+	// (SameBinder), and the records the lookup finds are the ones being
+	// renamed, so asking to merge them with themselves would leave the
+	// canonicalization audit asks for impossible to carry out.
+	if existing := recordsForBinder(refs, newName); len(existing) > 0 && !merge && !index.SameBinder(oldName, newName) {
 		fmt.Fprintf(os.Stderr, "Error: binder '%s' already exists (%d record(s)) — renaming would merge the two sets.\n", newName, len(existing))
 		fmt.Fprintln(os.Stderr, "Rerun with --merge to do that on purpose.")
 		return 1

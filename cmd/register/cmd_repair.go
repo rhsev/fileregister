@@ -167,10 +167,10 @@ func setIndexFilename(jsonlPath, id, name string) error {
 		return nil
 	}
 	_, err := index.JSONLRewrite(jsonlPath, func(rec map[string]any) (map[string]any, bool) {
-		if index.AsString(rec["id"]) != id || index.AsString(rec["filename"]) == name {
+		if index.AsString(rec["id"]) != id || index.SameName(index.AsString(rec["filename"]), name) {
 			return rec, false
 		}
-		rec["filename"] = name
+		rec["filename"] = index.CanonLabel(name)
 		return rec, true
 	})
 	return err
@@ -331,7 +331,11 @@ func cmdRepair(args []string) int {
 
 		if rid, failed := repairRecord(rec, newPath); rid != "" {
 			fmt.Printf("  Repaired: re-bound id %s (unchanged)\n", id)
-			if old, nw := index.AsString(rec["filename"]), filepath.Base(newPath); old != "" && old != nw {
+			// SameName, not !=: a file the Finder or Apple Mail created carries
+			// its name decomposed, the index holds it precomposed, and a raw
+			// comparison calls that a rename. It would rewrite the index to the
+			// decomposed form and report two names that read identically.
+			if old, nw := index.AsString(rec["filename"]), filepath.Base(newPath); old != "" && !index.SameName(old, nw) {
 				if err := setIndexFilename(index.AsString(rec["_note_file"]), id, nw); err != nil {
 					fmt.Fprintf(os.Stderr, "  Warning: could not update the file name in the index: %v\n", err)
 				} else {

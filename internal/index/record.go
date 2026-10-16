@@ -242,15 +242,20 @@ func AkaList(rec map[string]any) []string {
 	return AsStrings(rec["aka"])
 }
 
-// ResolveKey finds the index record whose id or one of whose aka handles equals
-// key (exact match; aka are unique across the index). Returns nil if none.
+// ResolveKey finds the index record whose id or one of whose aka handles is
+// key (aka are unique across the index). Returns nil if none.
+//
+// An aka matches through SameLabel, not ==: a handle with a diacritic is typed
+// on the keyboard (NFC) in one place and pasted out of a file name (NFD) in
+// another, and a composable `open "$(register resolve …)"` that fails on the
+// form is a dead end with nothing to see.
 func ResolveKey(recs []map[string]any, key string) map[string]any {
 	for _, r := range recs {
 		if AsString(r["id"]) == key {
 			return r
 		}
 		for _, a := range AkaList(r) {
-			if a == key {
+			if SameLabel(a, key) {
 				return r
 			}
 		}
