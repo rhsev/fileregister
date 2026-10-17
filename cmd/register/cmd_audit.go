@@ -152,12 +152,15 @@ func cmdAudit(args []string) int {
 	var inTrash []missingFileT
 	shared := sharedPaths(checked, resolved)
 	var missingXattr []missingXattrT
-	// Index entries not in canonical form (normalize.go). Harmless to read —
-	// every comparison folds — but a binder stored decomposed is the form
-	// `register list` prints and the Finder Quick Action then offers back, so
-	// it keeps seeding new decomposed records and note file names.
+	// Binders the index holds decomposed (normalize.go). Harmless to read —
+	// every comparison folds — but a decomposed binder is the form `register
+	// list` prints and the Finder Quick Action then offers back, so it keeps
+	// seeding new decomposed records and note file names, and `rename` clears
+	// it. A decomposed `filename` is left out on purpose: it is only a label,
+	// no command rewrites it on request, and a finding nobody can clear would
+	// fail every audit for good.
 	type notCanonicalT struct {
-		field, value, label, noteFile string
+		binder, label, noteFile string
 	}
 	var notCanonical []notCanonicalT
 	okCount := 0
@@ -172,12 +175,9 @@ func cmdAudit(args []string) int {
 		backend := index.XattrBackend(rec)
 		label := refLabel(rec)
 
-		if fn := index.AsString(rec["filename"]); fn != "" && fn != index.NFC(fn) {
-			notCanonical = append(notCanonical, notCanonicalT{"filename", fn, label, noteFile})
-		}
 		for _, b := range binders {
 			if b != index.NFC(b) {
-				notCanonical = append(notCanonical, notCanonicalT{"binder", b, label, noteFile})
+				notCanonical = append(notCanonical, notCanonicalT{b, label, noteFile})
 			}
 		}
 
@@ -298,17 +298,13 @@ func cmdAudit(args []string) int {
 		}
 		if len(notCanonical) > 0 {
 			fmt.Println("")
-			fmt.Printf("NOT CANONICAL (%d) — index entry is decomposed, not NFC\n", len(notCanonical))
+			fmt.Printf("NOT CANONICAL (%d) — binder stored decomposed, not NFC\n", len(notCanonical))
 			fmt.Println("  (both spellings read alike on screen; they differ in bytes)")
 			for _, nc := range notCanonical {
-				fmt.Printf("  %s: %s (%s)\n", nc.field, nc.value, nc.label)
+				fmt.Printf("  binder: %s (%s)\n", nc.binder, nc.label)
 				fmt.Printf("    in: %s\n", nc.noteFile)
-				if nc.field == "binder" {
-					fmt.Printf("    → run: register rename '%s' '%s'\n", nc.value, index.NFC(nc.value))
-					fmt.Println("      (the second name is the precomposed one, which is what gets stored)")
-				} else {
-					fmt.Println("    → cosmetic: the label prints decomposed; lookups fold either form")
-				}
+				fmt.Printf("    → run: register rename '%s' '%s'\n", nc.binder, index.NFC(nc.binder))
+				fmt.Println("      (the second name is the precomposed one, which is what gets stored)")
 			}
 		}
 		if len(missingIdentity) > 0 {

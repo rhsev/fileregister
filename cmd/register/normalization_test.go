@@ -324,3 +324,102 @@ func TestBinderNoteFilenameIsNFC(t *testing.T) {
 		t.Fatal("no binder note was written, so this test cannot fire")
 	}
 }
+
+// rewriteIndex applies fn to every record in the index and writes it back, to
+// put a record into the state an earlier version's write left behind.
+func rewriteIndex(t *testing.T, notes string, fn func(rec map[string]any)) {
+	t.Helper()
+	p := filepath.Join(notes, "collections", "inbox.jsonl")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			t.Fatal(err)
+		}
+		fn(rec)
+		b, err := json.Marshal(rec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, string(b))
+	}
+	if err := os.WriteFile(p, []byte(strings.Join(out, "\n")+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A filename stored decomposed by an earlier version is only a label: every
+// comparison folds, and no command rewrites it on request. audit leaves it out,
+// or it would fail on every run for something nobody can clear.
+func TestAuditPassesADecomposedFilename(t *testing.T) {
+	anchor := engineBin(t)
+	notes := seedNotes(t)
+	files := t.TempDir()
+	env := addEnv(t, notes, anchor)
+
+	p := filepath.Join(files, "Käse.md")
+	if err := os.WriteFile(p, []byte("# x\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, se, code := runGoAdd(t, env, p, "--binder", "AudNfcPlain"); code != 0 {
+		t.Fatalf("add failed (%d): %s", code, se)
+	}
+	if _, _, code := runGoAudit(t, env); code != 0 {
+		t.Fatalf("a fresh index already fails audit (%d), so this test cannot tell anything", code)
+	}
+
+	rewriteIndex(t, notes, func(rec map[string]any) {
+		rec["filename"] = unorm.NFD.String("Käse.md")
+	})
+	if got := indexFilenames(t, notes); len(got) != 1 || got[0] == unorm.NFC.String(got[0]) {
+		t.Fatalf("fixture filename is %q, want it decomposed, so this test cannot fire", got)
+	}
+
+	so, se, code := runGoAudit(t, env)
+	if code != 0 {
+		t.Errorf("audit exit %d for a decomposed filename, want 0:\n%s%s", code, so, se)
+	}
+	if strings.Contains(so, "NOT CANONICAL") {
+		t.Errorf("audit reports a decomposed filename:\n%s", so)
+	}
+}
+
+// A binder stored decomposed is what `register list` prints and the Quick
+// Action offers back, so audit reports it, fails, and names the rename that
+// clears it.
+func TestAuditFlagsADecomposedBinder(t *testing.T) {
+	anchor := engineBin(t)
+	notes := seedNotes(t)
+	files := t.TempDir()
+	env := addEnv(t, notes, anchor)
+
+	nfc := "AudNfcÜbung"
+	nfd := unorm.NFD.String(nfc)
+	p := filepath.Join(files, "a.md")
+	if err := os.WriteFile(p, []byte("# x\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, se, code := runGoAdd(t, env, p, "--binder", nfc); code != 0 {
+		t.Fatalf("add failed (%d): %s", code, se)
+	}
+	rewriteIndex(t, notes, func(rec map[string]any) {
+		rec["binder"] = []any{nfd}
+	})
+	if got := indexBinders(t, notes, "a.md"); len(got) != 1 || got[0] != nfd {
+		t.Fatalf("fixture binder is %q, want it decomposed, so this test cannot fire", got)
+	}
+
+	so, _, code := runGoAudit(t, env)
+	if code != 1 {
+		t.Errorf("audit exit %d for a decomposed binder, want 1", code)
+	}
+	for _, want := range []string{"NOT CANONICAL (1)", "register rename"} {
+		if !strings.Contains(so, want) {
+			t.Errorf("audit output lacks %q:\n%s", want, so)
+		}
+	}
+}
