@@ -42,11 +42,14 @@ fileanchor:
 # Fetch grubber's published release binary for this machine, not a source
 # build. grubber needs Go 1.27 to build while this repo pins an older one, and a
 # download keeps the two toolchains apart.
-GRUBBER_ARCH = $(subst x86_64,amd64,$(shell uname -m))
+# The release names its assets grubber-<macos|linux>-<amd64|arm64>, while uname
+# says Darwin or Linux and x86_64, arm64 or aarch64.
+GRUBBER_OS   = $(subst darwin,macos,$(shell uname -s | tr A-Z a-z))
+GRUBBER_ARCH = $(subst aarch64,arm64,$(subst x86_64,amd64,$(shell uname -m)))
 grubber:
 	@mkdir -p $(BUILD_DIR)
 	@curl -fsSL -o $(BUILD_DIR)/grubber \
-		https://github.com/rhsev/grubber/releases/download/$(GRUBBER_VERSION)/grubber-macos-$(GRUBBER_ARCH)
+		https://github.com/rhsev/grubber/releases/download/$(GRUBBER_VERSION)/grubber-$(GRUBBER_OS)-$(GRUBBER_ARCH)
 	@chmod 755 $(BUILD_DIR)/grubber
 	@echo "→ $(BUILD_DIR)/grubber ($$($(BUILD_DIR)/grubber --version))"
 
