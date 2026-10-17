@@ -167,6 +167,62 @@ replaces files, `refresh` puts the attributes back.
   synced xattrs *and syncs the bare version back*, poisoning the file everywhere.
   Each clean run needs a **fresh filename**.
 
+## Programs that replace the file on save
+
+A register bookmark follows the file's inode. Some programs write into the
+existing file when they save. Others write a new file and rename it over the
+old one, so the file keeps its path but gets a new inode. Verified 2026-10-15
+on macOS 15.8 with `register` 2.1.0, in a sandbox on a Spotlight-indexed
+volume. nv was reproduced without its GUI (temp file, `copyfile` with
+`COPYFILE_METADATA`, `renamex_np` with `RENAME_SWAP`). The NSDocument row is
+a headless `writeSafely` call, the save path TextEdit uses. TextEdit, BBEdit
+and Obsidian themselves were not tested. The vim and `perl -i` rows were
+measured on 2026-10-16 with [savecheck](../savecheck), which marks a file,
+waits while an app saves it and reports what happened to inode and xattrs.
+
+| Program | inode on save | xattrs on save |
+|---|---|---|
+| shell `>` and `>>` | kept | kept |
+| Apple's vim 9.1 (`/usr/bin/vim`, also with `-u NONE`) | kept | lost |
+| nv 2.5, NSDocument save | new | copied |
+| `sed -i`, `perl -i`, OpenCloud (edit on another Mac) | new | lost |
+
+**Writes into the existing file.** Inode and xattrs stay, and the bookmark
+resolves as before. A rename in Finder or with `mv` also keeps the inode. The
+bookmark then follows the file and is marked `stale`, which `register
+refresh` renews.
+
+**Writes into the existing file and drops the xattrs.** Apple's vim keeps the
+inode but removes every extended attribute when it writes. The bookmark
+resolves as before and follows a rename, but the file has no id afterwards,
+so Spotlight cannot find it by its id. `register refresh` writes the id back.
+
+**Replaces the file and copies the xattrs.** After a save the bookmark still
+resolves through its stored path, but macOS marks it `stale`. `audit` reports
+nothing. `register refresh` renews the bookmark. nv also renames a note by
+writing a new file. After that the bookmark no longer resolves. `audit`
+reports BROKEN and `resolve` exits with 1. The new file still carries the id
+in `kMDItemInformation`, so `register repair` finds it through Spotlight,
+binds it again under the same id and updates the file name in the index. This
+works whether or not `refresh` ran in between. Spotlight needs a few seconds
+for the new file. A `repair` run right after the rename finds nothing, and
+`audit` then calls the bookmark DEAD. A second run a few seconds later
+succeeds. Outside a Spotlight index, for example under `/private/tmp`,
+`repair` does not find the file at all.
+
+**Replaces the file and loses the xattrs.** After a save the bookmark is
+`stale` and resolves through its path, but the file has no id. `audit`
+reports MISSING ID. `register refresh` renews the bookmark and writes the id
+back, for members also ★ and the binder layer (see OpenCloud above). If the
+file is renamed before `refresh`, nothing on the file points to its record.
+`repair` then searches by the old file name, finds nothing and leaves the
+record unresolved. `register repair --interactive` accepts the new path.
+
+After editing registered files with a program that replaces the file or drops
+the xattrs, run `register refresh`. After a rename by a program that replaces
+the file, run `register repair`, or `repair --interactive` if it also dropped
+the xattrs.
+
 ## Tag value encoding
 
 - Finder Tags are a **binary plist ARRAY of strings**, not a plain-string
