@@ -37,9 +37,9 @@ tags) is a cache derived from the index, and `register refresh` rebuilds it
 whenever it drifts or a copy strips it.
 
 Most of the OS-specific work lives behind the
-[fileanchor](https://github.com/rhsev/fileanchor) engine, today built for macOS.
-A Linux port needs a Linux fileanchor, plus replacements for a few direct calls
-in register (`mdls`, `mdutil` and bsdtar's `--no-mac-metadata`).
+[fileanchor](https://github.com/rhsev/fileanchor) engine. It is released for
+macOS, and a Linux version is in preparation. register itself builds for Linux
+and passes its tests there, but it needs that engine to do anything useful.
 
 ## A first session
 
@@ -208,7 +208,7 @@ Go binary, and every subcommand is native.
 
 ### Companion releases
 
-`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads the Markdown layer. Without it, register manages only the index. The core commands (`add`, `list`, `resolve`, `audit`, `repair`, `refresh`, `remove`) run without it. The commands that read notes need it: `album`, `order`, `annotate`, `aka`, `rename`, `forget`, `marshal`, `reindex`, `cleanup` and `list --inbox`/`--curated`, because register has no Markdown reader of its own. This release is tested against **fileanchor 1.3.0** and **grubber v0.19.0**. `make fileanchor` builds the engine at its tag, `make grubber` downloads the grubber release binary into `.build/`, and `make install` puts both next to register.
+`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads the Markdown layer. Without it, register manages only the index. The core commands (`add`, `list`, `resolve`, `audit`, `repair`, `refresh`, `remove`) run without it. The commands that read notes need it: `album`, `order`, `annotate`, `aka`, `rename`, `forget`, `marshal`, `reindex`, `cleanup` and `list --inbox`/`--curated`, because register has no Markdown reader of its own. This release is tested against **fileanchor 1.4.0** and **grubber v0.19.0**. `make fileanchor` builds the engine at its tag, `make grubber` downloads the grubber release binary into `.build/`, and `make install` puts both next to register.
 
 ### Configuration
 
