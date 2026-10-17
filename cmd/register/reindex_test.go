@@ -62,6 +62,7 @@ func reindexEnv(t *testing.T, notes string) []string {
 }
 
 func TestReindex(t *testing.T) {
+	needGrubber(t)
 	// dry-run: lists the 2 missing records, writes nothing.
 	dN := seedReindexFixture(t)
 	dOut, dErr, dCode := runGoReindex(t, reindexEnv(t, dN), "--dry-run")

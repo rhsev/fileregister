@@ -119,6 +119,7 @@ func assertAkaWith(t *testing.T, label, extra string, args ...string) {
 }
 
 func TestAkaAdd(t *testing.T) {
+	needGrubber(t)
 	assertAka(t, "add", "22", "--add", "be", "--add", "beta")
 	// Resolution over an existing handle.
 	assertAka(t, "add-via-aka", "al", "--add", "a1")
@@ -127,6 +128,7 @@ func TestAkaAdd(t *testing.T) {
 }
 
 func TestAkaRemove(t *testing.T) {
+	needGrubber(t)
 	// Stripped from the index and from both block styles; other lines stay.
 	assertAka(t, "remove", "11", "--remove", "alpha")
 	// Last handles gone: the key disappears everywhere.
@@ -140,6 +142,7 @@ func TestAkaRemove(t *testing.T) {
 // Blocks that reach the record only through the removed handle are cleaned
 // up: they get the real id instead of losing their record.
 func TestAkaRemoveCleansBlocks(t *testing.T) {
+	needGrubber(t)
 	// aka in the id: slot → id: replaced.
 	assertAka(t, "remove-id-slot", "33", "--remove", "ha")
 	// aka-only block → id: inserted after type:, handle leaves the list.
@@ -151,6 +154,7 @@ func TestAkaRemoveCleansBlocks(t *testing.T) {
 }
 
 func TestAkaRefusals(t *testing.T) {
+	needGrubber(t)
 	assertAka(t, "add-clash", "22", "--add", "al")
 	assertAka(t, "add-own-id", "22", "--add", "22")
 	// A hand-written block would be silently adopted.

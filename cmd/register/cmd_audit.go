@@ -203,10 +203,10 @@ func cmdAudit(args []string) int {
 		// (repair's first lookup), the copy that travels, ★ on members.
 		var lacks []string
 		if !index.HasDescriptionID(refPath, id) {
-			lacks = append(lacks, "kMDItemInformation")
+			lacks = append(lacks, idLayerName)
 		}
 		if index.SyncID(refPath) != id {
-			lacks = append(lacks, "com.fileregister.id#S")
+			lacks = append(lacks, syncLayerName)
 		}
 		if len(binders) > 0 && !index.ManagedMarked(refPath) {
 			lacks = append(lacks, "★")
@@ -226,10 +226,7 @@ func cmdAudit(args []string) int {
 		for _, binder := range binders {
 			if !index.XattrBackendIncludes(refPath, binder, backend) {
 				allPresent = false
-				layer := "kMDItemProjects"
-				if backend == "tags" {
-					layer = "kMDItemUserTags"
-				}
+				layer := layerName(backend)
 				missingXattr = append(missingXattr, missingXattrT{binder, noteFile, refPath, label, backend, layer})
 			}
 		}
@@ -342,7 +339,7 @@ func cmdAudit(args []string) int {
 	}
 
 	fmt.Println("")
-	fmt.Printf("=== Direction 2: File → Record (%d binder(s) via mdfind) ===\n", len(binderNames))
+	fmt.Printf("=== Direction 2: File → Record (%d binder(s) via %s) ===\n", len(binderNames), direction2Source)
 	fmt.Println("")
 
 	recordIndex := map[string]bool{}
@@ -434,7 +431,7 @@ func auditBookmarkDirection(db map[string]string, records []map[string]any) bool
 			fmt.Println("Unreachable ones were not judged: this fileanchor does not report a failed resolve's")
 			fmt.Println("recorded path, so a gone file cannot be told from an absent volume. Update to 1.2.0.")
 		} else {
-			fmt.Println("Unreachable ones were not judged — mount the volume and run again.")
+			fmt.Println(auditUnjudged)
 		}
 	}
 	return tally[bmOrphan]+tally[bmBroken]+tally[bmDead]+tally[bmMalformed] > 0

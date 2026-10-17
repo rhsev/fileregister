@@ -37,6 +37,7 @@ func TestDeleteBlockIsExact(t *testing.T) {
 
 // A block that names no binder claims no membership, so it is never stale.
 func TestCleanupDoesNotCallABinderlessBlockStale(t *testing.T) {
+	needGrubber(t)
 	dir := t.TempDir()
 	col := filepath.Join(dir, "collections")
 	os.MkdirAll(col, 0755)

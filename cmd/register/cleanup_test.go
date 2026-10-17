@@ -64,6 +64,7 @@ func cleanupEnv(t *testing.T, notes string) []string {
 }
 
 func TestCleanup(t *testing.T) {
+	needGrubber(t)
 	cases := map[string][]string{
 		"report":  {},
 		"dry-run": {"--interactive", "--dry-run"},

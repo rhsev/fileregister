@@ -124,6 +124,7 @@ func assertAnnotate(t *testing.T, label, stdin string, checkMd bool, args ...str
 }
 
 func TestAnnotateFields(t *testing.T) {
+	needGrubber(t)
 	// New key appended; number stays plain, text gets promote's quoting rules.
 	assertAnnotate(t, "set-new", "", true, "Anno", "11", "--set", "due=2026-08-01", "--set", "note=needs review")
 	// Existing scalar replaced in place; leading-zero numeral stays a string.
@@ -139,6 +140,7 @@ func TestAnnotateFields(t *testing.T) {
 }
 
 func TestAnnotateProse(t *testing.T) {
+	needGrubber(t)
 	// Replace: old prose (before AND after the block) goes, blocks stay verbatim.
 	assertAnnotate(t, "prose-replace", "", true, "Anno", "11", "--prose", "New prose.\nSecond line.")
 	assertAnnotate(t, "prose-clear", "", true, "Anno", "11", "--prose", "")
@@ -148,6 +150,7 @@ func TestAnnotateProse(t *testing.T) {
 }
 
 func TestAnnotateRefusals(t *testing.T) {
+	needGrubber(t)
 	for _, k := range []string{"id", "type", "binder", "aka", "sort"} {
 		assertAnnotate(t, "reserved-"+k, "", false, "Anno", "11", "--set", k+"=x")
 	}

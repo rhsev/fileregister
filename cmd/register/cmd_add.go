@@ -415,10 +415,7 @@ func cmdAdd(args []string) int {
 			usedBackends[effBackend] = true
 			result := index.XattrBackendAdd(path, opts.binder, effBackend)
 			if result == "failed" {
-				layer := "kMDItemProjects"
-				if effBackend == "tags" {
-					layer = "kMDItemUserTags"
-				}
+				layer := layerName(effBackend)
 				fmt.Fprintf(os.Stderr, "  Warning: failed to update %s on %s: %s\n", layer, filepath.Base(path), index.LastEngineError())
 			}
 			// The tags backend shares Finder tags with the user. A tag that

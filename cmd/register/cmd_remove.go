@@ -189,14 +189,11 @@ func removeTarget(nd, binder, targetArg string) int {
 		for _, backend := range backendsUsed {
 			// A tag the user had set before the file joined the binder stays.
 			if backend == "tags" && anyKeptTag(matching, binder) {
-				fmt.Printf("kMDItemUserTags: '%s' is your own tag (kept)\n", binder)
+				fmt.Printf("%s: '%s' is your own tag (kept)\n", layerName("tags"), binder)
 				continue
 			}
 			result := index.XattrBackendRemove(filePath, binder, backend)
-			layer := "kMDItemProjects"
-			if backend == "tags" {
-				layer = "kMDItemUserTags"
-			}
+			layer := layerName(backend)
 			switch result {
 			case "removed":
 				fmt.Printf("Removed '%s' from %s\n", binder, layer)

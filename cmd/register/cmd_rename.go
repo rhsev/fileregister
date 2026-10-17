@@ -201,10 +201,7 @@ func cmdRename(args []string) int {
 		seenIDs[id] = true
 		label := refLabel(rec)
 		backend := index.XattrBackend(rec)
-		layer := "kMDItemProjects"
-		if backend == "tags" {
-			layer = "kMDItemUserTags"
-		}
+		layer := layerName(backend)
 
 		if index.URLRef(rec) {
 			xattrChanges++

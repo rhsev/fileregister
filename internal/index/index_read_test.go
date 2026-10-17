@@ -3,8 +3,11 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 func writeIndex(t *testing.T, name, content string) string {
@@ -60,10 +63,22 @@ func TestRewriteKeepsWhatItDoesNotEdit(t *testing.T) {
 	}
 }
 
+// The recorded name is matched in either Unicode form on every platform. Case
+// folds only where the default file system folds it: on ext4 Müller.PDF and
+// Müller.pdf are two files, so there a different case is a different name.
 func TestRestrictByFilenameNormalizes(t *testing.T) {
-	paths := []string{"/v/Rechnung-Müller.PDF", "/v/other.pdf"}
-	got := restrictByFilename(paths, "Rechnung-Müller.pdf")
-	if len(got) != 1 || got[0] != paths[0] {
-		t.Errorf("got %v", got)
+	nfd := norm.NFD.String("Rechnung-Müller.pdf")
+	paths := []string{"/v/" + nfd, "/v/other.pdf"}
+	if got := restrictByFilename(paths, norm.NFC.String("Rechnung-Müller.pdf")); len(got) != 1 || got[0] != paths[0] {
+		t.Errorf("form: got %v", got)
+	}
+
+	upper := []string{"/v/" + norm.NFD.String("Rechnung-Müller.PDF"), "/v/other.pdf"}
+	got := restrictByFilename(upper, norm.NFC.String("Rechnung-Müller.pdf"))
+	if runtime.GOOS == "darwin" && (len(got) != 1 || got[0] != upper[0]) {
+		t.Errorf("case on macOS: got %v", got)
+	}
+	if runtime.GOOS != "darwin" && len(got) != 0 {
+		t.Errorf("case off macOS: got %v, want none", got)
 	}
 }

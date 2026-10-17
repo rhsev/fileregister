@@ -345,11 +345,7 @@ func cmdMarshal(args []string) int {
 	}
 
 	os.Remove(out)
-	// Plain tar; --no-mac-metadata keeps AppleDouble cruft out so the archive
-	// stays OS-neutral.
-	cmd := exec.Command("tar", "--no-mac-metadata", "-czf", out, "-C", tmp, filepath.Base(root))
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := tarCreate(out, tmp, filepath.Base(root)); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: tar failed to create %s\n", out)
 		return 1
 	}
@@ -408,4 +404,14 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Close()
+}
+
+// tarCreate packs dir/name into the gzipped tar out. Plain tar, so the
+// container unpacks on any system; tarCreateArgs keeps macOS's own metadata
+// out, and GNU tar on Linux stores none unless asked.
+func tarCreate(out, dir, name string) error {
+	args := append(append([]string{}, tarCreateArgs...), "-czf", out, "-C", dir, name)
+	cmd := exec.Command("tar", args...)
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }

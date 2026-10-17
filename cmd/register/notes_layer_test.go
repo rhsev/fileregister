@@ -34,6 +34,7 @@ func TestCRLFNoteIsReadAndKeptCRLF(t *testing.T) {
 // are not annotations — annotate, marshal and album must not see them. Nor are
 // hidden files, or notes that are not Markdown.
 func TestParkedNotesAreNotAnnotations(t *testing.T) {
+	needGrubber(t)
 	notes := t.TempDir()
 	col := filepath.Join(notes, "collections")
 	os.MkdirAll(filepath.Join(col, "import", "ship"), 0755)
@@ -55,6 +56,7 @@ func TestParkedNotesAreNotAnnotations(t *testing.T) {
 // nothing comes down from the note's frontmatter, an album: there included.
 // A note without blocks is no block, whatever its header says.
 func TestAnnotationsCarryOnlyTheBlock(t *testing.T) {
+	needGrubber(t)
 	notes := t.TempDir()
 	col := filepath.Join(notes, "collections")
 	os.MkdirAll(col, 0755)
@@ -93,6 +95,7 @@ func TestAnnotationsCarryOnlyTheBlock(t *testing.T) {
 // from them. A note's own url: in the frontmatter must not turn a file record
 // into a URL record, and nothing else from the header reaches the index.
 func TestReindexDoesNotIndexTheFrontmatter(t *testing.T) {
+	needGrubber(t)
 	notes := t.TempDir()
 	col := filepath.Join(notes, "collections")
 	os.MkdirAll(col, 0755)

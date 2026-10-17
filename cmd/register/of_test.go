@@ -40,6 +40,14 @@ func engineBin(t *testing.T) string {
 // then PATH, then the copy `make grubber` builds. The album reads the Markdown
 // layer through grubber, so without one its checks cannot run — and the CI job
 // builds one and refuses skips, the same contract as the engine.
+// needGrubber skips t when no grubber can be found, so the tests that read
+// notes skip like the engine tests do instead of failing. Which grubber runs
+// is TestMain's business (main_test.go), not this one's.
+func needGrubber(t *testing.T) {
+	t.Helper()
+	grubberTestBin(t)
+}
+
 func grubberTestBin(t *testing.T) string {
 	t.Helper()
 	if env := os.Getenv("GRUBBER_BIN"); env != "" {

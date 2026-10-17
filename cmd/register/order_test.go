@@ -74,6 +74,7 @@ func assertOrder(t *testing.T, label string, checkMd bool, argSets ...[]string) 
 }
 
 func TestOrder(t *testing.T) {
+	needGrubber(t)
 	// show: no note yet, so by file name.
 	assertOrder(t, "show-pure", false, []string{"show", "Ord"})
 	assertOrder(t, "show-json", false, []string{"show", "Ord", "--json"})
@@ -105,6 +106,7 @@ func TestOrder(t *testing.T) {
 // come last by file name — here c.pdf before a.pdf because its block stands
 // first, b.pdf last although it sorts between them.
 func TestOrderFollowsTheDocument(t *testing.T) {
+	needGrubber(t)
 	n := seedOrderFixture(t)
 	note := filepath.Join(n, "collections", "binder_Ord.md")
 	writeFile(t, note,

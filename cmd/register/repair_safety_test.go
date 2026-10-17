@@ -9,30 +9,13 @@ import (
 	"github.com/rhsev/fileregister/v2/internal/index"
 )
 
-func TestUnmountedVolume(t *testing.T) {
-	cases := map[string]string{
-		"/Volumes/no-such-volume-4711/a/b.pdf": "no-such-volume-4711",
-		"/Users/someone/doc.pdf":               "",
-		"/Volumes/":                            "",
-		"":                                     "",
-	}
-	for p, want := range cases {
-		if got := unmountedVolume(p); got != want {
-			t.Errorf("unmountedVolume(%q) = %q, want %q", p, got, want)
-		}
-	}
-	if volumeOf("/Volumes/lightning/x") != "/Volumes/lightning" || volumeOf("/Users/x") != "/" {
-		t.Error("volumeOf")
-	}
-}
-
 // A file found by name or id is not taken when it is in the Trash or a
 // backup, or when it is another record's file.
 func TestCandidateProblem(t *testing.T) {
+	// A Trash both platforms recognize; macOS's backups are pinned in
+	// volume_guard_test.go, which runs there only.
 	for _, p := range []string{
 		"/Users/me/.Trash/rechnung.pdf",
-		"/Volumes/Backup/Backups.backupdb/Mac/2026/Users/me/rechnung.pdf",
-		"/Volumes/.timemachine/abc/2026/Data/Users/me/rechnung.pdf",
 	} {
 		if candidateProblem(p, "111", map[string]string{}, map[string]bool{}) == "" {
 			t.Errorf("%s was accepted", p)

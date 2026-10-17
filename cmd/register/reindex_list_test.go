@@ -9,6 +9,7 @@ import (
 
 // A hand-written block may list its binders; each is one membership.
 func TestReindexSplitsAListBinder(t *testing.T) {
+	needGrubber(t)
 	notes := t.TempDir()
 	col := filepath.Join(notes, "collections")
 	os.MkdirAll(col, 0755)
@@ -27,6 +28,7 @@ func TestReindexSplitsAListBinder(t *testing.T) {
 }
 
 func TestReindexNamesBlocksItCannotIndex(t *testing.T) {
+	needGrubber(t)
 	notes := t.TempDir()
 	col := filepath.Join(notes, "collections")
 	os.MkdirAll(col, 0755)

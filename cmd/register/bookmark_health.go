@@ -12,11 +12,8 @@ import (
 	"github.com/rhsev/fileregister/v2/internal/index"
 
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
-	"strings"
 )
 
 // Bookmark verdicts, worst-to-benign in the order a reader cares about.
@@ -128,7 +125,7 @@ func classifyBookmarks(db map[string]string, records []map[string]any) (bookmark
 				"the volume is not mounted — cannot tell a moved file from a gone one"})
 		case !volumeSearchable(r.LastPath):
 			out = append(out, bookmarkFinding{bmUnreachable, id, label, r.LastPath,
-				"Spotlight does not index that volume — \"no file carries this id\" is unknowable there"})
+				noIndexHint})
 		default:
 			out = append(out, bookmarkFinding{bmDead, id, label, r.LastPath,
 				"neither resolvable nor carried by any file — nothing to repair"})
@@ -150,68 +147,6 @@ func isMintedID(s string) bool {
 		}
 	}
 	return true
-}
-
-// volumesDir is where detachable volumes appear. A variable rather than a
-// constant so the guard can be tested against a directory the test controls:
-// the real /Volumes holds whatever the developer's machine happens to have
-// mounted, and a test asserting about it passes at home and fails on a runner.
-var volumesDir = "/Volumes"
-
-// volumeName returns the volume component of a path under volumesDir, or "" for
-// a path that does not live on a detachable volume.
-func volumeName(path string) string {
-	prefix := volumesDir + "/"
-	if path == "" || !strings.HasPrefix(path, prefix) {
-		return ""
-	}
-	rest := strings.TrimPrefix(path, prefix)
-	if i := strings.IndexByte(rest, '/'); i >= 0 {
-		return rest[:i]
-	}
-	return rest
-}
-
-// volumeMounted reports whether the volume a path lived on is present. An
-// absent volume makes every bookmark on it look dead: the blob cannot resolve
-// and Spotlight cannot index what is not mounted. "Dead" is the one verdict
-// something may later be deleted on, so the unjudgeable case gets its own name.
-//
-// Only /Volumes/<name> is treated as detachable; a path on the boot volume is
-// always reachable, and an empty last-known path is not a volume question.
-func volumeMounted(lastPath string) bool {
-	name := volumeName(lastPath)
-	if name == "" {
-		return true
-	}
-	st, err := os.Stat(filepath.Join(volumesDir, name))
-	return err == nil && st.IsDir()
-}
-
-// volumeSearchable reports whether Spotlight indexes the volume a path lived
-// on. Without an index, mdfind answers "nothing" for every id, and the dead
-// verdict would rest on a question that was never asked. Measured on this
-// machine: /Volumes/docker is mounted and not indexed, so a bookmark to a file
-// sitting right there would otherwise read as dead.
-//
-// mdutil is asked once per volume and cached: a store of a few hundred entries
-// otherwise spawns it a few hundred times.
-var volumeIndexed = map[string]bool{}
-
-func volumeSearchable(lastPath string) bool {
-	name := volumeName(lastPath)
-	if name == "" {
-		return true // the boot volume; its index is the one we rely on anyway
-	}
-	if known, seen := volumeIndexed[name]; seen {
-		return known
-	}
-	out, err := exec.Command("mdutil", "-s", filepath.Join(volumesDir, name)).Output()
-	// mdutil missing or erroring is not evidence of a missing index; assume
-	// searchable rather than parking every entry on the volume.
-	indexed := err != nil || !strings.Contains(string(out), "Indexing disabled")
-	volumeIndexed[name] = indexed
-	return indexed
 }
 
 // bookmarkFindingLine prints one finding the way both commands show it.

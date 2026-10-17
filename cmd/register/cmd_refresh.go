@@ -132,17 +132,17 @@ func cmdRefresh(args []string) int {
 		// strips; the #S copy is the one that travels.
 		if dryRun {
 			if !index.HasDescriptionID(refPath, id) {
-				fmt.Printf("[dry-run] id %s → kMDItemInformation of %s\n", id, filepath.Base(refPath))
+				fmt.Printf("[dry-run] id %s → %s of %s\n", id, idLayerName, filepath.Base(refPath))
 				restoredIDs++
 			}
 		} else {
 			index.SetSyncXattr(refPath, id)
 			if restored, why := index.RestoreDescriptionID(refPath, id); why != "" {
 				failed++
-				fmt.Fprintf(os.Stderr, "Warning: writing the id to kMDItemInformation failed for %s: %s\n", filepath.Base(refPath), why)
+				fmt.Fprintf(os.Stderr, "Warning: writing the id to %s failed for %s: %s\n", idLayerName, filepath.Base(refPath), why)
 			} else if restored {
 				restoredIDs++
-				fmt.Printf("Restored id %s → kMDItemInformation of %s\n", id, filepath.Base(refPath))
+				fmt.Printf("Restored id %s → %s of %s\n", id, idLayerName, filepath.Base(refPath))
 			}
 			if len(binders) > 0 {
 				index.ManagedMark(refPath)
@@ -194,7 +194,7 @@ func cmdRefresh(args []string) int {
 		fmt.Printf("  Bookmarks renewed (stale): %d\n", renewed)
 	}
 	if restoredIDs > 0 {
-		fmt.Printf("  IDs restored : %d (kMDItemInformation, so Spotlight finds them again)\n", restoredIDs)
+		fmt.Printf("  IDs restored : %d %s\n", restoredIDs, idRestoredNote)
 	}
 	if skippedNone > 0 {
 		fmt.Printf("  Skipped (none): %d\n", skippedNone)

@@ -82,6 +82,7 @@ func TestAnnotateReplaceProseNestedSections(t *testing.T) {
 // TestReindexFoldsMemberships: one id annotated in two binders rebuilds as ONE
 // record carrying both memberships (recovery must not drop the second binder).
 func TestReindexFoldsMemberships(t *testing.T) {
+	needGrubber(t)
 	dir := t.TempDir()
 	col := filepath.Join(dir, "collections")
 	if err := os.MkdirAll(col, 0755); err != nil {

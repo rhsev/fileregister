@@ -48,48 +48,6 @@ func locateCandidates(id, binder, filename, backend string) ([]string, bool) {
 	return uniqStrings(candidates, false), false
 }
 
-// unmountedVolume returns the name of the volume p lies on when that volume
-// is not mounted, or "". A file there is not gone, just not reachable now.
-func unmountedVolume(p string) string {
-	rest, ok := strings.CutPrefix(p, "/Volumes/")
-	if !ok {
-		return ""
-	}
-	name, _, _ := strings.Cut(rest, "/")
-	if name == "" {
-		return ""
-	}
-	if _, err := os.Stat(filepath.Join("/Volumes", name)); err == nil {
-		return ""
-	}
-	return name
-}
-
-// volumeOf is the mount a path lies on as far as its path shows: /Volumes/<name>, or /.
-func volumeOf(p string) string {
-	if rest, ok := strings.CutPrefix(p, "/Volumes/"); ok {
-		name, _, _ := strings.Cut(rest, "/")
-		return "/Volumes/" + name
-	}
-	return "/"
-}
-
-// trashOrBackup says where path lies when that is the Trash or a backup, or "".
-// A bookmark follows its file into the Trash, and a backup holds copies with
-// the same name and id.
-func trashOrBackup(path string) string {
-	for _, marker := range []string{"/.Trash/", "/.Trashes/"} {
-		if strings.Contains(path, marker) {
-			return "in the Trash"
-		}
-	}
-	if strings.Contains(path, "/Backups.backupdb/") || strings.Contains(path, "/.MobileBackups/") ||
-		strings.HasPrefix(path, "/Volumes/.timemachine/") {
-		return "in a Time Machine backup"
-	}
-	return ""
-}
-
 // sharedPaths maps each resolved path that more than one record resolves to
 // onto those ids — two identities on one file, the trace a bad re-bind leaves.
 func sharedPaths(records []map[string]any, resolved map[string]string) map[string][]string {

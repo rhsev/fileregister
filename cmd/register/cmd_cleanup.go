@@ -352,7 +352,7 @@ func cleanupPrune(unreachable, prunable []bookmarkFinding) int {
 			fmt.Printf("    → %s\n", f.hint)
 		}
 		fmt.Println("")
-		fmt.Println("Mount the volume (or let Spotlight index it) and run again.")
+		fmt.Println(unjudgedAdvice)
 		return 1
 	}
 	if len(prunable) == 0 {

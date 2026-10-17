@@ -16,7 +16,6 @@ import (
 
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -200,12 +199,10 @@ func albumFileMeta(path string) map[string]any {
 		}
 		out["modified"] = fi.ModTime().UTC().Format(time.RFC3339)
 	}
-	args := make([]string, 0, len(albumMdlsKeys)*2+1)
-	for _, k := range albumMdlsKeys {
-		args = append(args, "-name", k)
-	}
-	if raw, err := exec.Command("mdls", append(args, path)...).Output(); err == nil {
-		for k, v := range albumSpotlightFields(string(raw)) {
+	// Spotlight's fields exist on macOS only; elsewhere spotlightAttrs says
+	// nothing and the line carries size and modification time alone.
+	if raw := spotlightAttrs(path, albumMdlsKeys); raw != "" {
+		for k, v := range albumSpotlightFields(raw) {
 			out[k] = v
 		}
 	}

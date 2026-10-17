@@ -1,3 +1,5 @@
+//go:build darwin
+
 package main
 
 import (
@@ -54,6 +56,36 @@ func TestVolumeNameEdges(t *testing.T) {
 	for path, want := range cases {
 		if got := volumeName(path); got != want {
 			t.Errorf("volumeName(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
+
+func TestUnmountedVolume(t *testing.T) {
+	cases := map[string]string{
+		"/Volumes/no-such-volume-4711/a/b.pdf": "no-such-volume-4711",
+		"/Users/someone/doc.pdf":               "",
+		"/Volumes/":                            "",
+		"":                                     "",
+	}
+	for p, want := range cases {
+		if got := unmountedVolume(p); got != want {
+			t.Errorf("unmountedVolume(%q) = %q, want %q", p, got, want)
+		}
+	}
+	if volumeOf("/Volumes/lightning/x") != "/Volumes/lightning" || volumeOf("/Users/x") != "/" {
+		t.Error("volumeOf")
+	}
+}
+
+// Time Machine copies keep a file's name and id, so a hit there is a backup,
+// never the file that went missing.
+func TestTimeMachineCopyIsABackup(t *testing.T) {
+	for _, p := range []string{
+		"/Volumes/Backup/Backups.backupdb/Mac/2026/Users/me/rechnung.pdf",
+		"/Volumes/.timemachine/abc/2026/Data/Users/me/rechnung.pdf",
+	} {
+		if trashOrBackup(p) != "in a Time Machine backup" {
+			t.Errorf("%s is not seen as a backup", p)
 		}
 	}
 }
