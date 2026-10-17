@@ -78,17 +78,6 @@ func TestVolumeGuardOnLinux(t *testing.T) {
 	}
 }
 
-// Without a system index, "no file carries this id" can never be said, so no
-// bookmark may be called dead — on the boot disk as anywhere else.
-func TestNothingIsSearchableOnLinux(t *testing.T) {
-	fakeMounts(t, testMounts, "ralf")
-	for _, p := range []string{"", "/home/ralf/a.pdf", "/media/ralf/Backup/x.pdf"} {
-		if volumeSearchable(p) {
-			t.Errorf("volumeSearchable(%q) = true", p)
-		}
-	}
-}
-
 func TestTrashOnLinux(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("HOME", "/home/ralf")

@@ -430,6 +430,9 @@ func auditBookmarkDirection(db map[string]string, records []map[string]any) bool
 		if rep.blind {
 			fmt.Println("Unreachable ones were not judged: this fileanchor does not report a failed resolve's")
 			fmt.Println("recorded path, so a gone file cannot be told from an absent volume. Update to 1.2.0.")
+		} else if rep.noCoverage {
+			fmt.Println("Unreachable ones were not judged: this fileanchor cannot say whether its search covers")
+			fmt.Println("a place, so a gone file cannot be told from one nobody searched for. Update fileanchor.")
 		} else {
 			fmt.Println(auditUnjudged)
 		}

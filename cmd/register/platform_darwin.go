@@ -3,8 +3,7 @@
 package main
 
 // platform_darwin — what register knows about macOS around the engine: where
-// detachable volumes appear, whether Spotlight can answer for a volume, where
-// the Trash and backups are, how tar leaves Mac metadata out, and what the
+// detachable volumes appear, where the Trash and backups are, how tar leaves Mac metadata out, and what the
 // metadata layers are called in messages. The engine does the metadata work
 // itself; this file only holds what register decides and says around it.
 // platform_other.go is the same set of names for Linux.
@@ -50,32 +49,6 @@ func volumeMounted(lastPath string) bool {
 	}
 	st, err := os.Stat(filepath.Join(volumesDir, name))
 	return err == nil && st.IsDir()
-}
-
-// volumeSearchable reports whether Spotlight indexes the volume a path lived
-// on. Without an index, mdfind answers "nothing" for every id, and the dead
-// verdict would rest on a question that was never asked. Measured on this
-// machine: /Volumes/docker is mounted and not indexed, so a bookmark to a file
-// sitting right there would otherwise read as dead.
-//
-// mdutil is asked once per volume and cached: a store of a few hundred entries
-// otherwise spawns it a few hundred times.
-var volumeIndexed = map[string]bool{}
-
-func volumeSearchable(lastPath string) bool {
-	name := volumeName(lastPath)
-	if name == "" {
-		return true // the boot volume; its index is the one we rely on anyway
-	}
-	if known, seen := volumeIndexed[name]; seen {
-		return known
-	}
-	out, err := exec.Command("mdutil", "-s", filepath.Join(volumesDir, name)).Output()
-	// mdutil missing or erroring is not evidence of a missing index; assume
-	// searchable rather than parking every entry on the volume.
-	indexed := err != nil || !strings.Contains(string(out), "Indexing disabled")
-	volumeIndexed[name] = indexed
-	return indexed
 }
 
 // unmountedVolume returns the name of the volume p lies on when that volume

@@ -4,7 +4,8 @@ package main
 
 // platform_other — the names platform_darwin.go defines, for Linux. Same
 // questions, other answers: removable media mount under /media, /run/media or
-// /mnt instead of /Volumes; there is no Spotlight; the Trash follows the
+// /mnt instead of /Volumes; whether a search covers a place is the engine's
+// answer (searchable), as on macOS; the Trash follows the
 // freedesktop spec; GNU tar stores no extended attributes unless asked; and
 // what the engine calls its attributes is the engine's business (fileanchor
 // PLATFORMS.md), so messages name the logical layer, not an xattr key.
@@ -129,14 +130,6 @@ func unmountedVolume(p string) string {
 	}
 	return ""
 }
-
-// volumeSearchable is false on Linux, for every path. "Dead" needs a search
-// that may answer "no file carries this id", and Linux has no system index to
-// give that answer: the engine's query is a recovery path that may find
-// nothing (fileanchor PLATFORMS.md). Until the engine can say its answer is
-// complete, an unresolvable bookmark stays unjudged here and prune refuses —
-// the safe side of the one verdict something is deleted on.
-func volumeSearchable(lastPath string) bool { return false }
 
 // trashDirRe matches a per-volume freedesktop Trash, <top>/.Trash-<uid>/.
 var trashDirRe = regexp.MustCompile(`/\.Trash-\d+/`)

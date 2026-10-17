@@ -50,6 +50,9 @@ type bookmarkReport struct {
 	// to judge and none of it carried a path — a capability, tested rather than
 	// read off a version number.
 	blind bool
+	// noCoverage: the engine does not offer `searchable`, so whether its search
+	// covers a place cannot be asked, and no miss is called dead.
+	noCoverage bool
 }
 
 func classifyBookmarks(db map[string]string, records []map[string]any) (bookmarkReport, error) {
@@ -123,16 +126,39 @@ func classifyBookmarks(db map[string]string, records []map[string]any) (bookmark
 		case !volumeMounted(r.LastPath):
 			out = append(out, bookmarkFinding{bmUnreachable, id, label, r.LastPath,
 				"the volume is not mounted — cannot tell a moved file from a gone one"})
-		case !volumeSearchable(r.LastPath):
-			out = append(out, bookmarkFinding{bmUnreachable, id, label, r.LastPath,
-				noIndexHint})
 		default:
-			out = append(out, bookmarkFinding{bmDead, id, label, r.LastPath,
-				"neither resolvable nor carried by any file — nothing to repair"})
+			if gap := coverageGap(r.LastPath, &rep); gap != "" {
+				out = append(out, bookmarkFinding{bmUnreachable, id, label, r.LastPath, gap})
+			} else {
+				out = append(out, bookmarkFinding{bmDead, id, label, r.LastPath,
+					"neither resolvable nor carried by any file — nothing to repair"})
+			}
 		}
 	}
 	rep.findings = out
 	return rep, nil
+}
+
+// coverageGap says why a miss on lastPath proves nothing, or "" when the
+// engine's search covers that place and the dead verdict may stand. The engine
+// answers (searchable), on every platform: on macOS whether Spotlight indexes
+// the volume, on Linux whether the engine walks that place completely. An
+// engine that does not offer the op cannot say, and that withholds the verdict
+// the way a missing last_path does. An empty lastPath is not a place question,
+// as with volumeMounted.
+func coverageGap(lastPath string, rep *bookmarkReport) string {
+	if lastPath == "" {
+		return ""
+	}
+	covered, known := index.Searchable(lastPath)
+	switch {
+	case !known:
+		rep.noCoverage = true
+		return "this fileanchor cannot say whether its search covers that place — update it, so a gone file can be told from one nobody searched for"
+	case !covered:
+		return noIndexHint
+	}
+	return ""
 }
 
 // isMintedID reports whether a bookmarks.json key has the shape register gives

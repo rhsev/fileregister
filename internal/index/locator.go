@@ -6,6 +6,7 @@ package index
 
 import (
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/text/unicode/norm"
 )
@@ -61,4 +62,22 @@ func ByXattrItemProjects(binder, filename string) []string {
 // ByXattrTags finds files tagged with binder in kMDItemUserTags.
 func ByXattrTags(binder, filename string) []string {
 	return restrictByFilename(locatorQuery("tag", binder), filename)
+}
+
+// Searchable asks the engine whether a query would find a file under path if
+// one were there — the condition under which an empty answer is a fact
+// (fileanchor SPEC, "A miss is a fact only where searchable says so"). known
+// is false when the engine does not offer the op, one released before it, so
+// the caller can tell "no" from "cannot say".
+func Searchable(path string) (searchable, known bool) {
+	resp, err := fileAnchor().request(map[string]any{"op": "searchable", "path": path})
+	if err != nil {
+		return false, true
+	}
+	if ok, _ := resp["ok"].(bool); !ok {
+		msg, _ := resp["error"].(string)
+		return false, !strings.HasPrefix(msg, "unknown op")
+	}
+	s, _ := resp["searchable"].(bool)
+	return s, true
 }
