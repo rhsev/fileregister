@@ -150,6 +150,12 @@ binder: project-alpha
 
 The H3 heading is the filename (human recognition); the YAML block is the back-reference plus whatever custom fields and prose the user adds. A block names a **single** `binder`; it is the file's context *in that binder*. The same file may therefore carry **several** annotation blocks, one per binder, each with its own custom fields and prose (an invoice filed under `invoices-2024` with an amount, and under `project-a` with a deadline). The index stays one record per file; the Markdown layer is per-binder context, linked back by `id`. Annotations never replace the index entry; they are the optional, disposable custom layer. `register promote` (or `add --md`) creates them; grubber-over-Markdowns reads them for rich queries (with `--explode binder --merge-on id,binder`; see [matterbase Touchpoints](#matterbase-touchpoints)).
 
+### Writing a note
+
+A note can itself be a member of a binder, so register rewrites a note **in place** and keeps its inode: a temp file renamed over it would give it a new inode, and its bookmark would break on the next rename. The extended attributes, the creation date, flags, ACLs and hard links stay with the file as well. The index files are not notes and keep the temp-file-and-rename write above.
+
+Crash safety comes from a journal. The new content is first written and synced to `.<name>.journal` next to the note, then the note is overwritten and synced, then the journal is removed. If a write stops halfway, the journal holds the complete new content, and every later write of that note refuses until the user has compared the two and removed the journal. `jot prose` writes notes the same way and uses the same journal name. A note that does not exist yet is created through the temp file.
+
 ### Binder names
 
 A binder ends up on files as a Finder tag or a `kMDItemProjects` entry, so its
@@ -338,7 +344,7 @@ Edits an **existing** annotation block. It is the tool form of "the user edits i
 - **Reserved keys are refused**: `id`, `type` (identity), `binder` (membership, see `add`/`remove`), `aka` (identity handle, see `aka --add/--remove`), `sort` (ordering, see `order move`). Identity and membership have their own verbs; `_`-prefixed keys are injected, never stored.
 - `--prose` replaces the section's prose (every line of the section that is neither the heading nor a fenced `yaml` block; a `yml` fence is an example and counts as prose) with the given text (`-` reads stdin, empty clears), rewritten canonically between heading and block. The heading and the blocks themselves stay byte-identical. This is a **deliberate policy change**. register historically never touched prose; `annotate --prose` may, on explicit request, because register is the family's only Markdown writer and the alternative would be the second engine the rule exists to prevent.
 
-Blocks are matched over id ∪ aka like every other block lookup; all matching `(id ∪ aka, binder)` blocks are edited, wherever the note lives. A block without a preceding heading refuses `--prose` (no section to rebuild). Writes are atomic, one write per file, fields and prose in the same pass.
+Blocks are matched over id ∪ aka like every other block lookup; all matching `(id ∪ aka, binder)` blocks are edited, wherever the note lives. A block without a preceding heading refuses `--prose` (no section to rebuild). Each note is written once, in place (see [Writing a note](#writing-a-note)), fields and prose in the same pass.
 
 ### `register aka <id|aka> [--add <handle>]… [--remove <handle>]…`
 

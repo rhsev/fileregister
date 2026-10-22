@@ -1,9 +1,10 @@
 package index
 
 // AtomicWrite — crash-safe file replacement for the plain-text layer. The JSONL
-// index and the Markdown notes are the source of truth; a truncate+write
-// (os.WriteFile) can leave them half-written on a crash or a full disk, so
-// every rewrite goes through a temp file in the same directory + rename.
+// index is the source of truth; a truncate+write (os.WriteFile) can leave it
+// half-written on a crash or a full disk, so every rewrite goes through a temp
+// file in the same directory + rename. Markdown notes are rewritten in place
+// instead (WriteInPlace), so a note that is itself a member keeps its inode.
 
 import (
 	"os"

@@ -124,12 +124,13 @@ func readNote(path string) (content string, crlf bool, err error) {
 	return strings.ReplaceAll(s, "\r\n", "\n"), true, nil
 }
 
-// writeNote writes a note read by readNote back in its own line endings.
+// writeNote writes a note read by readNote back in its own line endings, in
+// place: the note may itself be a member, and its bookmark must survive.
 func writeNote(path, content string, crlf bool) error {
 	if crlf {
 		content = strings.ReplaceAll(content, "\n", "\r\n")
 	}
-	return index.AtomicWrite(path, []byte(content))
+	return index.WriteInPlace(path, []byte(content))
 }
 
 // leanAnnotation renders a lean annotation block: H3 = filename (or id), YAML =
