@@ -507,7 +507,7 @@ writes nothing (but the name, with `--title`). Each line is the member's
 |---|---|
 | `position` | 1-based, in the order `register order show` resolves (`sort:` keys first, then the order of the blocks in the note, then members without a block by file name). There is one source of order, so the album cannot disagree with the ordering it is made of. |
 | `fields` | The member's block as grubber returns it (`--no-fill`), frontmatter inherited, minus `type`, `id`, `binder`, `sort` and grubber's `_`-prefixed keys. Open set; omitted when empty. |
-| `file` | What the file carries: `size`, `modified` (file system); `type`, `title`, `comment`, `place`, `date`, `lat`, `lon`, `camera`, `width`, `height`, `pages`, `duration` (Spotlight, `mdls`, one call per file on a worker pool). Keys that mean what a field means take its name, so the shown value is `file` overlaid with `fields`. A `title` that only repeats the file name (Spotlight's default for images) is dropped. Omitted for URL records and broken members. |
+| `file` | What the file carries: `size`, `modified` (file system); `type`, `title`, `caption`, `place`, `date`, `lat`, `lon`, `camera`, `width`, `height`, `pages`, `duration` (Spotlight, `mdls`, one call per file on a worker pool). Keys that mean what a field means take its name, so the shown value is `file` overlaid with `fields`. A `title` that only repeats the file name (Spotlight's default for images) is dropped. Omitted for URL records and broken members. |
 
 Absent values are omitted, never `""`/`null`. Broken members keep their line and
 position with `"broken":true`, as in `list --json`. The album name is the `album`

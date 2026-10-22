@@ -114,7 +114,7 @@ whatever reads the album; fileregister gives none of them a meaning:
 | Field | Usual meaning |
 |---|---|
 | `title` | the member's title |
-| `comment` | a caption or description |
+| `caption` | a caption or description |
 | `place` | where it was taken or where it belongs |
 | `lat`, `lon` | coordinates |
 | `date` | when |
@@ -131,7 +131,7 @@ working notes; it does not reach the line.
 |---|---|
 | `size`, `modified` | the file system |
 | `type` | the content type (UTI), e.g. `public.jpeg`, `com.adobe.pdf` |
-| `title`, `comment` | IPTC headline and description; a document's title |
+| `title`, `caption` | IPTC headline and description; a document's title |
 | `place` | IPTC city and country |
 | `date` | when the content was created (EXIF for photos) |
 | `lat`, `lon` | EXIF GPS |

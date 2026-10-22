@@ -54,7 +54,7 @@ func seedAlbumFixture(t *testing.T) string {
 			`{"type":"ref","id":"3","binder":["Alb"],"filename":"gone.jpg","kind":"image"}`+"\n")
 	writeFile(t, filepath.Join(col, "binder_Alb.md"),
 		"---\nalbum: Alben-Test\n---\n\n"+
-			"### two\n```yaml\ntype: ref\nid: '2'\nbinder: Alb\ntitle: Erstes\ncomment: Ein <Test>\nmy_own: 7\nsort: \"1\"\n```\n\n"+
+			"### two\n```yaml\ntype: ref\nid: '2'\nbinder: Alb\ntitle: Erstes\ncaption: Ein <Test>\nmy_own: 7\nsort: \"1\"\n```\n\n"+
 			"### one\n```yaml\ntype: ref\nid: '1'\nbinder: Alb\n```\n")
 	return dir
 }

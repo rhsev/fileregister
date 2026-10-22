@@ -235,7 +235,7 @@ func albumSpotlightFields(raw string) map[string]any {
 		}
 	}
 	setStr("title", md["kMDItemHeadline"], md["kMDItemTitle"])
-	setStr("comment", md["kMDItemDescription"])
+	setStr("caption", md["kMDItemDescription"])
 	setStr("place", joinNonEmpty(", ", md["kMDItemCity"], md["kMDItemCountry"]))
 	setStr("camera", joinNonEmpty(" ", uniqStrings([]string{md["kMDItemAcquisitionMake"], md["kMDItemAcquisitionModel"]}, true)...))
 	setStr("type", md["kMDItemContentType"])
