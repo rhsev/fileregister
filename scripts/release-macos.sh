@@ -12,7 +12,7 @@
 # requires FULL Xcode. With only the Command Line Tools we build the host arch.
 # register itself (pure Go) cross-compiles freely; fileanchor is the constraint.
 #
-# Env: FILEANCHOR_VERSION (tag, default 1.4.0), FILEANCHOR_SRC (local checkout)
+# Env: FILEANCHOR_VERSION (tag, default 1.5.0), FILEANCHOR_SRC (local checkout)
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -20,7 +20,7 @@ cd "$(dirname "$0")/.."
 # The bundle carries the engine, so a stale default ships an engine that cannot
 # do what register expects of it — audit withholds its dead verdict then, which
 # is correct but a poor thing to publish.
-FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.4.0}"
+FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.5.0}"
 FILEANCHOR_REPO="${FILEANCHOR_REPO:-https://github.com/rhsev/fileanchor.git}"
 # register album reads the Markdown layer through grubber, so the bundle carries
 # it the way it carries the engine. Same pin as the Makefile, and the published
@@ -112,7 +112,7 @@ Upgrading from 2.0: the bookmark store moved. Once, before the first run:
   mkdir -p ~/.local/share/fileregister && mv ~/.local/share/bookmarks.json ~/.local/share/fileregister/
 Intel Mac? Build from source instead (go install + `make fileanchor` +
 `make grubber`).
-Tested with fileanchor 1.4.0 and grubber v0.20.0.
+Tested with fileanchor 1.5.0 and grubber v0.20.0.
 NOTE
 
 TARBALL="$OUT/fileregister-macos-$ARCH.tar.gz"

@@ -7,7 +7,12 @@ on:
 
 jobs:
   test:
-    runs-on: macos-15
+    # macOS with the Swift engine built from source, Linux with the engine's
+    # release binary; the same suite, no skips tolerated on either.
+    strategy:
+      matrix:
+        os: [macos-15, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 

@@ -206,6 +206,8 @@ register reindex --dry-run
 
 **Apple Silicon: download the prebuilt bundle** from the [latest release](https://github.com/rhsev/fileregister/releases/latest). `fileregister-macos-arm64.tar.gz` unpacks to a folder with `register`, the `fileanchor` engine and `grubber`, in the layout register expects. Fetched with `curl` it runs as-is; after a browser download, clear the quarantine flag once in that folder: `xattr -dr com.apple.quarantine register libexec`.
 
+**Linux: download the prebuilt bundle** for your architecture from the same release, `fileregister-linux-amd64.tar.gz` or `fileregister-linux-arm64.tar.gz`. It holds the same three programs, built for Linux. Linux needs kernel 6.6 or later and a file system with user extended attributes (ext4, btrfs, xfs), and registered files lie below one of the engine's roots, by default the home folder. `INSTALL.txt` in the bundle and fileanchor's [PLATFORMS.md](https://github.com/rhsev/fileanchor/blob/main/PLATFORMS.md) give the details.
+
 Or build it yourself. If you already have `fileanchor` on your `PATH`:
 
 ```sh
@@ -221,12 +223,13 @@ make install           # to ~/bin by default
 make install PREFIX=/usr/local/bin
 ```
 
-Requires Go, and macOS for the current fileanchor build. `register` is a single
-Go binary, and every subcommand is native.
+Requires Go. On macOS `make fileanchor` builds the engine with Swift; on Linux
+it downloads the engine's release binary. `register` is a single Go binary, and
+every subcommand is native.
 
 ### Companion releases
 
-`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads the Markdown layer. Without it, register manages only the index. The core commands (`add`, `list`, `resolve`, `audit`, `repair`, `refresh`, `remove`) run without it. The commands that read notes need it: `album`, `order`, `annotate`, `aka`, `rename`, `forget`, `marshal`, `reindex`, `cleanup` and `list --inbox`/`--curated`, because register has no Markdown reader of its own. This release is tested against **fileanchor 1.4.0** and **grubber v0.20.0**. `make fileanchor` builds the engine at its tag, `make grubber` downloads the grubber release binary into `.build/`, and `make install` puts both next to register.
+`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads the Markdown layer. Without it, register manages only the index. The core commands (`add`, `list`, `resolve`, `audit`, `repair`, `refresh`, `remove`) run without it. The commands that read notes need it: `album`, `order`, `annotate`, `aka`, `rename`, `forget`, `marshal`, `reindex`, `cleanup` and `list --inbox`/`--curated`, because register has no Markdown reader of its own. This release is tested against **fileanchor 1.5.0** and **grubber v0.20.0**. `make fileanchor` builds the engine at its tag, `make grubber` downloads the grubber release binary into `.build/`, and `make install` puts both next to register.
 
 ### Configuration
 
@@ -259,16 +262,19 @@ one-record-per-file index into per-membership rows.
 
 ### The metadata engine
 
-All macOS metadata work goes through
+All metadata work goes through
 [fileanchor](https://github.com/rhsev/fileanchor), a native engine in its own
 repo that puts move-resilient bookmarks, Finder tags, Spotlight queries and
-xattrs behind one batch stdio protocol. It runs once per command and handles the
+xattrs behind one batch stdio protocol. On Linux the same protocol is answered
+by fileanchor's Linux engine, which keeps the values in `user.*` extended
+attributes and finds a moved file by walking its roots. It runs once per command and handles the
 whole batch in-process, which matters because `add`, `audit`, `refresh`,
 `repair` and `rename` touch every record's file; a helper spawned per file would
 spend most of its time on process startup.
 
 No binary ships in this repo. `make fileanchor` clones fileanchor at a pinned
-tag and builds it with SwiftPM; `make install` puts it next to the CLI. Bump
+tag and builds it with SwiftPM, or on Linux downloads that tag's Linux binary;
+`make install` puts it next to the CLI. Bump
 `FILEANCHOR_VERSION` in the [Makefile](Makefile) for a newer engine. Building it
 needs a Swift toolchain (Xcode or the Command Line Tools) and produces a
 binary for macOS 13 or later.
