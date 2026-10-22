@@ -177,14 +177,23 @@ volume. nv was reproduced without its GUI (temp file, `copyfile` with
 `COPYFILE_METADATA`, `renamex_np` with `RENAME_SWAP`). The NSDocument row is
 a headless `writeSafely` call, the save path TextEdit uses. TextEdit, BBEdit
 and Obsidian themselves were not tested. The vim and `perl -i` rows were
-measured on 2026-10-16 with [savecheck](../savecheck), which marks a file,
-waits while an app saves it and reports what happened to inode and xattrs.
+measured on 2026-10-16 with savecheck, an unpublished tool that marks a
+file, waits while an app saves it and reports what happened to inode and
+xattrs. The Neovim, Helix and LibreOffice rows were measured on 2026-10-21
+and 2026-10-22 on macOS 27.2, each with a Finder tag, a Finder comment and
+the id on the file. Neovim ran with `--clean` and with LazyVim. LibreOffice
+saved through UNO `store()`, the call behind Cmd-S, and with `--convert-to`
+over an existing file. Helix has the setting `atomic-save` since 25.07.
 
 | Program | inode on save | xattrs on save |
 |---|---|---|
 | shell `>` and `>>` | kept | kept |
+| Neovim 0.12.6 | kept | kept |
+| LibreOffice 26.8.1 (.odt, .docx) | kept | kept |
+| Helix 25.07.1 with `atomic-save = false` | kept | kept |
 | Apple's vim 9.1 (`/usr/bin/vim`, also with `-u NONE`) | kept | lost |
 | nv 2.5, NSDocument save | new | copied |
+| Helix 25.01.1 and 25.07.1 with default settings | new | lost |
 | `sed -i`, `perl -i`, OpenCloud (edit on another Mac) | new | lost |
 
 **Writes into the existing file.** Inode and xattrs stay, and the bookmark
