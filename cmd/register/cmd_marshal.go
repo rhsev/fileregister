@@ -13,8 +13,9 @@ package main
 // transfer.go), its size and sha256, its free Finder tags and comment; file
 // and markdown are paths relative to <name>/. The archive carries no xattrs —
 // unmarshal rebuilds metadata from the manifest, keeping the format OS-neutral.
-// Containers before format 2 carry origin (relative to collections/) instead
-// of base and path; unmarshal still reads them.
+// origin, the path relative to collections/, is written as well, for a
+// register before format 2, which reads only that; unmarshal reads base and
+// path when they are there.
 //
 // Note on manifest key order: the manifest preserves the record's input
 // key order; this Go port emits map order. The manifest is machine-read by
@@ -306,6 +307,7 @@ func cmdMarshal(args []string) int {
 				}
 				fileRel[id] = "files/" + name
 				f["base"], f["path"] = classifier.classify(src)
+				f["origin"] = collectionsRel(jsonlRoot, src)
 				f["size"], f["sha256"] = size, sum
 				if withFinder {
 					addFinderFields(f, rec, src)
@@ -339,6 +341,7 @@ func cmdMarshal(args []string) int {
 		if pack, ok := notePack[note]; ok {
 			manifest = append(manifest, map[string]any{
 				"type": "note", "file": pack.file, "base": baseNotes, "path": pack.path,
+				"origin": pack.origin,
 			})
 		}
 	}
@@ -392,6 +395,19 @@ func cmdMarshal(args []string) int {
 		}
 	}
 	return 0
+}
+
+// collectionsRel is src relative to the index folder, the origin a register
+// before format 2 places a file by.
+func collectionsRel(jsonlRoot, src string) string {
+	real, err := filepath.EvalSymlinks(src)
+	if err != nil {
+		real = src
+	}
+	if rel, err := filepath.Rel(jsonlRoot, real); err == nil {
+		return rel
+	}
+	return real
 }
 
 // scatteredRank is 1 for a scattered note (origin escaping via ..), else 0.

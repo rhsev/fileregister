@@ -301,9 +301,10 @@ func TestSnapshotRestoreIntoAnotherRoot(t *testing.T) {
 		t.Errorf("audit after restore exit %d\n%s\n%s", code, so, se)
 	}
 
-	// A second restore finds a register with records and refuses.
-	if _, se, code := runIn(t, env, cmdRestore, snap, "--into", into); code != 1 || !strings.Contains(se, "only fills an empty register") {
-		t.Errorf("restore into a register with records: exit %d, %s", code, se)
+	// A second run of the same snapshot finds everything in place.
+	if so, se, code := runIn(t, env, cmdRestore, snap, "--into", into); code != 0 ||
+		!strings.Contains(so, "already restored : 4") || strings.Contains(so, "created") {
+		t.Errorf("second restore: exit %d\n%s\n%s", code, so, se)
 	}
 }
 
@@ -377,6 +378,45 @@ func TestRestoreMissingAndAmbiguous(t *testing.T) {
 	// The records are in the index all the same.
 	if n := len(inboxByFilename(t, notes)); n != 5 {
 		t.Errorf("index has %d records, want 5", n)
+	}
+}
+
+func TestRestoreGoesOnAfterAnEarlierRun(t *testing.T) {
+	anchor := engineBin(t)
+	fx := makeSnapFixture(t, anchor)
+	snap := snapshotOf(t, fx, "--no-files")
+	watchComments(t)
+
+	// First run: only a.txt is there.
+	home := t.TempDir()
+	notes := filepath.Join(home, "Notes")
+	put(t, filepath.Join(notes, "a.txt"), "Rechnung A\n")
+	env := snapEnv(home, notes, anchor)
+	if so, _, code := runIn(t, env, cmdRestore, snap); code != 1 || !strings.Contains(so, "without file     : 3") {
+		t.Fatalf("first run: exit %d\n%s", code, so)
+	}
+
+	// b.txt turns up; the second run binds it and leaves a.txt alone.
+	put(t, filepath.Join(notes, "b.txt"), "Beleg B\n")
+	so, se, code := runIn(t, env, cmdRestore, snap)
+	for _, want := range []string{"already restored : 1", "taken over       : 1", "b.txt → " + filepath.Join(notes, "b.txt"), "without file     : 2"} {
+		if !strings.Contains(so, want) {
+			t.Errorf("second run lacks %q (exit %d):\n%s\n%s", want, code, so, se)
+		}
+	}
+	if !strings.Contains(se, "going on with the files an earlier restore left") {
+		t.Errorf("second run does not say it goes on:\n%s", se)
+	}
+	if got := queryStampedID(t, anchor, filepath.Join(notes, "b.txt")); !strings.Contains(got, fx.ids["b.txt"]) {
+		t.Errorf("b.txt not stamped with %s: %s", fx.ids["b.txt"], got)
+	}
+
+	// An index that changed since is not the snapshot's any more.
+	f, _ := os.OpenFile(filepath.Join(notes, "collections", "inbox.jsonl"), os.O_APPEND|os.O_WRONLY, 0644)
+	f.WriteString(`{"type":"ref","id":"1","binder":[],"url":"https://example.org"}` + "\n")
+	f.Close()
+	if _, se, code := runIn(t, env, cmdRestore, snap); code != 1 || !strings.Contains(se, "differ from the snapshot") {
+		t.Errorf("changed index: exit %d, %s", code, se)
 	}
 }
 

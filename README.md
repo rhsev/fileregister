@@ -115,8 +115,9 @@ binder and URL records are part of it. `register restore` rebuilds an empty
 register from it, in the same places, in another folder (`--into`) or on Linux.
 With `--no-files` the snapshot keeps each file's size and sha256 instead of its
 content, and restore finds the files where a separate file backup put them,
-also after a move or a rename. Bookmarks are made anew on the system that
-restores.
+also after a move or a rename. Run again with the same snapshot, restore goes on
+with what the first run parked or did not find. Bookmarks are made anew on the
+system that restores.
 
 **Keep macOS Spotlight up to date.** `register refresh` rewrites the xattrs from
 the index, and Spotlight indexes them from there. `register audit` reports drift

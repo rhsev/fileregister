@@ -84,9 +84,22 @@ func cmdRestore(args []string) int {
 			return 1
 		}
 	}
+	// A register with records is refused, unless its index is the snapshot's
+	// own: then an earlier restore wrote it, and this run goes on with what
+	// that one parked or did not find.
+	again := false
 	if why := registerNotEmpty(collections); why != "" {
-		fmt.Fprintf(os.Stderr, "Error: %s — restore only fills an empty register. To add a binder to this one, use marshal and unmarshal.\n", why)
-		return 1
+		same, cerr := indexMatchesSnapshot(container, collections)
+		if cerr != nil {
+			fmt.Fprintln(os.Stderr, "Error:", cerr)
+			return 1
+		}
+		if !same {
+			fmt.Fprintf(os.Stderr, "Error: %s that differ from the snapshot — restore only fills an empty register, or one it filled from this snapshot. To add a binder to this one, use marshal and unmarshal.\n", why)
+			return 1
+		}
+		again = true
+		fmt.Fprintln(os.Stderr, "The index is this snapshot's; going on with the files an earlier restore left.")
 	}
 
 	// Unpack. A real run stages below collections/import/, where whatever is
@@ -106,11 +119,10 @@ func cmdRestore(args []string) int {
 		defer os.RemoveAll(staging)
 		keep = func(n string) bool { return !strings.HasPrefix(n, "files/") }
 	} else {
+		// What an earlier run parked here came from the container and is
+		// unpacked again.
 		staging = filepath.Join(importDir(notesDir), name)
-		if _, serr := os.Stat(staging); serr == nil {
-			fmt.Fprintf(os.Stderr, "Error: %s already exists — a previous restore left it; move it away first\n", staging)
-			return 1
-		}
+		os.RemoveAll(staging)
 		if err := os.MkdirAll(staging, 0755); err != nil {
 			fmt.Fprintln(os.Stderr, "register:", err)
 			return 1
@@ -242,10 +254,37 @@ func cmdRestore(args []string) int {
 		return 1
 	}
 
+	// On a second run, a record whose bookmark finds its file is done.
+	bound := map[string]string{}
+	if again {
+		var ids []string
+		for _, it := range items {
+			if _, ok := db[it.id]; ok {
+				ids = append(ids, it.id)
+			}
+		}
+		res, rerr := index.BatchResolve(ids)
+		if rerr != nil {
+			fmt.Fprintf(os.Stderr, "Error: fileanchor batch resolve failed: %v\n", rerr)
+			return 1
+		}
+		for id, r := range res {
+			if r.Path != "" && index.FileExists(r.Path) {
+				bound[id] = r.Path
+			}
+		}
+	}
+
 	// Decide where each file goes and what is there.
 	claimed := map[string]bool{}
+	for _, p := range bound {
+		claimed[p] = true
+	}
 	var searching []*restoreItem
 	for _, it := range items {
+		if p, ok := bound[it.id]; ok && it.action == "" {
+			it.action, it.target = "bound", p
+		}
 		if it.action != "" {
 			continue
 		}
@@ -264,7 +303,7 @@ func cmdRestore(args []string) int {
 		}
 		it.target = target
 		if decomposedTwin(pl.rawTarget(it.base, it.path), target) {
-			it.action, it.reason = "park", "the file exists with a decomposed (NFD) name; rename it to NFC, then run register repair --interactive"
+			it.action, it.reason = "park", "the file exists with a decomposed (NFD) name; rename it to NFC, then run the same restore again"
 			continue
 		}
 		if why := protectedTarget(target, underDir(target, collections)); why != "" && why != "an existing annotation note" {
@@ -435,6 +474,9 @@ func cmdRestore(args []string) int {
 			return 1
 		}
 		for _, n := range indexNames {
+			if again {
+				break // the index is the snapshot's already
+			}
 			data, _ := os.ReadFile(entries["index/"+n].path)
 			if err := index.AtomicWrite(filepath.Join(collections, n), data); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", n, err)
@@ -499,6 +541,9 @@ func cmdRestore(args []string) int {
 			}
 		}
 	}
+	if count["bound"] > 0 {
+		fmt.Printf("  %-17s: %d\n", "already restored", count["bound"])
+	}
 	section("create", "created")
 	section("adopt", "taken over")
 	section("moved", "found moved")
@@ -523,14 +568,14 @@ func cmdRestore(args []string) int {
 		if parked > 0 {
 			fmt.Printf("Parked items are in %s\n", staging)
 			if count["park"] > 0 {
-				fmt.Println("Their records are in the index: put a file in place by hand, then register repair --interactive binds it.")
+				fmt.Println("Their records are in the index: clear the conflict or put the file in place, then run the same restore again.")
 			}
 		} else {
 			cleanupStaging(dry, staging, notesDir)
 		}
 	}
 	if count["nofile"] > 0 {
-		fmt.Println("Records without file are in the index; register audit lists them, register repair finds a file later.")
+		fmt.Println("Records without file are in the index; register audit lists them. Once a file is back, run the same restore again, or register repair --interactive.")
 	}
 	if parked > 0 || count["nofile"] > 0 || bookmarkFailed > 0 {
 		return 1
@@ -554,6 +599,43 @@ func topRoots(roots []string) []string {
 		}
 	}
 	return out
+}
+
+// indexMatchesSnapshot reports whether the index files in collections are
+// byte for byte the snapshot's: every one that holds records is in the
+// snapshot, and every one in the snapshot is here.
+func indexMatchesSnapshot(container, collections string) (bool, error) {
+	tmp, err := os.MkdirTemp("", "register-restore-index")
+	if err != nil {
+		return false, err
+	}
+	defer os.RemoveAll(tmp)
+	_, entries, err := extractContainer(container, tmp, func(n string) bool {
+		return strings.HasPrefix(n, "index/") && strings.HasSuffix(n, ".jsonl")
+	})
+	if err != nil {
+		return false, err
+	}
+	snap := map[string]string{}
+	for n, e := range entries {
+		snap[strings.TrimPrefix(n, "index/")] = e.path
+	}
+	local, _ := filepath.Glob(filepath.Join(collections, "*.jsonl"))
+	for _, f := range local {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			return false, err
+		}
+		if _, ok := snap[filepath.Base(f)]; !ok && strings.TrimSpace(string(data)) != "" {
+			return false, nil
+		}
+	}
+	for n, p := range snap {
+		if !sameBytes(p, filepath.Join(collections, n)) {
+			return false, nil
+		}
+	}
+	return len(snap) > 0, nil
 }
 
 // registerNotEmpty says why the register at collections already has records,

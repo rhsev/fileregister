@@ -1,6 +1,6 @@
 === manifest ===
 {"aka":"alpha","binder":["Ship"],"file":null,"filename":"a.md","id":"1","kind":"doc","markdown":"notes/ship-notes.md","type":"ref","url":"x-devonthink-item://AAA"}
-{"base":"notes","file":"notes/ship-notes.md","path":"collections/ship-notes.md","type":"note"}
+{"base":"notes","file":"notes/ship-notes.md","origin":"ship-notes.md","path":"collections/ship-notes.md","type":"note"}
 {"bases":{"notes":"$notes"},"finder":true,"format":2,"register":"dev","system":"$system","type":"head"}
 {"binder":["Ship"],"file":null,"filename":"b.md","id":"2","markdown":"notes/ship-notes.md","type":"ref","url":"x-devonthink-item://BBB"}
 === notes/ship-notes.md ===

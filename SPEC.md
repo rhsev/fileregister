@@ -565,7 +565,8 @@ kept, and after cleaning it must stay below the base's folder.
 
 | Field | Meaning |
 |---|---|
-| `base`, `path` | where the file was; replaces `origin`, which older containers carry relative to `collections/` and which `unmarshal` still reads |
+| `base`, `path` | where the file was; `unmarshal` places by these when they are there |
+| `origin` | the path relative to `collections/`, the only placement a register before format 2 reads; written as well so that such a register can still unpack the container (with `--scatter` for files outside `collections/`) |
 | `size`, `sha256` | the content; confirms that a file found at the target is the right one, finds a moved one |
 | `finder_tags` | the free Finder tags: all but ★ and, for a record with the `tags` backend, its binder names (names in `kept_tags` count as free); no colors |
 | `finder_comment` | the Finder comment as the engine reads it (the xattr; a comment only in `.DS_Store` is not seen) |
@@ -616,7 +617,13 @@ exit 1.
 #### `register restore <snapshot> [--into <folder>] [--map <base>=<folder>]... [--dry-run]`
 
 Only into an empty register: when an index file in the target's `collections/`
-holds records, restore refuses. Merging is `unmarshal`'s job. The index files
+holds records, restore refuses. Merging is `unmarshal`'s job. The exception is
+a register whose index files are byte for byte the snapshot's, as an earlier
+restore of it left them. Then restore goes on: a record whose bookmark finds its
+file counts as already restored, the index is not written again, and the rest
+is handled as below. So a parked file can be put in place by hand, or a conflict
+cleared, and the same snapshot restored again. The earlier run's staging folder
+is unpacked anew. The index files
 come back under their names, the notes at their paths below the notes folder.
 An existing note with the same bytes counts as placed; a different one is not
 overwritten, and the snapshot's note stays parked.
@@ -634,7 +641,7 @@ Per file record, at the target path from its base:
 Taking over or creating a file means a bookmark under the same id, the id
 attributes, the binder attribute per backend, ★ for a member, the free Finder
 tags and the comment. A record without a file stays in the index; `audit` lists
-it and `repair --interactive` binds it later. Parked files wait in
+it, and a second restore or `repair --interactive` binds it later. Parked files wait in
 `collections/import/<snapshot>/`. An id that already has a bookmark on this
 system for another existing file, and a file already registered under another
 id, are parked. Exit 0 only when nothing is parked and no file is missing.
