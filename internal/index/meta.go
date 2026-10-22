@@ -3,7 +3,10 @@ package index
 // meta — file→identity, the xattr backends, and the ★ status marker. All go
 // through the one fileanchor engine process.
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 // OfFileIDs returns the id(s) fileregister stamped on a file: kMDItemInformation
 // (engine key "id") primary, the cross-device #S sync xattr (key "sync") as
@@ -37,6 +40,21 @@ func OfFileIDs(path string) []string {
 		out = append(out, id)
 	}
 	return out
+}
+
+// MetaReadable asks the engine to read the file's id attribute and returns
+// the engine's refusal, if any: a file system without extended attributes, a
+// file it may not read. An absent id is no error.
+func MetaReadable(path string) error {
+	resp, err := fileAnchor().request(map[string]any{"op": "get_meta", "path": path, "key": "id"})
+	if err != nil {
+		return err
+	}
+	if ok, _ := resp["ok"].(bool); !ok {
+		msg, _ := resp["error"].(string)
+		return errors.New(msg)
+	}
+	return nil
 }
 
 // tagsGet returns the file's Finder tags as plain strings (color suffix already

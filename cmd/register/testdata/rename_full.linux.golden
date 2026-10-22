@@ -1,0 +1,15 @@
+exit: 0
+=== stdout ===
+Found 1 record(s) and 0 note block(s). Renaming 'Old' → 'New'…
+
+  inbox.jsonl: 1 record(s) updated
+
+  groups attribute updated: doc.txt
+
+Rename complete:
+  Index records updated : 1
+  Note blocks updated   : 0
+  xattr files updated   : 1
+
+=== stderr ===
+Collecting refs for binder 'Old'…

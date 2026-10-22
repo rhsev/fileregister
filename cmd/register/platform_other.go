@@ -5,10 +5,11 @@ package main
 // platform_other — the names platform_darwin.go defines, for Linux. Same
 // questions, other answers: removable media mount under /media, /run/media or
 // /mnt instead of /Volumes; whether a search covers a place is the engine's
-// answer (searchable), as on macOS; the Trash follows the
-// freedesktop spec; GNU tar stores no extended attributes unless asked; and
-// what the engine calls its attributes is the engine's business (fileanchor
-// PLATFORMS.md), so messages name the logical layer, not an xattr key.
+// answer (searchable), as on macOS, and on Linux it covers the engine's roots;
+// the Trash follows the freedesktop spec; GNU tar stores no extended
+// attributes unless asked; and what the engine calls its attributes is the
+// engine's business (fileanchor PLATFORMS.md), so messages name the logical
+// layer, not an xattr key.
 
 import (
 	"os"
@@ -16,6 +17,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/rhsev/fileregister/v2/internal/index"
+	unorm "golang.org/x/text/unicode/norm"
 )
 
 // detachableRoots are where Linux desktops mount removable media (udisks:
@@ -179,9 +183,27 @@ func spotlightAttrs(path string, keys []string) string { return "" }
 
 // Wording that names the search index or tells how to get a verdict.
 const (
-	noIndexHint      = "no search index can say that no file carries this id — unknowable here"
-	unjudgedAdvice   = "Mount the volume and run again. Without a search index a bookmark whose file is gone stays unjudged: register repair --interactive re-binds a moved file, register forget <id> drops a record that is gone."
-	auditUnjudged    = "Unreachable ones were not judged — mount the volume and run again; without a search index, register repair --interactive or register forget <id> settles the rest."
+	noIndexHint      = "that place is outside fileanchor's roots — \"no file carries this id\" is unknowable there"
+	unjudgedAdvice   = "Mount the volume and run again. Outside fileanchor's roots a bookmark whose file is gone stays unjudged: register repair --interactive re-binds a moved file, register forget <id> drops a record that is gone."
+	auditUnjudged    = "Unreachable ones were not judged — mount the volume and run again; outside fileanchor's roots, register repair --interactive or register forget <id> settles the rest."
 	direction2Source = "the engine's search"
 	idRestoredNote   = "(id attribute, so a search by id finds them again)"
 )
+
+// addRefusal says why add must not take a file on Linux, or "". The engine
+// finds a moved file only under its roots and keeps metadata only in
+// extended attributes, and ext4 tells a precomposed name from a decomposed
+// one, so a file outside those requirements (fileanchor PLATFORMS.md) would
+// be registered without a way to find it again.
+func addRefusal(path string) string {
+	if unorm.NFC.String(path) != path {
+		return "its path is decomposed (NFD); on Linux a registered file needs a precomposed (NFC) name — rename it first"
+	}
+	if s, _ := index.Searchable(path); !s {
+		return "it lies outside fileanchor's roots, where a moved file could not be found again — add its folder to ~/.config/fileanchor/roots"
+	}
+	if err := index.MetaReadable(path); err != nil {
+		return err.Error()
+	}
+	return ""
+}

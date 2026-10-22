@@ -194,6 +194,17 @@ func cmdAdd(args []string) int {
 	for _, f := range missing {
 		fmt.Fprintf(os.Stderr, "Skipping (not found): %s\n", f)
 	}
+	// What the platform's engine cannot keep track of is refused before any
+	// lock is taken: asking whether a place is searchable may walk the roots.
+	allowed := present[:0]
+	for _, f := range present {
+		if why := addRefusal(f); why != "" {
+			fmt.Fprintf(os.Stderr, "Skipping %s: %s\n", f, why)
+			continue
+		}
+		allowed = append(allowed, f)
+	}
+	present = allowed
 	if len(present) == 0 {
 		fmt.Fprintln(os.Stderr, "Error: no existing files to add")
 		return 1

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -17,17 +18,36 @@ var updateGolden = flag.Bool("update", false, "update golden files in testdata/"
 // assertGolden compares got against testdata/<name>.golden. With -update it
 // writes the file instead. The golden file freezes the verified-correct output,
 // so any regression surfaces as a diff.
+//
+// Off macOS a command may word a line differently (it names the engine's
+// search, not Spotlight, and attributes by their role). Such output lives in
+// testdata/<name>.linux.golden; where Linux prints the same, the one golden
+// serves both, and -update on Linux writes a .linux.golden only for a
+// difference.
 func assertGolden(t *testing.T, name, got string) {
 	t.Helper()
 	path := filepath.Join("testdata", name+".golden")
+	linux := filepath.Join("testdata", name+".linux.golden")
 	if *updateGolden {
 		if err := os.MkdirAll("testdata", 0755); err != nil {
 			t.Fatal(err)
+		}
+		if runtime.GOOS != "darwin" {
+			if shared, err := os.ReadFile(path); err == nil && string(shared) == got {
+				os.Remove(linux)
+				return
+			}
+			path = linux
 		}
 		if err := os.WriteFile(path, []byte(got), 0644); err != nil {
 			t.Fatal(err)
 		}
 		return
+	}
+	if runtime.GOOS != "darwin" {
+		if _, err := os.Stat(linux); err == nil {
+			path = linux
+		}
 	}
 	want, err := os.ReadFile(path)
 	if err != nil {

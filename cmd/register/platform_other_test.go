@@ -3,8 +3,13 @@
 package main
 
 import (
+	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+
+	"golang.org/x/sys/unix"
 )
 
 // fakeMounts hands the volume functions a mount table and a login name the
@@ -137,5 +142,67 @@ func TestLinuxNamesNoMacLayer(t *testing.T) {
 	}
 	if spotlightAttrs("/x", albumMdlsKeys) != "" {
 		t.Error("spotlightAttrs says something without Spotlight")
+	}
+}
+
+// The test helpers platform_darwin_test.go defines, for Linux: GNU cp drops
+// extended attributes unless asked, and there is no xattr tool to rely on.
+
+// copyKeepingAttrs copies a file with its extended attributes.
+func copyKeepingAttrs(src, dst string) *exec.Cmd {
+	return exec.Command("cp", "--preserve=xattr", src, dst)
+}
+
+// stripIDAttr removes the id the engine keeps on a file (fileanchor
+// PLATFORMS.md: user.fileanchor.id).
+func stripIDAttr(path string) ([]byte, error) {
+	return nil, unix.Removexattr(path, "user.fileanchor.id")
+}
+
+// clearAttrs removes every user attribute from a file.
+func clearAttrs(path string) error {
+	buf := make([]byte, 4096)
+	n, err := unix.Listxattr(path, buf)
+	if err != nil {
+		return err
+	}
+	for _, name := range strings.Split(string(buf[:n]), "\x00") {
+		if strings.HasPrefix(name, "user.") {
+			if err := unix.Removexattr(path, name); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// On Linux a decomposed name is another file than its precomposed spelling,
+// so add refuses it instead of registering a name nobody types.
+func TestAddRefusesADecomposedName(t *testing.T) {
+	anchor := engineBin(t)
+	notes := seedNotes(t)
+	env := addEnv(t, notes, anchor)
+	nfd := touchNFD(t, t.TempDir(), "Grüße.md")
+	if _, se, code := runGoAdd(t, env, nfd, "--binder", "Akte"); code == 0 || !strings.Contains(se, "decomposed (NFD)") {
+		t.Errorf("add of a decomposed name: %d %q", code, se)
+	}
+	nfc := filepath.Join(t.TempDir(), "Grüße.md")
+	writeFile(t, nfc, "x")
+	if _, se, code := runGoAdd(t, env, nfc, "--binder", "Akte"); code != 0 {
+		t.Errorf("add of the precomposed name: %d %q", code, se)
+	}
+}
+
+// add refuses a file outside the engine's roots: after a move nothing would
+// find it again.
+func TestAddRefusesAFileOutsideTheRoots(t *testing.T) {
+	anchor := engineBin(t)
+	notes := seedNotes(t)
+	t.Setenv("FILEANCHOR_ROOTS", filepath.Join(t.TempDir(), "elsewhere"))
+	env := addEnv(t, notes, anchor)
+	f := filepath.Join(t.TempDir(), "a.txt")
+	writeFile(t, f, "a")
+	if _, se, code := runGoAdd(t, env, f, "--binder", "Akte"); code == 0 || !strings.Contains(se, "outside fileanchor's roots") {
+		t.Errorf("add outside the roots: %d %q", code, se)
 	}
 }

@@ -117,7 +117,7 @@ func buildFileRefContainer(t *testing.T) string {
 		`{"type":"ref","id":"900000001","binder":["Docs"],"filename":"doc.txt","kind":"txt","file":"files/doc.txt","origin":"sub/doc.txt"}`+"\n")
 
 	out := filepath.Join(t.TempDir(), "pack.tar.gz")
-	cmd := exec.Command("tar", "--no-mac-metadata", "-czf", out, "-C", tmp, "Pack")
+	cmd := exec.Command("tar", append(append([]string{}, tarCreateArgs...), "-czf", out, "-C", tmp, "Pack")...)
 	if o, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build container: %v\n%s", err, o)
 	}
@@ -178,7 +178,7 @@ func TestUnmarshalNoteWaitsForItsRecords(t *testing.T) {
 		`{"type":"ref","id":"900000002","binder":["Docs"],"filename":"doc.txt","kind":"txt","file":"files/doc.txt","origin":"../outside/doc.txt"}`+"\n"+
 			`{"type":"note","file":"notes/binder_Docs.md","origin":"binder_Docs.md"}`+"\n")
 	container := filepath.Join(t.TempDir(), "pack.tar.gz")
-	if o, err := exec.Command("tar", "--no-mac-metadata", "-czf", container, "-C", tmp, "Pack").CombinedOutput(); err != nil {
+	if o, err := exec.Command("tar", append(append([]string{}, tarCreateArgs...), "-czf", container, "-C", tmp, "Pack")...).CombinedOutput(); err != nil {
 		t.Fatalf("build container: %v\n%s", err, o)
 	}
 

@@ -137,3 +137,8 @@ const (
 	direction2Source = "mdfind"
 	idRestoredNote   = "(kMDItemInformation, so Spotlight finds them again)"
 )
+
+// addRefusal: on macOS add takes every file that exists. APFS treats both
+// Unicode forms of a name as one file, and Spotlight and bookmarks need no
+// roots; a volume without extended attributes gets AppleDouble files.
+func addRefusal(path string) string { return "" }

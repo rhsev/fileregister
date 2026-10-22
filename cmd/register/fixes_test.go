@@ -140,7 +140,7 @@ func buildScatterContainer(t *testing.T) string {
 	writeFile(t, filepath.Join(root, "manifest.jsonl"),
 		`{"type":"ref","id":"900000002","binder":["Docs"],"filename":"out.txt","kind":"txt","file":"files/out.txt","origin":"../out.txt"}`+"\n")
 	out := filepath.Join(t.TempDir(), "scatter.tar.gz")
-	cmd := exec.Command("tar", "--no-mac-metadata", "-czf", out, "-C", tmp, "Scatter")
+	cmd := exec.Command("tar", append(append([]string{}, tarCreateArgs...), "-czf", out, "-C", tmp, "Scatter")...)
 	if o, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build container: %v\n%s", err, o)
 	}
@@ -218,7 +218,7 @@ func buildTraversalContainer(t *testing.T, fileField, origin string) string {
 		`{"type":"ref","id":"900000003","binder":["Docs"],"filename":"x.txt","kind":"txt","file":`+
 			jsonStr(fileField)+`,"origin":`+jsonStr(origin)+`}`+"\n")
 	out := filepath.Join(t.TempDir(), "evil.tar.gz")
-	cmd := exec.Command("tar", "--no-mac-metadata", "-czf", out, "-C", tmp, "Evil")
+	cmd := exec.Command("tar", append(append([]string{}, tarCreateArgs...), "-czf", out, "-C", tmp, "Evil")...)
 	if o, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build container: %v\n%s", err, o)
 	}

@@ -30,26 +30,37 @@ LDFLAGS := -X main.registerVersion=$(VERSION)
 build:
 	go build -ldflags="$(LDFLAGS)" -o $(CURDIR)/$(BIN) ./cmd/register
 
-# Build the fileanchor engine from source at the pinned tag. Needs a Swift
-# toolchain (Xcode or the Command Line Tools); macOS arm64, 13 or later.
+# Release assets are named <tool>-<macos|linux>-<amd64|arm64>, while uname
+# says Darwin or Linux and x86_64, arm64 or aarch64.
+HOST_OS   = $(subst darwin,macos,$(shell uname -s | tr A-Z a-z))
+HOST_ARCH = $(subst aarch64,arm64,$(subst x86_64,amd64,$(shell uname -m)))
+
+# The fileanchor engine at the pinned tag. On macOS it is built from source
+# and needs a Swift toolchain (Xcode or the Command Line Tools); arm64, 13 or
+# later. On Linux the tag's release binary is fetched, like grubber's; the
+# Linux engine needs kernel 6.6 or later.
 fileanchor:
+ifeq ($(HOST_OS),macos)
 	@rm -rf $(BUILD_DIR)/fileanchor-src
 	@git clone --depth 1 --branch $(FILEANCHOR_VERSION) $(FILEANCHOR_REPO) $(BUILD_DIR)/fileanchor-src
 	@cd $(BUILD_DIR)/fileanchor-src && swift build -c release
 	@install -m 755 $(BUILD_DIR)/fileanchor-src/.build/release/fileanchor $(BUILD_DIR)/fileanchor
 	@echo "→ $(BUILD_DIR)/fileanchor ($(FILEANCHOR_VERSION))"
+else
+	@mkdir -p $(BUILD_DIR)
+	@curl -fsSL -o $(BUILD_DIR)/fileanchor \
+		https://github.com/rhsev/fileanchor/releases/download/$(FILEANCHOR_VERSION)/fileanchor-$(HOST_OS)-$(HOST_ARCH)
+	@chmod 755 $(BUILD_DIR)/fileanchor
+	@echo "→ $(BUILD_DIR)/fileanchor ($$($(BUILD_DIR)/fileanchor --version))"
+endif
 
 # Fetch grubber's published release binary for this machine, not a source
 # build. grubber needs Go 1.27 to build while this repo pins an older one, and a
 # download keeps the two toolchains apart.
-# The release names its assets grubber-<macos|linux>-<amd64|arm64>, while uname
-# says Darwin or Linux and x86_64, arm64 or aarch64.
-GRUBBER_OS   = $(subst darwin,macos,$(shell uname -s | tr A-Z a-z))
-GRUBBER_ARCH = $(subst aarch64,arm64,$(subst x86_64,amd64,$(shell uname -m)))
 grubber:
 	@mkdir -p $(BUILD_DIR)
 	@curl -fsSL -o $(BUILD_DIR)/grubber \
-		https://github.com/rhsev/grubber/releases/download/$(GRUBBER_VERSION)/grubber-$(GRUBBER_OS)-$(GRUBBER_ARCH)
+		https://github.com/rhsev/grubber/releases/download/$(GRUBBER_VERSION)/grubber-$(HOST_OS)-$(HOST_ARCH)
 	@chmod 755 $(BUILD_DIR)/grubber
 	@echo "→ $(BUILD_DIR)/grubber ($$($(BUILD_DIR)/grubber --version))"
 

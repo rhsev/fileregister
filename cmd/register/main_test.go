@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -32,6 +33,16 @@ func TestMain(m *testing.M) {
 				if _, serr := os.Stat(bin); serr == nil {
 					os.Setenv("GRUBBER_BIN", bin)
 				}
+			}
+		}
+	}
+	// On Linux the engine searches only its roots (fileanchor PLATFORMS.md),
+	// and add refuses a file outside them. The tests make their files under
+	// the temp dir, so that is the root unless the caller names one.
+	if runtime.GOOS != "darwin" {
+		if _, ok := os.LookupEnv("FILEANCHOR_ROOTS"); !ok {
+			if real, err := filepath.EvalSymlinks(os.TempDir()); err == nil {
+				os.Setenv("FILEANCHOR_ROOTS", real)
 			}
 		}
 	}

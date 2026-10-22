@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -116,11 +115,11 @@ func TestAuditReportsMissingID(t *testing.T) {
 	if path == "" {
 		t.Fatal("fixture bookmark does not resolve")
 	}
-	if out, err := exec.Command("xattr", "-d", "com.apple.metadata:kMDItemInformation", path).CombinedOutput(); err != nil {
+	if out, err := stripIDAttr(path); err != nil {
 		t.Fatalf("strip id: %v %s", err, out)
 	}
 	out, _, code := runGoAudit(t, env)
-	if code != 1 || !strings.Contains(out, "MISSING ID (1)") || !strings.Contains(out, "missing: kMDItemInformation") {
+	if code != 1 || !strings.Contains(out, "MISSING ID (1)") || !strings.Contains(out, "missing: "+idLayerName) {
 		t.Errorf("exit %d, want 1 with MISSING ID:\n%s", code, out)
 	}
 }

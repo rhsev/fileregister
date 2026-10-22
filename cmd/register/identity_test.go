@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -87,7 +88,7 @@ func TestCopyIsNotTheOriginal(t *testing.T) {
 	}
 	origID := fileMeta(t, anchor, orig, "id")
 	dup := filepath.Join(dir, "copy.txt")
-	if out, err := exec.Command("cp", orig, dup).CombinedOutput(); err != nil {
+	if out, err := copyKeepingAttrs(orig, dup).CombinedOutput(); err != nil {
 		t.Fatalf("cp: %v %s", err, out)
 	}
 	if got := fileMeta(t, anchor, dup, "id"); strings.Join(got, " ") != strings.Join(origID, " ") {
@@ -131,8 +132,8 @@ func TestAddFindsTheIdThroughSyncCopy(t *testing.T) {
 		t.Fatalf("add: %d %s", code, e)
 	}
 	id := fileMeta(t, anchor, f, "sync")[0]
-	if out, err := exec.Command("xattr", "-d", "com.apple.metadata:kMDItemInformation", f).CombinedOutput(); err != nil {
-		t.Fatalf("xattr -d: %v %s", err, out)
+	if out, err := stripIDAttr(f); err != nil {
+		t.Fatalf("strip id: %v %s", err, out)
 	}
 
 	if _, e, code := runGoAdd(t, env, f, "--binder", "y"); code != 0 {
@@ -205,7 +206,7 @@ func TestCopiedFromNamesTheOriginal(t *testing.T) {
 	if _, e, code := runGoAdd(t, env, orig, "--binder", "x"); code != 0 {
 		t.Fatalf("add: %d %s", code, e)
 	}
-	exec.Command("cp", orig, dup).Run()
+	copyKeepingAttrs(orig, dup).Run()
 
 	restore := setEnv(t, env)
 	defer restore()
@@ -240,15 +241,20 @@ func TestOfTellsFilesApart(t *testing.T) {
 		t.Fatalf("add: %d %s", code, e)
 	}
 	dup := filepath.Join(dir, "Kopie.pdf")
-	exec.Command("cp", orig, dup).Run()
+	copyKeepingAttrs(orig, dup).Run()
 
 	if out, _, code := runOf(t, env, dup); code != 1 || !strings.Contains(out, "A copy of record") {
 		t.Errorf("of on a copy: %d %q", code, out)
 	}
 
-	// Strip the id: the bookmark still finds the file under its NFD name.
-	exec.Command("xattr", "-c", orig).Run()
+	// Strip the id: the bookmark still finds the file, on macOS also under its
+	// NFD name. On Linux that name is another file (ext4 keeps both forms
+	// apart), so there the file is asked about by the name it has.
+	clearAttrs(orig)
 	nfd := filepath.Join(dir, "Rechnung-Müller.pdf")
+	if runtime.GOOS != "darwin" {
+		nfd = orig
+	}
 	if out, errOut, code := runOf(t, env, nfd); code != 0 || !strings.Contains(out, "binder:   x") ||
 		!strings.Contains(errOut, "found by its bookmark") {
 		t.Errorf("of by bookmark: %d %q %q", code, out, errOut)

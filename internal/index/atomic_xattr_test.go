@@ -5,6 +5,7 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"golang.org/x/sys/unix"
@@ -20,6 +21,10 @@ func TestAtomicWriteKeepsXattrs(t *testing.T) {
 	attrs := map[string]string{
 		"com.apple.metadata:_kMDItemUserTags": "bplist-stand-in",
 		"com.example.note":                    "keep me",
+	}
+	if runtime.GOOS == "linux" {
+		// Linux keeps a user's attributes in the user. namespace.
+		attrs = map[string]string{"user.xdg.tags": "Rot,Blau", "user.example.note": "keep me"}
 	}
 	for name, value := range attrs {
 		if err := unix.Setxattr(p, name, []byte(value), 0); err != nil {
