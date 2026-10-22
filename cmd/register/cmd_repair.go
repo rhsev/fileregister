@@ -121,17 +121,38 @@ func repairRecord(rec map[string]any, newPath string) (string, []string) {
 // filename is the display label list and album show; the id stays the identity,
 // and note headings are left as they are.
 func setIndexFilename(jsonlPath, id, name string) error {
+	_, err := setIndexFilenames(jsonlPath, map[string]string{id: name})
+	return err
+}
+
+// setIndexFilenames records several files' current names (id → name) in one
+// rewrite of the index file, and returns how many lines changed.
+func setIndexFilenames(jsonlPath string, names map[string]string) (int, error) {
 	if !strings.HasSuffix(strings.ToLower(jsonlPath), ".jsonl") {
-		return nil
+		return 0, nil
 	}
-	_, err := index.JSONLRewrite(jsonlPath, func(rec map[string]any) (map[string]any, bool) {
-		if index.AsString(rec["id"]) != id || index.SameName(index.AsString(rec["filename"]), name) {
+	return index.JSONLRewrite(jsonlPath, func(rec map[string]any) (map[string]any, bool) {
+		name, ok := names[index.AsString(rec["id"])]
+		if !ok || index.SameName(index.AsString(rec["filename"]), name) {
 			return rec, false
 		}
 		rec["filename"] = index.CanonLabel(name)
 		return rec, true
 	})
-	return err
+}
+
+// renamedTo returns the name the record's file now has when the index still
+// holds another one, or "". The two Unicode forms of a name count as one: a
+// file the Finder created carries its name decomposed, the index precomposed.
+func renamedTo(rec map[string]any, path string) string {
+	old := index.AsString(rec["filename"])
+	if index.URLRef(rec) || old == "" || path == "" {
+		return ""
+	}
+	if now := filepath.Base(path); !index.SameName(old, now) {
+		return now
+	}
+	return ""
 }
 
 var digitsRe = regexp.MustCompile(`^\d+$`)

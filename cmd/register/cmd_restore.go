@@ -574,6 +574,18 @@ func cmdRestore(args []string) int {
 			cleanupStaging(dry, staging, notesDir)
 		}
 	}
+	// A file found under another name keeps its old name in the index until
+	// refresh writes the new one. restore leaves the index as the snapshot
+	// has it; a second run accepts it with refreshed names (sameIndexFile).
+	renamedFound := 0
+	for _, it := range items {
+		if it.action == "moved" && !index.SameName(it.label, filepath.Base(it.target)) {
+			renamedFound++
+		}
+	}
+	if renamedFound > 0 && !dry {
+		fmt.Printf("%d file(s) were found under another name; run register refresh to update the names in the index.\n", renamedFound)
+	}
 	if count["nofile"] > 0 {
 		fmt.Println("Records without file are in the index; register audit lists them. Once a file is back, run the same restore again, or register repair --interactive.")
 	}
@@ -602,7 +614,7 @@ func topRoots(roots []string) []string {
 }
 
 // indexMatchesSnapshot reports whether the index files in collections are
-// byte for byte the snapshot's: every one that holds records is in the
+// the snapshot's (sameIndexFile): every one that holds records is in the
 // snapshot, and every one in the snapshot is here.
 func indexMatchesSnapshot(container, collections string) (bool, error) {
 	tmp, err := os.MkdirTemp("", "register-restore-index")
@@ -631,11 +643,42 @@ func indexMatchesSnapshot(container, collections string) (bool, error) {
 		}
 	}
 	for n, p := range snap {
-		if !sameBytes(p, filepath.Join(collections, n)) {
+		if !sameIndexFile(p, filepath.Join(collections, n)) {
 			return false, nil
 		}
 	}
 	return len(snap) > 0, nil
+}
+
+// sameIndexFile reports whether two index files hold the same lines, where a
+// ref record may differ in its filename alone: refresh writes the name a file
+// has now, and the register is still the one this snapshot filled.
+func sameIndexFile(a, b string) bool {
+	da, err1 := os.ReadFile(a)
+	db, err2 := os.ReadFile(b)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	la := strings.Split(strings.TrimRight(string(da), "\n"), "\n")
+	lb := strings.Split(strings.TrimRight(string(db), "\n"), "\n")
+	if len(la) != len(lb) {
+		return false
+	}
+	for i := range la {
+		if la[i] == lb[i] {
+			continue
+		}
+		ra, rb := index.ParseJSONObject(la[i]), index.ParseJSONObject(lb[i])
+		if ra == nil || rb == nil || index.AsString(ra["type"]) != "ref" {
+			return false
+		}
+		delete(ra, "filename")
+		delete(rb, "filename")
+		if index.JSONVal(ra) != index.JSONVal(rb) {
+			return false
+		}
+	}
+	return true
 }
 
 // registerNotEmpty says why the register at collections already has records,

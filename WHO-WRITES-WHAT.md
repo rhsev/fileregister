@@ -52,7 +52,7 @@ The columns for the file and the index:
 | `remove` | binder out | — | — | — | out (last binder) | out (not a kept tag) | — |
 | `forget`† | record out | out | id out | out | — | — | — |
 | `rename`† | binder renamed | — | — | — | — | old out, new add | renamed |
-| `refresh` | — | renewed (stale) | restore | set | set (member) | add | — |
+| `refresh` | `filename` edited (renamed file) | renewed (stale) | restore | set | set (member) | add | — |
 | `repair` | `filename` edited (renamed file) | re-bound | add | set | set (member) | add | — |
 | `unmarshal` | new records | new | add | set | set (member) | add | — |
 | `restore` | index files placed | new | add | set | set (member) | add | — |

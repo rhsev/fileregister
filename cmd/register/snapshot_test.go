@@ -346,6 +346,21 @@ func TestRestoreFromFileBackup(t *testing.T) {
 	if len(comments) != 0 {
 		t.Errorf("a file with its own comment got another: %v", comments)
 	}
+	if !strings.Contains(so, "1 file(s) were found under another name; run register refresh") {
+		t.Errorf("no refresh hint for the renamed file:\n%s", so)
+	}
+
+	// refresh writes the new name; a second restore still takes the index
+	// as the snapshot's.
+	if _, se, code := runIn(t, env, cmdRefresh); code != 0 {
+		t.Fatalf("refresh: %s", se)
+	}
+	if got := index.AsString(inboxByFilename(t, notes)["vertrag-2026.pdf"]["id"]); got != fx.ids["vertrag.pdf"] {
+		t.Errorf("index has no vertrag-2026.pdf for id %s after refresh", fx.ids["vertrag.pdf"])
+	}
+	if so, se, code := runIn(t, env, cmdRestore, snap); code != 0 || !strings.Contains(so, "already restored : 4") {
+		t.Errorf("restore after refresh: exit %d\n%s\n%s", code, so, se)
+	}
 	if got := strings.Join(engineTags(t, anchor, renamed), ","); got != "Steuer 2026,★" {
 		t.Errorf("found file tags = %s", got)
 	}
@@ -579,5 +594,40 @@ func TestClassifyBases(t *testing.T) {
 	}
 	if b, _ := c.classify("/usr/share/x"); b != "system" && !strings.HasPrefix(b, "volume:") {
 		t.Errorf("classify(/usr/share/x) = %s", b)
+	}
+}
+
+func TestRefreshWritesTheNewFileName(t *testing.T) {
+	anchor := engineBin(t)
+	fx := makeSnapFixture(t, anchor)
+	old := filepath.Join(fx.home, "Ablage", "Steuer", "vertrag.pdf")
+	now := filepath.Join(fx.home, "Ablage", "Steuer", "Vertrag 2026.pdf")
+	if err := os.Rename(old, now); err != nil {
+		t.Fatal(err)
+	}
+
+	// audit names it and does not fail on it.
+	so, se, code := runIn(t, fx.env, cmdAudit)
+	if code != 0 || !strings.Contains(so, "RENAMED (1)") || !strings.Contains(so, "vertrag.pdf ("+fx.ids["vertrag.pdf"]+") → Vertrag 2026.pdf") {
+		t.Errorf("audit after a rename: exit %d\n%s\n%s", code, so, se)
+	}
+
+	// --dry-run tells, the real run writes.
+	if so, _, _ := runIn(t, fx.env, cmdRefresh, "--dry-run"); !strings.Contains(so, "[dry-run] file name in the index: vertrag.pdf → Vertrag 2026.pdf") {
+		t.Errorf("refresh --dry-run:\n%s", so)
+	}
+	if _, ok := inboxByFilename(t, fx.notes)["vertrag.pdf"]; !ok {
+		t.Errorf("refresh --dry-run changed the index")
+	}
+	so, se, code = runIn(t, fx.env, cmdRefresh)
+	if code != 0 || !strings.Contains(so, "File names updated in the index: 1") {
+		t.Errorf("refresh: exit %d\n%s\n%s", code, so, se)
+	}
+	recs := inboxByFilename(t, fx.notes)
+	if index.AsString(recs["Vertrag 2026.pdf"]["id"]) != fx.ids["vertrag.pdf"] {
+		t.Errorf("index after refresh: %v", recs)
+	}
+	if so, _, _ := runIn(t, fx.env, cmdAudit); strings.Contains(so, "RENAMED") {
+		t.Errorf("audit still reports the rename:\n%s", so)
 	}
 }

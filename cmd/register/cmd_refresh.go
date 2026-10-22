@@ -4,6 +4,9 @@ package main
 // id (kMDItemInformation, Spotlight's, and its syncable copy), the ★ managed
 // marker, and the binder xattr layer.
 //
+// One field goes the other way: the file name. After a rename the bookmark
+// follows the file, and refresh writes the name it has now into the index,
+// where repair and add look for it.
 
 import (
 	"github.com/rhsev/fileregister/v2/internal/index"
@@ -71,6 +74,8 @@ func cmdRefresh(args []string) int {
 		resolved[id] = r.Path
 	}
 	renewed := 0
+	renames := map[string]map[string]string{} // index file → id → new name
+	renamedNames := 0
 
 	type brokenEntry struct {
 		binders         []string
@@ -116,6 +121,20 @@ func cmdRefresh(args []string) int {
 		if len(shared[refPath]) > 1 {
 			skippedShared = append(skippedShared, refLabel(rec))
 			continue
+		}
+
+		if now := renamedTo(rec, refPath); now != "" {
+			old := index.AsString(rec["filename"])
+			if dryRun {
+				fmt.Printf("[dry-run] file name in the index: %s → %s\n", old, now)
+				renamedNames++
+			} else {
+				if renames[noteFile] == nil {
+					renames[noteFile] = map[string]string{}
+				}
+				renames[noteFile][id] = now
+				fmt.Printf("File name in the index: %s → %s\n", old, now)
+			}
 		}
 
 		// A stale bookmark still resolves, but macOS asks for it to be saved
@@ -182,6 +201,15 @@ func cmdRefresh(args []string) int {
 		}
 	}
 
+	for f, names := range renames {
+		n, err := setIndexFilenames(f, names)
+		renamedNames += n
+		if err != nil {
+			failed++
+			fmt.Fprintf(os.Stderr, "Warning: updating file names in %s failed: %v\n", filepath.Base(f), err)
+		}
+	}
+
 	fmt.Println("")
 	dr := ""
 	if dryRun {
@@ -195,6 +223,9 @@ func cmdRefresh(args []string) int {
 	}
 	if restoredIDs > 0 {
 		fmt.Printf("  IDs restored : %d %s\n", restoredIDs, idRestoredNote)
+	}
+	if renamedNames > 0 {
+		fmt.Printf("  File names updated in the index: %d\n", renamedNames)
 	}
 	if skippedNone > 0 {
 		fmt.Printf("  Skipped (none): %d\n", skippedNone)

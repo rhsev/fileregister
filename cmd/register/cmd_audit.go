@@ -163,6 +163,13 @@ func cmdAudit(args []string) int {
 		binder, label, noteFile string
 	}
 	var notCanonical []notCanonicalT
+	// A file renamed since it was added: the bookmark follows it, the index
+	// still holds the old name. Reported, but no reason to exit 1; refresh
+	// writes the new name.
+	type renamedT struct {
+		label, now, path string
+	}
+	var renamed []renamedT
 	okCount := 0
 
 	fmt.Printf("=== Direction 1: Record → File (%d record(s)) ===\n", len(checked))
@@ -198,6 +205,9 @@ func cmdAudit(args []string) int {
 		if trashOrBackup(refPath) != "" {
 			inTrash = append(inTrash, missingFileT{binders, noteFile, refPath, label})
 			continue
+		}
+		if now := renamedTo(rec, refPath); now != "" {
+			renamed = append(renamed, renamedT{label, now, refPath})
 		}
 		// The identity layer refresh writes: the id where Spotlight searches it
 		// (repair's first lookup), the copy that travels, ★ on members.
@@ -314,6 +324,16 @@ func cmdAudit(args []string) int {
 				fmt.Println("    → run: register refresh")
 			}
 		}
+	}
+
+	if len(renamed) > 0 {
+		fmt.Println("")
+		fmt.Printf("RENAMED (%d) — the file has another name than the index holds:\n", len(renamed))
+		for _, r := range renamed {
+			fmt.Printf("  %s → %s\n", r.label, r.now)
+			fmt.Printf("    file: %s\n", r.path)
+		}
+		fmt.Println("  → run: register refresh (updates the names in the index)")
 	}
 
 	// Direction 2: File → Record (ghost xattr scan via mdfind).

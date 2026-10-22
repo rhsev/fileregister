@@ -148,7 +148,7 @@ register <subcommand> [args...]
 | `annotate` | Edit an existing block's fields or note from the command line (`--set`, `--unset`, `--prose`) |
 | `remove` | Take files out of a binder; a record whose binder set runs empty stays, in no binder |
 | `forget` | Delete a record in no binder for good: index line, bookmark entry, its id in the notes and on the file; the notes' blocks stay, and `promote` reattaches one if the file returns |
-| `refresh` | Rebuild the attributes on each file from the index, and renew stale bookmarks |
+| `refresh` | Rebuild the attributes on each file from the index, renew stale bookmarks, and write a renamed file's new name into the index |
 | `audit` | Read-only consistency report in three directions: record → file, file → record, and bookmark → record; exits 1 while something needs you |
 | `repair` | Re-bind a moved file's broken bookmark under its unchanged id, located via Spotlight |
 | `rename` | Rename a binder across all records and xattrs; onto an existing name needs `--merge` |

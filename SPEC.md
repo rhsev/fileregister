@@ -352,6 +352,7 @@ Edits a record's `aka` handles after add time. `annotate` refuses `aka` as an id
 Pushes index state to macOS metadata. Reads every `type: ref` record from the index via `index.ReadAllRefs`, resolves the bookmarks in one batch, and for each file record whose file resolves:
 
 - renews the bookmark under the same id when macOS reports it as stale
+- writes the file's current name into the record's `filename` when the file was renamed (the two Unicode forms of a name count as one)
 - writes the id: `com.fileregister.id#S` always, and `kMDItemInformation` where the id is missing there (added, never set)
 - sets ★ when the record is in at least one binder
 - ensures each binder name in the layer of the record's `xattr:` backend:
@@ -363,7 +364,7 @@ URL records are skipped (they have no file). A file in the Trash or a backup, an
 
 Exit status is 1 when a metadata write failed, a bookmark is broken or a file is missing, that is, anything that needs the user.
 
-Direction is always index → xattr. Records are the source; xattr is the cache. The bookmark is the anchor, not part of the cache. `add`, `repair` and `unmarshal` write it; refresh renews one that still resolves but that macOS reports as stale, under the same id, and leaves a broken one to `repair`. Both id carriers derive entirely from the record's `id`, so refresh puts the id back on each resolved file in both: `com.fileregister.id#S` (the copy that travels), and `kMDItemInformation` (the one Spotlight searches) when the id is missing there. iCloud Drive strips it, and without it `repair` cannot find the file by its id. The id is added, never set. Other ids on the file stay; deciding which ids are its own is left to `add` and `repair`. An id already present is not written again (the engine answers noop).
+Direction is index → xattr. Records are the source; xattr is the cache. The one exception is `filename`: after a rename the bookmark follows the file, and the name on the volume is the truth. `repair` and `add` look for a file by that name, so refresh writes it into the index, one rewrite per index file. The bookmark is the anchor, not part of the cache. `add`, `repair` and `unmarshal` write it; refresh renews one that still resolves but that macOS reports as stale, under the same id, and leaves a broken one to `repair`. Both id carriers derive entirely from the record's `id`, so refresh puts the id back on each resolved file in both: `com.fileregister.id#S` (the copy that travels), and `kMDItemInformation` (the one Spotlight searches) when the id is missing there. iCloud Drive strips it, and without it `repair` cannot find the file by its id. The id is added, never set. Other ids on the file stay; deciding which ids are its own is left to `add` and `repair`. An id already present is not written again (the engine answers noop).
 
 Reports:
 - Records whose bookmark does not resolve (candidates for `register repair`)
@@ -372,6 +373,7 @@ Reports:
 - Count of `none`-backend records (skipped intentionally)
 - Count of records skipped in the Trash or a backup, or on a file shared with another record, when any
 - Count of ids restored to `kMDItemInformation`, when any (`--dry-run` lists them)
+- Each file name written into the index, old and new, and their count
 
 Idempotent. Safe to run repeatedly.
 
@@ -428,7 +430,7 @@ Read-only consistency report. Three directions:
 
 Two more findings on the record side: a file whose bookmark followed it into the **Trash or a backup** (a bookmark tracks its file wherever it moves), and a **shared file** that several records resolve to (two identities on one file, the trace a bad re-bind leaves). `refresh` marks neither kind (it would re-mark a discarded file, or write the records' ids onto the file in turn).
 
-The record side also checks the identity layer `refresh` writes: the record id in `kMDItemInformation` (where `repair` looks first), the same id in `com.fileregister.id#S`, and ★ on a record in a binder. A file that lacks any of them is reported as **missing id**, with `register refresh` as the remedy.
+The record side also checks the identity layer `refresh` writes: the record id in `kMDItemInformation` (where `repair` looks first), the same id in `com.fileregister.id#S`, and ★ on a record in a binder. A file that lacks any of them is reported as **missing id**, with `register refresh` as the remedy. A file whose name differs from the record's `filename` is reported as **renamed**, also with `register refresh` as the remedy; it does not change the exit status, since the bookmark still finds the file.
 
 Output is plain text. Decisions stay with the user. Exit status is 1 while something needs the user: a broken bookmark, a missing file, a missing binder xattr or id, a file in the Trash or a backup, a shared file, a ghost entry, or an orphan, broken, dead or malformed bookmark entry. Copies and entries on an absent volume are reported but do not count, so a monitor can rely on the exit status.
 
@@ -637,6 +639,10 @@ Per file record, at the target path from its base:
 | other sha256 | no (`--no-files`) | taken over, reported as changed since the snapshot |
 | other sha256 | yes | parked, never overwritten |
 | nothing | no | looked for below the bases' folders, by size first and sha256 only then. One match is taken over and reported as moved; several are parked; none leaves the record without a file |
+
+A file found under another name keeps its old `filename` in the index; restore
+says so and leaves the update to `refresh`. A second restore accepts an index
+whose records differ from the snapshot's in `filename` alone.
 
 Taking over or creating a file means a bookmark under the same id, the id
 attributes, the binder attribute per backend, ★ for a member, the free Finder
@@ -860,7 +866,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | `annotate` | Edits an existing annotation block: `--set`/`--unset` custom fields, `--prose` replaces the section's prose. Reserved keys (`id`, `binder`, `sort`) are refused with the command that owns them. |
 | `remove` | Set-deletes the binder from the index record and removes the binder name from the xattr layer; annotation blocks stay (`cleanup` reviews stale ones). With an emptied set the record stays, in no binder. |
 | `forget` | Deletes a record in no binder: index line, bookmark entry, its id in the notes' blocks (the blocks stay) and on the file. The only command that deletes a record. |
-| `refresh` | Rebuilds the derived metadata on the file from the index (the id, the ★ marker, the binder xattr through ItemProjects, Tags, or skipped for `none`) and renews stale bookmarks. Idempotent. |
+| `refresh` | Rebuilds the derived metadata on the file from the index (the id, the ★ marker, the binder xattr through ItemProjects, Tags, or skipped for `none`), renews stale bookmarks and writes a renamed file's name into the index. Idempotent. |
 | `audit` | Read-only consistency report: dangling records, broken bookmarks, mismatched/ghost xattr in both layers. |
 | `repair` | Re-binds a moved file's broken bookmark under its **unchanged** `id`; locates the file via Spotlight (id lookup first, backend-agnostic). |
 | `rename` | Renames a binder across both stores (index + annotations), the ordering config, the canonical note file, and the per-record xattr backend. |
