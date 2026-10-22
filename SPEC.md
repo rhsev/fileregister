@@ -123,7 +123,7 @@ The section every consumer of `collections/*.jsonl` relies on. Producers and con
 
 The entry unit: a heading + optional prose + one fenced ```yaml block. Producers and consumers today: **register** (promote/annotate/delete, writing), **grubber** (read), **commenter** (in the grubber repo, reading and replacing the prose), **matterbase** (section extraction).
 
-The workspace-wide rules for where an entry's prose starts and ends are those of grubber's package `entry` (cases in `entry/testdata/entries`), which `commenter` applies. In short: only a ```` ```yaml ```` fence is data, a ```` ```yml ```` fence is an example; the prose is the text between the block and the nearest boundary above it (a heading of any level, the end of another data block, a `---` line, the end of the frontmatter, the start of the file); text after a block belongs to no entry. `annotate --prose` still rebuilds the section from the heading to the next heading, which agrees with these rules for an entry of one heading and one block.
+The workspace-wide rules for where an entry's prose starts and ends are those of grubber's package `entry` (cases in `entry/testdata/entries`), which `commenter` applies. In short: only a ```` ```yaml ```` fence is data, a ```` ```yml ```` fence is an example; the prose is the text between the block and the nearest boundary above it (a heading of any level, the end of another data block, a `---` line, the end of the frontmatter, the start of the file); text after a block belongs to no entry. `annotate --prose` uses the same package, so register and commenter replace the same text.
 
 **Heading levels (the layering rule):**
 
@@ -342,9 +342,9 @@ Edits an **existing** annotation block. It is the tool form of "the user edits i
 
 - `--set k=v` replaces the field in place (an array-valued field collapses to the scalar, its `- ` items go with it) or appends it; `--unset k` removes field and items, absent = no-op. Values are scalars. Numerals and booleans are written plain (`amount=129.50` means a number; leading-zero numerals stay quoted strings), everything else follows promote's quoting.
 - **Reserved keys are refused**: `id`, `type` (identity), `binder` (membership, see `add`/`remove`), `aka` (identity handle, see `aka --add/--remove`), `sort` (ordering, see `order move`). Identity and membership have their own verbs; `_`-prefixed keys are injected, never stored.
-- `--prose` replaces the section's prose (every line of the section that is neither the heading nor a fenced `yaml` block; a `yml` fence is an example and counts as prose) with the given text (`-` reads stdin, empty clears), rewritten canonically between heading and block. The heading and the blocks themselves stay byte-identical. This is a **deliberate policy change**. register historically never touched prose; `annotate --prose` may, on explicit request, because register is the family's only Markdown writer and the alternative would be the second engine the rule exists to prevent.
+- `--prose` replaces the entry's prose with the given text (`-` reads stdin, empty clears): the text between the block and the nearest boundary above it, by the rules of grubber's package `entry` (see [Markdown entry contract](#markdown-entry-contract-normative)). Text after the block, the heading and the blocks themselves stay byte-identical. A text holding a heading, a `---` line or a `yaml` block is refused, because it would move a boundary. register historically never touched prose; `annotate --prose` may, on explicit request, through the same rules every other tool uses.
 
-Blocks are matched over id ∪ aka like every other block lookup; all matching `(id ∪ aka, binder)` blocks are edited, wherever the note lives. A block without a preceding heading refuses `--prose` (no section to rebuild). Each note is written once, in place (see [Writing a note](#writing-a-note)), fields and prose in the same pass.
+Blocks are matched over id ∪ aka like every other block lookup; all matching `(id ∪ aka, binder)` blocks are edited, wherever the note lives. Each note is written once, in place (see [Writing a note](#writing-a-note)), fields and prose in the same pass.
 
 ### `register aka <id|aka> [--add <handle>]… [--remove <handle>]…`
 
@@ -880,7 +880,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 |---|---|
 | `add` | Saves the bookmark and writes/updates the index record (set-insert the binder). With `--binder` joins a binder; **without `--binder` the record is in no binder** (empty set; folds in the former `link`). `--md`/`--target *.md` also writes an annotation. `--xattr` selects backend. |
 | `promote` | Adds a per-binder Markdown context block for a binder's records (binder- or record-granularity). Additive; the index entry stays. |
-| `annotate` | Edits an existing annotation block: `--set`/`--unset` custom fields, `--prose` replaces the section's prose. Reserved keys (`id`, `binder`, `sort`) are refused with the command that owns them. |
+| `annotate` | Edits an existing annotation block: `--set`/`--unset` custom fields, `--prose` replaces the entry's prose. Reserved keys (`id`, `binder`, `sort`) are refused with the command that owns them. |
 | `remove` | Set-deletes the binder from the index record and removes the binder name from the xattr layer; annotation blocks stay (`cleanup` reviews stale ones). With an emptied set the record stays, in no binder. |
 | `forget` | Deletes a record in no binder: index line, bookmark entry, its id in the notes' blocks (the blocks stay) and on the file. The only command that deletes a record. |
 | `refresh` | Rebuilds the derived metadata on the file from the index (the id, the ★ marker, the binder xattr through ItemProjects, Tags, or skipped for `none`), renews stale bookmarks and writes a renamed file's name into the index. Idempotent. |

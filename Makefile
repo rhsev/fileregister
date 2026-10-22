@@ -13,7 +13,7 @@ FILEANCHOR_VERSION ?= 1.4.0
 
 # The Markdown layer is read through grubber, so the album checks need it the
 # same way half the suite needs the engine. Same rule: pin a tag.
-GRUBBER_VERSION ?= v0.19.0
+GRUBBER_VERSION ?= v0.20.0
 
 # Stamp the version from the tag rather than trusting a literal in main.go,
 # which shipped 1.4.0 as 1.3.0. A dirty or untagged tree says so in --version.
@@ -55,8 +55,8 @@ else
 endif
 
 # Fetch grubber's published release binary for this machine, not a source
-# build. grubber needs Go 1.27 to build while this repo pins an older one, and a
-# download keeps the two toolchains apart.
+# build. register imports grubber's package entry from the same tag (go.mod);
+# the binary is what the commands that read notes run.
 grubber:
 	@mkdir -p $(BUILD_DIR)
 	@curl -fsSL -o $(BUILD_DIR)/grubber \

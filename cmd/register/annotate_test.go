@@ -173,3 +173,24 @@ func TestAnnotateProseIgnoresYml(t *testing.T) {
 		t.Errorf("a yml block must not be edited: n=%d err=%v\n%s", n, err, got)
 	}
 }
+
+// The prose rules are grubber's package entry: a block needs no heading of
+// its own, its prose starts after the nearest boundary.
+func TestAnnotateProseWithoutHeading(t *testing.T) {
+	content := "---\nalbum: x\n---\n\n```yaml\ntype: ref\nid: '11'\nbinder: Anno\n```\n"
+	got, n, err := annotateReplaceProse(content, map[string]bool{"11": true}, "Anno", "New.")
+	if err != nil || n != 1 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	if want := "---\nalbum: x\n---\n\nNew.\n\n```yaml\ntype: ref\nid: '11'\nbinder: Anno\n```\n"; got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// A prose that would move a boundary is refused, and nothing is changed.
+func TestAnnotateProseRefusesHeading(t *testing.T) {
+	content := "### a.pdf\n\nOld.\n\n```yaml\ntype: ref\nid: '11'\nbinder: Anno\n```\n"
+	if _, _, err := annotateReplaceProse(content, map[string]bool{"11": true}, "Anno", "Intro\n## Not prose"); err == nil {
+		t.Error("a heading in the prose must be refused")
+	}
+}

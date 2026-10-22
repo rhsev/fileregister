@@ -25,7 +25,7 @@ FILEANCHOR_REPO="${FILEANCHOR_REPO:-https://github.com/rhsev/fileanchor.git}"
 # register album reads the Markdown layer through grubber, so the bundle carries
 # it the way it carries the engine. Same pin as the Makefile, and the published
 # release binary rather than a source build, for the same reason.
-GRUBBER_VERSION="${GRUBBER_VERSION:-v0.19.0}"
+GRUBBER_VERSION="${GRUBBER_VERSION:-v0.20.0}"
 ARCH="arm64"
 OUT="$(pwd)/.build/dist"
 STAGE="$OUT/fileregister-macos-$ARCH"
@@ -112,7 +112,7 @@ Upgrading from 2.0: the bookmark store moved. Once, before the first run:
   mkdir -p ~/.local/share/fileregister && mv ~/.local/share/bookmarks.json ~/.local/share/fileregister/
 Intel Mac? Build from source instead (go install + `make fileanchor` +
 `make grubber`).
-Tested with fileanchor 1.4.0 and grubber v0.19.0.
+Tested with fileanchor 1.4.0 and grubber v0.20.0.
 NOTE
 
 TARBALL="$OUT/fileregister-macos-$ARCH.tar.gz"

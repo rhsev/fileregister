@@ -13,6 +13,8 @@ tags:
 - y
 ```
 
+Trailing prose after the block.
+
 ### beta.pdf
 ```yaml
 type: ref

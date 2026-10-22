@@ -1,5 +1,4 @@
 ### alpha.pdf
-
 ```yaml
 type: ref
 id: '11'
@@ -9,6 +8,8 @@ tags:
 - x
 - y
 ```
+
+Trailing prose after the block.
 
 ### beta.pdf
 ```yaml

@@ -6,12 +6,13 @@ package main
 // ancestor. Reserved keys are refused — identity and membership have their own
 // verbs, the ordering key belongs to `order move`.
 //
-// Prose replacement is a deliberate policy change: register used to never
-// touch prose. It may here, on explicit request (--prose), because register is
-// the only Markdown writer of the family — see SPEC §register annotate.
+// Prose replacement follows grubber's package entry, the rules commenter
+// applies as well, so register and every other tool agree on where an entry's
+// prose starts and ends — see SPEC §register annotate.
 
 import (
 	"github.com/rhsev/fileregister/v2/internal/index"
+	"github.com/rhsev/grubber/entry"
 
 	"fmt"
 	"io"
@@ -202,7 +203,7 @@ func cmdAnnotate(args []string) int {
 		if prose == "" {
 			verb = "cleared"
 		}
-		parts = append(parts, fmt.Sprintf("prose %s in %d section(s)", verb, proseEdits))
+		parts = append(parts, fmt.Sprintf("prose %s for %d block(s)", verb, proseEdits))
 	}
 	fmt.Printf("Annotated '%s' in binder '%s': %s\n", key, binder, strings.Join(parts, ", "))
 	return 0
@@ -372,178 +373,30 @@ func isSetKey(sets []annotateSet, k string) bool {
 	return false
 }
 
-// codeFenceSpans returns [start, end] line indexes of every fenced code block
-// (``` or ~~~, any info string). An unterminated fence runs to the end.
-func codeFenceSpans(lines []string) [][2]int {
-	var spans [][2]int
-	for i := 0; i < len(lines); i++ {
-		t := strings.TrimSpace(lines[i])
-		if !strings.HasPrefix(t, "```") && !strings.HasPrefix(t, "~~~") {
-			continue
-		}
-		fence := t[:3]
-		j := i + 1
-		for j < len(lines) {
-			c := strings.TrimSpace(lines[j])
-			if strings.HasPrefix(c, fence) && strings.Trim(c, fence[:1]) == "" {
-				break
-			}
-			j++
-		}
-		if j >= len(lines) {
-			j = len(lines) - 1
-		}
-		spans = append(spans, [2]int{i, j})
-		i = j
-	}
-	return spans
-}
-
-// headingLevelOf returns the Markdown heading level of a line (1–6), or 0.
-func headingLevelOf(line string) int {
-	n := 0
-	for n < len(line) && line[n] == '#' {
-		n++
-	}
-	if n < 1 || n > 6 {
-		return 0
-	}
-	if n == len(line) || line[n] == ' ' {
-		return n
-	}
-	return 0
-}
-
-// annotateReplaceProse rewrites the section around every matching block:
-// heading and fenced yaml blocks stay verbatim (in order), everything
-// else — the prose, wherever it sat — is replaced by the given text, placed
-// between heading and blocks. A section runs from the block's nearest
-// preceding heading to the NEXT heading of any level: stopping at any
-// heading keeps sections disjoint, so a nested subsection is never rebuilt
-// (and its heading destroyed) from an enclosing one, and the back-to-front
-// rebuild never works on stale indexes. Returns (content, sections changed,
-// error).
+// annotateReplaceProse replaces the prose of every matching (id ∪ aka,
+// binder) ref block. Where an entry's prose starts and ends is grubber's
+// package entry: the text between the block and the nearest boundary above it
+// (a heading of any level, another yaml block, a --- line, the frontmatter's
+// end). Text after a block belongs to no entry and stays. A prose holding a
+// heading, a --- line or a yaml block is refused, because it would move a
+// boundary. Returns (content, blocks changed, error).
 func annotateReplaceProse(content string, keys map[string]bool, binder, prose string) (string, int, error) {
-	trailingNL := strings.HasSuffix(content, "\n")
-	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
-
-	// Fence spans: [start, end] line indexes of ```yaml blocks. A ```yml fence
-	// is an example, not data, and stays part of the prose.
-	type span struct {
-		start, end int
-		matched    bool
+	n := &entry.Note{Lines: strings.Split(content, "\n")}
+	blocks := entry.ParseBlocks(n.Lines)
+	var hits []int
+	for i, b := range blocks {
+		if t, _ := b.Fields["type"].(string); t == "ref" &&
+			blockMatchesKeys(b.Fields, keys) &&
+			index.SameBinder(index.AsString(b.Fields["binder"]), binder) {
+			hits = append(hits, i)
+		}
 	}
-	var spans []span
-	for i := 0; i < len(lines); i++ {
-		t := strings.TrimSpace(lines[i])
-		if t != "```yaml" {
-			continue
-		}
-		j := i + 1
-		for j < len(lines) && strings.TrimSpace(lines[j]) != "```" {
-			j++
-		}
-		if j >= len(lines) {
-			break // unterminated fence — leave the tail alone
-		}
-		body := strings.Join(lines[i+1:j], "\n")
-		var parsed map[string]any
-		matched := false
-		if yaml.Unmarshal([]byte(body), &parsed) == nil && parsed != nil {
-			if t, _ := parsed["type"].(string); t == "ref" &&
-				blockMatchesKeys(parsed, keys) &&
-				index.SameBinder(index.AsString(parsed["binder"]), binder) {
-				matched = true
-			}
-		}
-		spans = append(spans, span{start: i, end: j, matched: matched})
-		i = j
-	}
-
-	// A column-0 `#` line INSIDE any fenced block — a YAML comment, a shell
-	// comment in a ```sh block — is not a heading. The heading scans skip
-	// every fence interior, or such a line would be read as an H1 and split
-	// the section mid-fence, leaving half a code block behind.
-	fences := codeFenceSpans(lines)
-	insideFence := func(i int) bool {
-		for _, f := range fences {
-			if i >= f[0] && i <= f[1] {
-				return true
-			}
-		}
-		return false
-	}
-	headingAt := func(i int) int {
-		if insideFence(i) {
-			return 0
-		}
-		return headingLevelOf(lines[i])
-	}
-
-	// Section ranges around matched blocks, deduped (two matched blocks under
-	// one heading rebuild once).
-	type section struct{ start, end int }
-	var sections []section
-	for _, s := range spans {
-		if !s.matched {
-			continue
-		}
-		headIdx := -1
-		for i := s.start - 1; i >= 0; i-- {
-			if headingAt(i) > 0 {
-				headIdx = i
-				break
-			}
-		}
-		if headIdx < 0 {
-			return "", 0, fmt.Errorf("block for the record has no preceding heading — edit the note by hand")
-		}
-		end := len(lines)
-		for i := headIdx + 1; i < len(lines); i++ {
-			if headingAt(i) > 0 {
-				end = i
-				break
-			}
-		}
-		if n := len(sections); n > 0 && sections[n-1].start == headIdx {
-			continue
-		}
-		sections = append(sections, section{start: headIdx, end: end})
-	}
-	if len(sections) == 0 {
+	if len(hits) == 0 {
 		return content, 0, nil
 	}
-
-	// Rebuild back-to-front so earlier indexes stay valid.
-	for si := len(sections) - 1; si >= 0; si-- {
-		sec := sections[si]
-		var rebuilt []string
-		rebuilt = append(rebuilt, lines[sec.start]) // heading
-		rebuilt = append(rebuilt, "")
-		if prose != "" {
-			rebuilt = append(rebuilt, strings.Split(prose, "\n")...)
-			rebuilt = append(rebuilt, "")
-		}
-		first := true
-		for _, s := range spans {
-			if s.start < sec.start || s.end >= sec.end {
-				continue
-			}
-			if !first {
-				rebuilt = append(rebuilt, "")
-			}
-			rebuilt = append(rebuilt, lines[s.start:s.end+1]...)
-			first = false
-		}
-		if sec.end < len(lines) {
-			rebuilt = append(rebuilt, "") // blank line before the next section
-		}
-		lines = append(lines[:sec.start], append(rebuilt, lines[sec.end:]...)...)
+	out, _, err := n.SetProse(blocks, hits, prose)
+	if err != nil {
+		return "", 0, err
 	}
-
-	out := strings.Join(lines, "\n")
-	if trailingNL {
-		out += "\n"
-	}
-	return out, len(sections), nil
+	return strings.Join(out, "\n"), len(hits), nil
 }
