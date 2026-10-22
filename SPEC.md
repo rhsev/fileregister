@@ -121,7 +121,9 @@ The section every consumer of `collections/*.jsonl` relies on. Producers and con
 
 ### Markdown entry contract (normative)
 
-The entry unit: a heading + optional prose + one fenced ```yaml block. Producers and consumers today: **register** (promote/annotate/delete, writing), **grubber** (read), **matterbase** (section extraction).
+The entry unit: a heading + optional prose + one fenced ```yaml block. Producers and consumers today: **register** (promote/annotate/delete, writing), **grubber** (read), **jot** (`jot prose`, reading and replacing the prose), **matterbase** (section extraction).
+
+The workspace-wide rules for where an entry's prose starts and ends are jot's (`jot/entry.go`, cases in `jot/testdata/entries`). In short: only a ```` ```yaml ```` fence is data, a ```` ```yml ```` fence is an example; the prose is the text between the block and the nearest boundary above it (a heading of any level, the end of another data block, a `---` line, the end of the frontmatter, the start of the file); text after a block belongs to no entry. `annotate --prose` still rebuilds the section from the heading to the next heading, which agrees with these rules for an entry of one heading and one block.
 
 **Heading levels (the layering rule):**
 
@@ -334,7 +336,7 @@ Edits an **existing** annotation block. It is the tool form of "the user edits i
 
 - `--set k=v` replaces the field in place (an array-valued field collapses to the scalar, its `- ` items go with it) or appends it; `--unset k` removes field and items, absent = no-op. Values are scalars. Numerals and booleans are written plain (`amount=129.50` means a number; leading-zero numerals stay quoted strings), everything else follows promote's quoting.
 - **Reserved keys are refused**: `id`, `type` (identity), `binder` (membership, see `add`/`remove`), `aka` (identity handle, see `aka --add/--remove`), `sort` (ordering, see `order move`). Identity and membership have their own verbs; `_`-prefixed keys are injected, never stored.
-- `--prose` replaces the section's prose (every line of the section that is neither the heading nor a fenced `yaml`/`yml` block) with the given text (`-` reads stdin, empty clears), rewritten canonically between heading and block. The heading and the blocks themselves stay byte-identical. This is a **deliberate policy change**. register historically never touched prose; `annotate --prose` may, on explicit request, because register is the family's only Markdown writer and the alternative would be the second engine the rule exists to prevent.
+- `--prose` replaces the section's prose (every line of the section that is neither the heading nor a fenced `yaml` block; a `yml` fence is an example and counts as prose) with the given text (`-` reads stdin, empty clears), rewritten canonically between heading and block. The heading and the blocks themselves stay byte-identical. This is a **deliberate policy change**. register historically never touched prose; `annotate --prose` may, on explicit request, because register is the family's only Markdown writer and the alternative would be the second engine the rule exists to prevent.
 
 Blocks are matched over id ∪ aka like every other block lookup; all matching `(id ∪ aka, binder)` blocks are edited, wherever the note lives. A block without a preceding heading refuses `--prose` (no section to rebuild). Writes are atomic, one write per file, fields and prose in the same pass.
 

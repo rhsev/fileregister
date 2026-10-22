@@ -415,7 +415,7 @@ func headingLevelOf(line string) int {
 }
 
 // annotateReplaceProse rewrites the section around every matching block:
-// heading and fenced yaml/yml blocks stay verbatim (in order), everything
+// heading and fenced yaml blocks stay verbatim (in order), everything
 // else — the prose, wherever it sat — is replaced by the given text, placed
 // between heading and blocks. A section runs from the block's nearest
 // preceding heading to the NEXT heading of any level: stopping at any
@@ -427,7 +427,8 @@ func annotateReplaceProse(content string, keys map[string]bool, binder, prose st
 	trailingNL := strings.HasSuffix(content, "\n")
 	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
 
-	// Fence spans: [start, end] line indexes of ```yaml/```yml blocks.
+	// Fence spans: [start, end] line indexes of ```yaml blocks. A ```yml fence
+	// is an example, not data, and stays part of the prose.
 	type span struct {
 		start, end int
 		matched    bool
@@ -435,7 +436,7 @@ func annotateReplaceProse(content string, keys map[string]bool, binder, prose st
 	var spans []span
 	for i := 0; i < len(lines); i++ {
 		t := strings.TrimSpace(lines[i])
-		if t != "```yaml" && t != "```yml" {
+		if t != "```yaml" {
 			continue
 		}
 		j := i + 1

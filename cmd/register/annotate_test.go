@@ -163,3 +163,13 @@ func TestAnnotateRefusals(t *testing.T) {
 	// Record exists but has no block in this binder → promote hint.
 	assertAnnotate(t, "no-block", "", false, "Other", "11", "--set", "k=v")
 }
+
+// A ```yml fence is an example, not data: it never matches a record, and in a
+// section it is prose like any other code fence.
+func TestAnnotateProseIgnoresYml(t *testing.T) {
+	content := "### a.pdf\n\n```yml\ntype: ref\nid: '11'\nbinder: Anno\n```\n"
+	got, n, err := annotateReplaceProse(content, map[string]bool{"11": true}, "Anno", "New.")
+	if err != nil || n != 0 || got != content {
+		t.Errorf("a yml block must not be edited: n=%d err=%v\n%s", n, err, got)
+	}
+}
