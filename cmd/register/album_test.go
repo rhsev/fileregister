@@ -54,7 +54,7 @@ func seedAlbumFixture(t *testing.T) string {
 			`{"type":"ref","id":"3","binder":["Alb"],"filename":"gone.jpg","kind":"image"}`+"\n")
 	writeFile(t, filepath.Join(col, "binder_Alb.md"),
 		"---\nalbum: Alben-Test\n---\n\n"+
-			"### two\n```yaml\ntype: ref\nid: '2'\nbinder: Alb\ntitle: Erstes\ncaption: Ein <Test>\nmy_own: 7\nsort: \"1\"\n```\n\n"+
+			"### two\n\nAm Wasserloch, \"früh\".\nZweite Zeile.\n\n```yaml\ntype: ref\nid: '2'\nbinder: Alb\ntitle: Erstes\ncaption: Ein <Test>\nmy_own: 7\nsort: \"1\"\n```\n\nNach dem Block, privat.\n\n"+
 			"### one\n```yaml\ntype: ref\nid: '1'\nbinder: Alb\n```\n")
 	return dir
 }
@@ -75,6 +75,11 @@ func TestAlbum(t *testing.T) {
 
 	so, se, code := runGoAlbum(t, albumEnv(t, n, anchor), "Alb")
 	assertGolden(t, "album_lines", cliResult(so, se, code))
+
+	// --prose adds the text before each block, and only that: the text after
+	// a block stays in the note.
+	po, pe, pc := runGoAlbum(t, albumEnv(t, n, anchor), "Alb", "--prose")
+	assertGolden(t, "album_lines_prose", cliResult(po, pe, pc))
 
 	// Error: unknown binder.
 	go2, ge2, gc2 := runGoAlbum(t, albumEnv(t, n, anchor), "Ghost")

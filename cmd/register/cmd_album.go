@@ -8,11 +8,13 @@ package main
 // An album line is a `list <binder> --json` line plus three keys: position
 // (the order `order show` resolves), fields (the member's block, read through
 // grubber, frontmatter inherited) and file (Spotlight and the file system).
+// With --prose, a fourth: prose, the text before the member's block.
 // list stays fast because it touches neither grubber nor Spotlight; album is
 // the one command that joins the three layers.
 
 import (
 	"github.com/rhsev/fileregister/v2/internal/index"
+	"github.com/rhsev/grubber/entry"
 
 	"fmt"
 	"os"
@@ -28,14 +30,14 @@ import (
 	unorm "golang.org/x/text/unicode/norm"
 )
 
-const albumUsage = "Usage: register album <binder> [--title TEXT]"
+const albumUsage = "Usage: register album <binder> [--title TEXT] [--prose]"
 
 // albumRemovedFlags were the HTML renderer's, gone since the album became data.
 // They get a sentence saying so instead of a bare "unknown option".
 var albumRemovedFlags = map[string]bool{"--out": true, "--css": true, "--milan": true, "--open": true}
 
 func cmdAlbum(args []string) int {
-	vals, bools, pos, unk := parseFlags(args, map[string]bool{"--title": true}, nil)
+	vals, bools, pos, unk := parseFlags(args, map[string]bool{"--title": true}, map[string]bool{"--prose": true})
 	if name := strings.TrimSuffix(unk, missingValue); albumRemovedFlags[name] {
 		fmt.Fprintf(os.Stderr, "register album: %s is gone — album prints the album as JSON lines, "+
 			"and rendering it is up to the tool that reads them (ALBUM.md)\n", name)
@@ -126,6 +128,10 @@ func cmdAlbum(args []string) int {
 		}
 	}
 	files := albumFileMetaAll(paths)
+	// The prose is the note's text and may be a private working note, so it
+	// leaves the note only when asked for.
+	withProse := bools["--prose"]
+	notes := albumNotes{}
 
 	for i, id := range ctx.displayed {
 		rec := byID[id]
@@ -133,6 +139,11 @@ func cmdAlbum(args []string) int {
 		parts := append(memberJSONParts(rec, loc), jsonPair("position", i+1))
 		if f := albumFields(blocks[id]); len(f) > 0 {
 			parts = append(parts, jsonPair("fields", f))
+		}
+		if withProse {
+			if p := notes.prose(blocks[id]); p != "" {
+				parts = append(parts, jsonPair("prose", p))
+			}
 		}
 		if !index.URLRef(rec) && loc != "" {
 			if f := files[loc]; len(f) > 0 {
@@ -172,6 +183,43 @@ func albumFields(block map[string]any) map[string]any {
 		}
 	}
 	return out
+}
+
+// albumNotes reads each note once for --prose: its lines and blocks by
+// grubber's package entry, keyed by the note's path.
+type albumNotes map[string]*albumNote
+
+type albumNote struct {
+	lines  []string
+	blocks []entry.Block
+}
+
+// prose is the member's prose: the text between its block and the nearest
+// boundary above it, found at the block's _note_file and _line, by the rules
+// commenter applies. A member without a block, or a grubber without _line,
+// has none.
+func (n albumNotes) prose(block map[string]any) string {
+	file := index.AsString(block["_note_file"])
+	line, err := strconv.Atoi(index.AsString(block["_line"]))
+	if file == "" || err != nil {
+		return ""
+	}
+	note, ok := n[file]
+	if !ok {
+		if read, rerr := entry.ReadNote(file); rerr == nil {
+			note = &albumNote{lines: read.Lines, blocks: entry.ParseBlocks(read.Lines)}
+		}
+		n[file] = note
+	}
+	if note == nil {
+		return ""
+	}
+	for _, b := range note.blocks {
+		if b.Open+1 == line {
+			return b.Prose(note.lines)
+		}
+	}
+	return ""
 }
 
 // albumMdlsKeys are the Spotlight attributes an album line reports under file.

@@ -164,7 +164,7 @@ register <subcommand> [args...]
 | `restore` | Rebuild an empty register from a snapshot; `--into` and `--map` place it in another folder, `--dry-run` shows what would happen |
 | `reindex` | Rebuild the index from Markdown ref blocks; `--dry-run` to preview |
 | `order` | Arrange a binder for presentation (`show`/`move`) |
-| `album` | The binder in order as JSON lines: each member's `list --json` line plus `position`, `fields` (its block, read through grubber) and `file` (Spotlight); `--title` names the album in the note's frontmatter |
+| `album` | The binder in order as JSON lines: each member's `list --json` line plus `position`, `fields` (its block, read through grubber) and `file` (Spotlight); `--title` names the album in the note's frontmatter, `--prose` adds the text before each block |
 
 ### More examples
 

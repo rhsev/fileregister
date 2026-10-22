@@ -9,6 +9,7 @@ whatever tool and look suits the purpose.
 
 ```sh
 register album safari                  # the album, one JSON line per member
+register album safari --prose          # with the text before each block
 ```
 
 An album line is the member's `register list safari --json` line plus three
@@ -120,8 +121,40 @@ whatever reads the album; fileregister gives none of them a meaning:
 | `date` | when |
 | `map` | `false` where a reader should not show a map |
 
-`register annotate` sets them (`--set`, `--unset`). Prose below a block is
-working notes; it does not reach the line.
+`register annotate` sets them (`--set`, `--unset`).
+
+## Prose
+
+A field holds one line. For more, such as a few paragraphs about a picture or
+a page of a report, write the text above the member's block, below its
+heading:
+
+````markdown
+### IMG_2041.jpg
+
+We got there before sunrise. The elephants came an hour later,
+and stayed until the heat drove them off.
+
+```yaml
+type: ref
+id: '270450536'
+binder: safari
+caption: At the waterhole
+```
+````
+
+The text stays in the note unless you ask for it. `register album safari
+--prose` adds it to the line as `prose`, as written, Markdown included:
+
+```json
+{"id":"270450536", … ,"fields":{"caption":"At the waterhole"},"prose":"We got there before sunrise. The elephants came an hour later,\nand stayed until the heat drove them off."}
+```
+
+Where the text of a member starts and ends is decided by grubber's package
+`entry`, the rules `commenter` applies: it is the text between the block and
+the nearest heading, other block or `---` line above it. Text below a block
+belongs to no member and never reaches the line, so it is the place for
+working notes.
 
 ## File
 
