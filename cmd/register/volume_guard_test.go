@@ -5,6 +5,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -87,5 +88,35 @@ func TestTimeMachineCopyIsABackup(t *testing.T) {
 		if trashOrBackup(p) != "in a Time Machine backup" {
 			t.Errorf("%s is not seen as a backup", p)
 		}
+	}
+}
+
+// A record whose file sits on a volume that is not mounted is not judged:
+// audit names it apart and does not send it to repair, nor exit 1 for it.
+func TestAuditLeavesAnAbsentVolumeUnjudged(t *testing.T) {
+	anchor := engineBin(t)
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := volumesDir
+	volumesDir = root
+	defer func() { volumesDir = old }()
+	vol := filepath.Join(root, "Platte")
+	if err := os.MkdirAll(vol, 0755); err != nil {
+		t.Fatal(err)
+	}
+	f := filepath.Join(vol, "x.txt")
+	writeFile(t, f, "x")
+	notes := seedNotes(t)
+	env := addEnv(t, notes, anchor)
+	if _, e, code := runGoAdd(t, env, f, "--binder", "Akte"); code != 0 {
+		t.Fatalf("add: %d %s", code, e)
+	}
+	os.RemoveAll(vol) // the volume goes away
+
+	out, errOut, code := runGoAudit(t, env)
+	if !strings.Contains(out, "ON AN ABSENT VOLUME (1)") || strings.Contains(out, "BROKEN BOOKMARK") || code != 0 {
+		t.Errorf("exit %d, want 0 with the file on an absent volume:\n%s%s", code, out, errOut)
 	}
 }

@@ -123,7 +123,11 @@ func cmdAudit(args []string) int {
 		return 0
 	}
 
-	resolved, rerr := resolveRecordPaths(checked)
+	res, rerr := resolveRecords(checked)
+	resolved := make(map[string]string, len(res))
+	for id, r := range res {
+		resolved[id] = r.Path
+	}
 	if rerr != nil {
 		// With the engine failing, every record would report as broken.
 		fmt.Fprintf(os.Stderr, "Error: fileanchor batch resolve failed: %v — cannot audit\n", rerr)
@@ -170,6 +174,14 @@ func cmdAudit(args []string) int {
 		label, now, path string
 	}
 	var renamed []renamedT
+	// A record whose file lies on a volume that is not mounted. Not judged,
+	// like the unreachable entries of direction 3, and no reason to exit 1:
+	// repair would skip it too.
+	type absentT struct {
+		binders           []string
+		label, vol, where string
+	}
+	var absent []absentT
 	okCount := 0
 
 	fmt.Printf("=== Direction 1: Record → File (%d record(s)) ===\n", len(checked))
@@ -195,6 +207,10 @@ func cmdAudit(args []string) int {
 
 		refPath := resolved[id]
 		if refPath == "" {
+			if vol := unmountedVolume(res[id].LastPath); vol != "" {
+				absent = append(absent, absentT{binders, label, vol, res[id].LastPath})
+				continue
+			}
 			brokenBookmark = append(brokenBookmark, brokenT{binders, noteFile, label})
 			continue
 		}
@@ -246,7 +262,7 @@ func cmdAudit(args []string) int {
 	}
 
 	needsYou := len(brokenBookmark)+len(missingFile)+len(missingXattr)+len(missingIdentity)+len(inTrash)+len(shared)+len(notCanonical) > 0
-	if !needsYou {
+	if !needsYou && len(absent) == 0 {
 		fmt.Printf("All %d record(s) are consistent.\n", okCount)
 	} else {
 		if okCount > 0 {
@@ -324,6 +340,16 @@ func cmdAudit(args []string) int {
 				fmt.Println("    → run: register refresh")
 			}
 		}
+	}
+
+	if len(absent) > 0 {
+		fmt.Println("")
+		fmt.Printf("ON AN ABSENT VOLUME (%d) — not mounted, so not judged:\n", len(absent))
+		for _, a := range absent {
+			fmt.Printf("  [%s] %s\n", binderTag(a.binders), a.label)
+			fmt.Printf("    last seen: %s\n", a.where)
+		}
+		fmt.Println("  → mount the volume and run again")
 	}
 
 	if len(renamed) > 0 {

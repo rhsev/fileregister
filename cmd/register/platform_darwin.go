@@ -54,18 +54,10 @@ func volumeMounted(lastPath string) bool {
 // unmountedVolume returns the name of the volume p lies on when that volume
 // is not mounted, or "". A file there is not gone, just not reachable now.
 func unmountedVolume(p string) string {
-	rest, ok := strings.CutPrefix(p, "/Volumes/")
-	if !ok {
-		return ""
+	if name := volumeName(p); name != "" && !volumeMounted(p) {
+		return name
 	}
-	name, _, _ := strings.Cut(rest, "/")
-	if name == "" {
-		return ""
-	}
-	if _, err := os.Stat(filepath.Join("/Volumes", name)); err == nil {
-		return ""
-	}
-	return name
+	return ""
 }
 
 // volumeOf is the mount a path lies on as far as its path shows: /Volumes/<name>, or /.
