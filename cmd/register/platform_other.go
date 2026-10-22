@@ -207,3 +207,42 @@ func addRefusal(path string) string {
 	}
 	return ""
 }
+
+// volumeOfPath names the volume p lies on (the last part of its mount point)
+// and the mount point, or "", "".
+func volumeOfPath(p string) (string, string) {
+	m := volumeName(p)
+	if m == "" {
+		return "", ""
+	}
+	return filepath.Base(m), m
+}
+
+// placeName is the name a placed file gets: NFC, because ext4 tells the two
+// forms apart and a registered file needs the precomposed one.
+func placeName(rel string) string { return unorm.NFC.String(rel) }
+
+// decomposedTwin reports whether the file exists only under its decomposed
+// spelling raw. register does not take it over: renaming is the user's call.
+func decomposedTwin(raw, target string) bool {
+	if raw == "" || raw == target || index.FileExists(target) {
+		return false
+	}
+	_, err := os.Lstat(raw)
+	return err == nil
+}
+
+// placeRefusal says why a file must not be placed or taken over at target,
+// or "": outside the engine's roots a moved file is not found again, and a
+// file system without extended attributes cannot hold the id.
+func placeRefusal(target string) string {
+	if s, _ := index.Searchable(target); !s {
+		return "it lies outside fileanchor's roots, where a moved file could not be found again — add the folder to ~/.config/fileanchor/roots"
+	}
+	if _, err := os.Lstat(target); err == nil {
+		if err := index.MetaReadable(target); err != nil {
+			return err.Error()
+		}
+	}
+	return ""
+}

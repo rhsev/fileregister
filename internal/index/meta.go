@@ -228,3 +228,79 @@ func IsKeptTag(rec map[string]any, tag string) bool {
 	}
 	return false
 }
+
+// FileTags returns the file's Finder tags (names only, no colors), or the
+// engine's refusal: a file that cannot be read is not a file without tags.
+func FileTags(path string) ([]string, error) {
+	resp, err := fileAnchor().request(map[string]any{"op": "tags", "path": path})
+	if err != nil {
+		return nil, err
+	}
+	if ok, _ := resp["ok"].(bool); !ok {
+		msg, _ := resp["error"].(string)
+		return nil, errors.New(msg)
+	}
+	tags, _ := resp["tags"].([]any)
+	out := make([]string, 0, len(tags))
+	for _, t := range tags {
+		if s, ok := t.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out, nil
+}
+
+// AddTag adds a Finder tag the way the user would: added, noop, or the
+// engine's error symbol.
+func AddTag(path, tag string) string { return tagsAdd(path, tag) }
+
+// FileComment returns the file's Finder comment as the engine reads it (the
+// xattr; a comment Finder keeps only in .DS_Store is not seen), "" for none.
+func FileComment(path string) (string, error) {
+	resp, err := fileAnchor().request(map[string]any{"op": "get_meta", "path": path, "key": "comment"})
+	if err != nil {
+		return "", err
+	}
+	if ok, _ := resp["ok"].(bool); !ok {
+		msg, _ := resp["error"].(string)
+		return "", errors.New(msg)
+	}
+	return AsString(resp["value"]), nil
+}
+
+// SetFileComment writes the Finder comment through the engine.
+func SetFileComment(path, comment string) error {
+	resp, err := fileAnchor().request(map[string]any{"op": "set_meta", "path": path,
+		"key": "comment", "value": comment, "mode": "set"})
+	if err != nil {
+		return err
+	}
+	if ok, _ := resp["ok"].(bool); !ok {
+		msg, _ := resp["error"].(string)
+		return errors.New(msg)
+	}
+	return nil
+}
+
+// FreeTags is the part of a file's tags that belongs to the user: all but ★
+// and, for a record with the tags backend, its binder names. A binder name in
+// kept_tags was the user's tag before it was the binder's, so it stays free.
+func FreeTags(rec map[string]any, tags []string) []string {
+	binderTag := map[string]bool{}
+	if XattrBackend(rec) == "tags" {
+		for _, b := range AsStrings(rec["binder"]) {
+			binderTag[NFC(b)] = true
+		}
+	}
+	var out []string
+	for _, t := range tags {
+		if t == managedMarker {
+			continue
+		}
+		if binderTag[NFC(t)] && !IsKeptTag(rec, t) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}

@@ -97,14 +97,26 @@ fields from the note and what the file itself carries (date, place,
 coordinates, size). A gallery, a report or a web page is built from that by
 whatever reads it; fileregister ships no renderer. See [ALBUM.md](ALBUM.md).
 
-**Rebuild a binder on another machine.** `register marshal` packs files, notes
-and a manifest into a tar.gz; `register unmarshal` unpacks it on the other
-side, mirrors the files to their origin paths and recreates the records, with the
-same binders, handles and working links, now on the second Mac. Mirroring to
-paths outside `collections/` is opt-in and explicit (`--scatter`), so a
-container from someone else can't write anywhere it likes. The container is
-OS-neutral, so the trip may go through exFAT, rsync without `-E`, or a cloud
-folder that eats xattrs.
+**Rebuild a binder on another machine.** `register marshal` packs a binder's
+files, notes and a manifest into a tar.gz. `register unmarshal` adds it to the
+register on the other side, with the same ids, binders and handles, the free
+Finder tags and the Finder comment. Each file is recorded by a base (the notes
+folder, the home folder, a volume or an absolute path) and its path below that
+base. Files from the notes folder go into the notes folder. Files from other
+bases need `--into <folder>` or `--map <base>=<folder>`, or `--scatter` to put
+them where they were, so a container from someone else can't write anywhere it
+likes. A file that already lies at its target with the same sha256 is taken
+over. The container is OS-neutral, so the trip may go through exFAT, rsync
+without `-E`, a cloud folder that eats xattrs, or a Linux machine.
+
+**Back up the whole register.** `register snapshot` packs every index file, the
+notes with ref blocks and, by default, the files into one tar.gz. Records in no
+binder and URL records are part of it. `register restore` rebuilds an empty
+register from it, in the same places, in another folder (`--into`) or on Linux.
+With `--no-files` the snapshot keeps each file's size and sha256 instead of its
+content, and restore finds the files where a separate file backup put them,
+also after a move or a rename. Bookmarks are made anew on the system that
+restores.
 
 **Keep macOS Spotlight up to date.** `register refresh` rewrites the xattrs from
 the index, and Spotlight indexes them from there. `register audit` reports drift
@@ -145,8 +157,10 @@ register <subcommand> [args...]
 | `resolve` | Turn an id or `aka` handle into a path; `--record` prints the full record |
 | `of` | Given a file, report its id, `aka` and binders |
 | `aka` | Add or remove a record's `aka` handles later (`--add`, `--remove`) |
-| `marshal` | Pack a binder's files, notes and manifest into a portable tar.gz |
-| `unmarshal` | Unpack a container, mirror files to their origin, recreate records; idempotent, conflicts parked. Origins outside `collections/` need `--scatter` |
+| `marshal` | Pack a binder's files, notes and manifest into a portable tar.gz, with free Finder tags and comments |
+| `unmarshal` | Add a container's binder to this register; idempotent, conflicts parked. Files from outside the notes folder need `--into`, `--map` or `--scatter` |
+| `snapshot` | Pack the whole register into one tar.gz (index files, notes and, by default, the files); exits 1 when a file could not be reached |
+| `restore` | Rebuild an empty register from a snapshot; `--into` and `--map` place it in another folder, `--dry-run` shows what would happen |
 | `reindex` | Rebuild the index from Markdown ref blocks; `--dry-run` to preview |
 | `order` | Arrange a binder for presentation (`show`/`move`) |
 | `album` | The binder in order as JSON lines: each member's `list --json` line plus `position`, `fields` (its block, read through grubber) and `file` (Spotlight); `--title` names the album in the note's frontmatter |
@@ -174,7 +188,10 @@ register order move project-alpha 482910337 --after 482910901
 register album project-alpha --title "Project Alpha, Q1" > alpha.jsonl
 
 register marshal --binder project-alpha --out project-alpha.tar.gz
-register unmarshal project-alpha.tar.gz      # on the other machine
+register unmarshal project-alpha.tar.gz --into ~/Restored   # on the other machine
+
+register snapshot --out ~/Backup/register.tar.gz
+register restore register.tar.gz --dry-run   # into an empty register
 
 register refresh --dry-run
 register audit --binder project-alpha

@@ -17,8 +17,11 @@ sidecars). This page shows which command writes to which of them.
 - **★ leaves a file only with its last binder** (`remove`).
 - **A note's frontmatter has one writer**, `album --title`, and it touches one
   field, `album:`.
-- **`list`, `resolve`, `of`, `audit`, `album` (without `--title`), `order show`
-  and `marshal` only read.** They write nothing to any of the four places.
+- **`list`, `resolve`, `of`, `audit`, `album` (without `--title`), `order show`,
+  `marshal` and `snapshot` only read.** They write nothing to any of the four places.
+- **Free Finder tags and the Finder comment** are written only by `unmarshal`
+  and `restore`, from the container. Tags are added, the comment is set only on
+  a file that has none.
 
 The tables below give the detail. They are derived from the code (the calls each
 command makes), not from intent.
@@ -52,10 +55,11 @@ The columns for the file and the index:
 | `refresh` | — | renewed (stale) | restore | set | set (member) | add | — |
 | `repair` | `filename` edited (renamed file) | re-bound | add | set | set (member) | add | — |
 | `unmarshal` | new records | new | add | set | set (member) | add | — |
+| `restore` | index files placed | new | add | set | set (member) | add | — |
 | `write` (`.jsonl` target) | records | — | — | — | set (`_ref_path`) | add (`_ref_path`) | — |
 | `cleanup --prune`, `--interactive`† | — | entries no record needs out | — | — | — | — | — |
 
-Read only: `list`, `resolve`, `of`, `audit`.
+Read only: `list`, `resolve`, `of`, `audit`, `snapshot`.
 
 ¹ Only with the `tags` backend, when the Finder tag was on the file before the
 binder. † Also has a part in the notes (second table), and needs grubber for it,
@@ -86,8 +90,9 @@ Notes are read through grubber.
 | `cleanup --interactive` | — | stale and unindexed blocks out | — |
 | `write` (`.md` target) | — | new | — |
 | `unmarshal` | (first table) | whole notes placed | — |
+| `restore` | (first table) | whole notes placed | — |
 
-Read only: `album`, `order show`, `marshal`, `list --inbox/--curated`.
+Read only: `album`, `order show`, `marshal`, `snapshot`, `list --inbox/--curated`.
 
 ² `promote` and `add --md` first look for a block that `forget` left behind. If
 exactly one id-less block of the binder sits under a heading naming the file, it

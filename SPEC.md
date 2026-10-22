@@ -525,6 +525,127 @@ This is the migration/repair path:
 
 Annotations are left untouched; reindex only ever *adds* to the index. A record rebuilt this way has no bookmark yet. `register repair --interactive` binds it to its file; a match by name is confirmed by hand, since only a match by id is taken without asking. The same holds for a record `register write` puts into the index.
 
+### Containers: `marshal`, `unmarshal`, `snapshot`, `restore`
+
+Two pairs move records between systems. They share the container principle
+(`tar.gz`, a manifest in JSON lines, no xattrs), the placement of files and the
+handling of Finder tags and comments. The bookmark store never travels. A
+bookmark works only on the system that made it, and the target makes new ones.
+
+| | `marshal` / `unmarshal` | `snapshot` / `restore` |
+|---|---|---|
+| Scope | one binder | the whole register: every index file, every record (also those in no binder and URL records), the notes with ref blocks |
+| Target | an existing register; records go into its `inbox.jsonl` | an empty register; index files come back under their names |
+| Files | always in the container | in the container by default, or from a separate file backup (`--no-files`) |
+| Merge | yes, conflicts are parked | no |
+
+**Bases.** Each file is recorded by a base and a path relative to it. The
+narrowest base wins, in this order:
+
+- `notes`: the notes folder (`GRUBBER_NOTES` or the set's path)
+- `home`: the home folder
+- `volume:<name>`: a mounted volume, `/Volumes/<name>` on macOS, a mount
+  under `/media`, `/run/media` or `/mnt` on Linux
+- `system`: anything else, as an absolute path
+
+The container's head records what each base was on the source system.
+
+**Placement.** `notes` always goes to the target's notes folder. `--into
+<folder>` puts every other base below one folder: `home` directly, `volume:<name>`
+in `<folder>/<name>/`, `system` in `<folder>/system/`. `--map <base>=<folder>`
+places one base and wins over `--into`. Without either, `restore` puts `home` in
+the target's home folder, a volume at its mount point if that exists, and
+`system` at its absolute path if the snapshot comes from the same kind of
+system. Anything else is not guessed; its files are parked. `unmarshal` writes
+only into the notes folder unless `--into`, `--map` or `--scatter` is given;
+`--scatter` places the other bases as `restore` does. The path below a base is
+kept, and after cleaning it must stay below the base's folder.
+
+**Per file in the manifest** (both pairs), next to the record's own fields:
+
+| Field | Meaning |
+|---|---|
+| `base`, `path` | where the file was; replaces `origin`, which older containers carry relative to `collections/` and which `unmarshal` still reads |
+| `size`, `sha256` | the content; confirms that a file found at the target is the right one, finds a moved one |
+| `finder_tags` | the free Finder tags: all but ★ and, for a record with the `tags` backend, its binder names (names in `kept_tags` count as free); no colors |
+| `finder_comment` | the Finder comment as the engine reads it (the xattr; a comment only in `.DS_Store` is not seen) |
+| `file` | the content's place in the container; absent when it does not travel |
+
+`--no-finder` leaves out tags and comment. On the target, tags are added and
+the comment is set only on a file that has none. A file that keeps a different
+comment is named in the report.
+
+#### `register marshal --binder <name> [--out <file>.tar.gz] [--all-notes] [--no-finder]`
+
+The manifest starts with a `{"type":"head"}` line (`format: 2`, system, bases),
+then one line per record and one `{"type":"note"}` line per packed note
+(`base: notes`, `path` below the notes folder). A file that does not resolve is
+packed without content, with a warning.
+
+#### `register unmarshal <container> [--into <folder>] [--map <base>=<folder>]... [--scatter] [--force]`
+
+Records go into `inbox.jsonl`. An id this register already has is parked, and a
+local note of the same name wins while the container's stays parked. A file
+already at the target with the same sha256 is taken over instead of copied; a
+different file there is parked (`--force` overwrites it). A file that is
+already registered here under another id is parked, because taking it over
+would give it two identities.
+
+#### `register snapshot [--out <file>.tar.gz] [--no-files] [--no-finder]`
+
+Container layout, below `register-snapshot-<date>/` (also the default file
+name):
+
+- `snapshot.json`: format, time, register version, system, bases, whether the
+  files are included, counts
+- `index/`: every `collections/*.jsonl` and `SCHEMA`, byte for byte, foreign
+  line types and several index files included
+- `notes/`: every note with `type: ref` blocks, by its path below the notes
+  folder
+- `files.jsonl`: one line per file record with the fields above
+- `files/<id>/<name>`: the files, by id so that equal names do not collide;
+  absent with `--no-files`
+
+All bookmarks are resolved in one engine batch. A file that does not resolve
+(volume not mounted, file gone) goes in with its last path and without content,
+size and checksum. The container is written all the same, the output names
+those files, and the exit code is 1 so that a scheduled backup notices. A line
+in an index file that is not a record is packed as it is and named, also with
+exit 1.
+
+#### `register restore <snapshot> [--into <folder>] [--map <base>=<folder>]... [--dry-run]`
+
+Only into an empty register: when an index file in the target's `collections/`
+holds records, restore refuses. Merging is `unmarshal`'s job. The index files
+come back under their names, the notes at their paths below the notes folder.
+An existing note with the same bytes counts as placed; a different one is not
+overwritten, and the snapshot's note stays parked.
+
+Per file record, at the target path from its base:
+
+| At the target | Content in the snapshot | Result |
+|---|---|---|
+| nothing | yes | created |
+| same sha256 | either | taken over |
+| other sha256 | no (`--no-files`) | taken over, reported as changed since the snapshot |
+| other sha256 | yes | parked, never overwritten |
+| nothing | no | looked for below the bases' folders, by size first and sha256 only then. One match is taken over and reported as moved; several are parked; none leaves the record without a file |
+
+Taking over or creating a file means a bookmark under the same id, the id
+attributes, the binder attribute per backend, ★ for a member, the free Finder
+tags and the comment. A record without a file stays in the index; `audit` lists
+it and `repair --interactive` binds it later. Parked files wait in
+`collections/import/<snapshot>/`. An id that already has a bookmark on this
+system for another existing file, and a file already registered under another
+id, are parked. Exit 0 only when nothing is parked and no file is missing.
+`--dry-run` reads the snapshot without its files and writes nothing.
+
+**Linux** (for `unmarshal` and `restore`). Names that are created are written
+in NFC. A file that exists only under its decomposed name is not taken over but
+parked with a hint to rename it. A target outside the engine's roots, or on a
+file system without extended attributes, is parked with the engine's reason. A
+macOS container with a `volume:<name>` base needs `--into` or `--map`.
+
 ## matterbase Touchpoints
 
 matterbase is the query-construction TUI. Its primary job is to help users assemble grubber queries (with filters, fulltext, SQL refinement) and to yank the resulting CLI command.
@@ -681,7 +802,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 - **JSONL edits are parse/mutate/serialize**: the JSONL editor mirrors the Markdown editor's surface (read all refs, update id, delete block, rename/add/remove binder) but operates on whole JSON lines rather than block regex, so index mutations do not depend on text matching. The record's `_note_file` extension picks which editor runs. Injected provenance fields (`_note_file`, `_mtime`) are stripped before a line is rewritten, so they never persist into the store. When multiple `*.jsonl` files exist, edits group records by `_note_file` and rewrite only the file each record came from.
 - **Path identity is filesystem truth**: whether two paths name the same file is decided by the filesystem where possible. Existing files compare by device:inode (`os.SameFile`), which is exact on case-sensitive APFS and Linux alike and immune to Unicode form and symlinks, because the `stat` lookup applies the filesystem's own rules. Only two nonexistent paths fall back to string comparison (NFC-normalized everywhere; case-folded on macOS only). Used by `remove`'s path fallback and `audit`'s ghost keys.
 - **Container names are form-folded for uniqueness**: payload and note names are allocated unique on a lower-cased, NFC-normalized key, so staging dirs and unpacked containers stay collision-free on case- and normalization-insensitive filesystems, regardless of the filesystem the container was built on. Basenames colliding only in case or Unicode form get a `-N` suffix instead of silently overwriting each other.
-- **unmarshal confines manifest paths**: a container's `file` and `origin` are manifest strings, not tar members, so tar's own traversal defense doesn't cover them. Both are joined and then re-checked *after* `filepath.Clean` (interior `..` collapses first): the staged `file` must stay inside the extracted container, and the `origin` write target must stay inside `collections/` unless `--scatter` is given. A foreign container therefore can't read/delete host files or write above the vault; `--scatter` exists to gate that last case.
+- **unmarshal confines manifest paths**: a container's `file`, `origin`, `base` and `path` are manifest strings, not tar members, so tar's own traversal defense doesn't cover them. They are joined and then re-checked *after* `filepath.Clean` (interior `..` collapses first): the staged `file` must stay inside the extracted container, an `origin` write target must stay inside `collections/` unless `--scatter` is given, and a `path` must stay below its base's folder, which is the notes folder unless `--into`, `--map` or `--scatter` names another. A foreign container therefore can't read/delete host files or write outside the folders the user named. `restore` reads its snapshot in-process and accepts only regular files and folders whose names stay below the staging folder.
 - **kMDItemInformation is multi-valued**: multiple record ids are space-separated in this string field, which fileanchor stores as a binary plist. Spotlight parses `com.apple.metadata:*` values as plists, and a raw `"id1 id2"` is not indexed at all ([FINDINGS-attributes.md](FINDINGS-attributes.md)). `register repair`'s most reliable file-location strategy is an id Spotlight lookup (engine `query by:id`). It is backend-agnostic, since the id xattr carries the record id regardless of which xattr layer the binder lives in.
 - **The locator is the portability seam for file discovery**: `repair` does not query Spotlight directly; its lookups go through the locator (`locator.go`), which calls the engine's `query {by, value}` op (covering id, filename, and the groups/tags xattr layers). On Linux the engine grows a second implementation of the same op (e.g. `plocate`, `locate`, or the index); no other code changes. The finder strategy is injectable in tests, so the ordering/fallback can be unit-tested without a live engine.
 - **`REGISTER_BINDER` env var**: `add`, `remove`, `promote` and `marshal` fall back to `$REGISTER_BINDER` when `--binder` is not given. Useful for session-oriented workflows (e.g. `export REGISTER_BINDER=berlin-2024; register add *.jpg --kind image`). Explicit `--binder` always wins.
@@ -739,8 +860,10 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | `cleanup` | Interactive, human-judged review of layer drift: stale context blocks, unindexed annotations, records in no binder (listed for review), bookmark entries no record needs; per-item accept/reject. Never auto-deletes a record. |
 | `reindex` | Rebuild the index from Markdown ref blocks so every record has an index entry. Idempotent; `--dry-run` previews. |
 | `write` | Internal helper: idempotent append of one ref record per input. Shares its index writer with `add`; available as a subcommand for advanced use. |
-| `marshal` | Packs a binder into a portable `tar.gz` container (manifest of index records, the files, the annotation notes). Carries no xattrs; `unmarshal` rebuilds metadata from the manifest. |
-| `unmarshal` | Unpacks a container: places each file at its `origin` (inside `collections/` unless `--scatter`), re-creates its bookmark under the same id, writes the index records. Never overwrites a file or touches an already-managed id; conflicts are parked in the import folder. |
+| `marshal` | Packs a binder into a portable `tar.gz` container (manifest of index records with base, path, size, sha256 and Finder fields per file, the files, the annotation notes). Carries no xattrs; `unmarshal` rebuilds metadata from the manifest. |
+| `unmarshal` | Unpacks a container: places each file by its base (the notes folder; other bases with `--into`, `--map` or `--scatter`), takes over a file with the same sha256, re-creates its bookmark under the same id, writes the index records. Never overwrites a file or touches an already-managed id; conflicts are parked in the import folder. |
+| `snapshot` | Packs the whole register into a `tar.gz`: index files byte for byte, notes with ref blocks, per file record its base, path, size, sha256 and Finder fields, and the files unless `--no-files`. |
+| `restore` | Rebuilds an empty register from a snapshot: index files, notes, and each file created, taken over or found again by size and sha256. Never overwrites; what cannot be placed is parked. |
 | `list` | List all binders with file counts (pure register, no Markdown scan), or files in one binder. `--inbox`/`--curated` filter by annotation status and read the optional Markdown layer on demand, through grubber. `--paths` (with a binder) prints only resolved absolute paths, one per line (unresolvable members, and paths containing a line break, are omitted with a stderr warning); `--paths --print0` separates them with NUL instead and omits none but the unresolvable; `--json` prints neutral JSONL per member (id, binder, filename, kind, aka, path/url; a member whose bookmark does not resolve carries `"broken":true` instead of a path) for a consumer to shape. Without a binder, `--json` lists the binders instead, one `{"name","count"}` line each in the table's order (filters apply; `name`, because `binder` is a record's membership and always a list), and prints nothing for an empty set, where the table prints a sentence. `--paths`/`--print0` need exactly one binder, and two binders are refused (`list` exits 1 rather than print the human table). |
 | `resolve` | Forward lookup: a key (`id` or `aka`) → the file's path. `--record` prints id/binder/filename/aka/path. |
 | `aka` | Add or remove a record's `aka` handles in the index, uniqueness-checked; guarded against Markdown blocks that reach the record only through the handle. |

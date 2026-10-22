@@ -182,9 +182,13 @@ Register — the index (identity & membership):
   audit     [--binder <name>]
   repair    [--interactive]
   reindex   [--dry-run]                    (rebuild the index from Markdown ref blocks)
-  marshal   --binder <name> [--out <file>.tar.gz] [--all-notes]  (pack a binder into a portable container)
-  unmarshal <container>.tar.gz [--force] [--scatter]  (unpack a container, mirror files, recreate records;
-            --scatter allows mirroring to origins outside collections/)
+  marshal   --binder <name> [--out <file>.tar.gz] [--all-notes] [--no-finder]  (pack a binder into a portable container)
+  unmarshal <container>.tar.gz [--into <folder>] [--map <base>=<folder>]... [--scatter] [--force]
+            (add a container's binder to this register; files outside the notes folder need
+            --into or --map, or --scatter to put them where they were)
+  snapshot  [--out <file>.tar.gz] [--no-files] [--no-finder]  (pack the whole register: index, notes, files)
+  restore   <snapshot>.tar.gz [--into <folder>] [--map <base>=<folder>]... [--dry-run]
+            (rebuild a register from a snapshot, into an empty register)
 
 Annotation — Markdown info layer:
   promote   --binder <name> [--target <file>.md] [--id <id>]
@@ -249,6 +253,8 @@ var commands = map[string]func([]string) int{
 	"rename":    cmdRename,
 	"repair":    cmdRepair,
 	"resolve":   cmdResolve,
+	"restore":   cmdRestore,
+	"snapshot":  cmdSnapshot,
 	"unmarshal": cmdUnmarshal,
 	"write":     cmdWrite,
 }

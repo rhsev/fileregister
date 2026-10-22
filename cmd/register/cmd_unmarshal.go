@@ -2,10 +2,14 @@ package main
 
 // cmd_unmarshal — unpack a container and recreate the local collection.
 //
-// Mirror placement: each file goes to `origin` resolved against the LOCAL jsonl
-// dir; the id is preserved (re-bookmarked under the same id) so the Markdown
-// back-reference re-links. Safe by default: a file is never overwritten and an
-// already-managed id is never touched — conflicts are parked in the import folder.
+// Placement: each file goes to its base and path (transfer.go). Files in the
+// notes folder go there; other bases need --into or --map, or --scatter to put
+// them where they were. A container before format 2 carries `origin` relative
+// to collections/ instead, placed as before. The id is preserved (re-bookmarked
+// under the same id) so the Markdown back-reference re-links. Safe by default:
+// a file is never overwritten and an already-managed id is never touched —
+// conflicts are parked in the import folder. A file already at the target with
+// the same sha256 is taken over instead of parked.
 
 import (
 	"github.com/rhsev/fileregister/v2/internal/index"
@@ -13,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -119,30 +124,37 @@ func rejectKeys(m map[string]any, keys ...string) map[string]any {
 	return out
 }
 
+const unmarshalUsage = "Usage: register unmarshal <container>.tar.gz [--into <folder>] [--map <base>=<folder>]... [--scatter] [--force]"
+
 func cmdUnmarshal(args []string) int {
-	force := false
-	scatter := false
+	multi, bools, pos, unknown := parseFlagsMulti(args,
+		map[string]bool{"--into": true, "--map": true},
+		map[string]bool{"--force": true, "--scatter": true})
+	if bools["--help"] {
+		fmt.Println(unmarshalUsage)
+		return 0
+	}
+	if bools["--version"] {
+		fmt.Println("register unmarshal " + registerVersion)
+		return 0
+	}
+	if unknown != "" {
+		return unknownOption("unmarshal", unknown)
+	}
+	force := bools["--force"]
+	scatter := bools["--scatter"]
 	container := ""
-	for _, a := range args {
-		switch {
-		case a == "--force":
-			force = true
-		case a == "--scatter":
-			scatter = true
-		case a == "-h" || a == "--help":
-			fmt.Println("Usage: register unmarshal <container>.tar.gz [--force] [--scatter]")
-			return 0
-		case a == "-v" || a == "--version":
-			fmt.Println("register unmarshal " + registerVersion)
-			return 0
-		default:
-			if strings.HasPrefix(a, "-") {
-				return unknownOption("unmarshal", a)
-			}
-			if container == "" {
-				container = a
-			}
-		}
+	if len(pos) > 0 {
+		container = pos[0]
+	}
+	maps, merr := parseMaps(multi["--map"])
+	if merr != nil {
+		fmt.Fprintln(os.Stderr, "Error:", merr)
+		return 1
+	}
+	into := ""
+	if v := multi["--into"]; len(v) > 0 {
+		into, _ = filepath.Abs(index.ExpandPath(v[len(v)-1]))
 	}
 
 	if container == "" || !index.FileExists(container) {
@@ -186,6 +198,7 @@ func cmdUnmarshal(args []string) int {
 	inner := filepath.Dir(manifestPath)
 
 	var refLines, noteLines []map[string]any
+	var head map[string]any
 	if data, rerr := os.ReadFile(manifestPath); rerr == nil {
 		for _, line := range strings.Split(string(data), "\n") {
 			line = strings.TrimSpace(line)
@@ -201,6 +214,8 @@ func cmdUnmarshal(args []string) int {
 				refLines = append(refLines, e)
 			case "note":
 				noteLines = append(noteLines, e)
+			case "head":
+				head = e
 			}
 		}
 	}
@@ -231,7 +246,21 @@ func cmdUnmarshal(args []string) int {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		return 1
 	}
+	home, _ := os.UserHomeDir()
+	pl := &placement{notesDir: notesDir, home: home, into: into, maps: maps, defaults: scatter}
+	if head != nil {
+		pl.srcSystem = index.AsString(head["system"])
+		if b, ok := head["bases"].(map[string]any); ok {
+			pl.srcRoots = map[string]string{}
+			for k, v := range b {
+				pl.srcRoots[k] = index.AsString(v)
+			}
+		}
+	}
+
 	dbDirty := false
+	adopted := 0
+	var remarks []string
 	imported := 0
 	parked := 0
 	bookmarkFailed := 0
@@ -252,7 +281,8 @@ func cmdUnmarshal(args []string) int {
 	}
 
 	appendRefs := func(entry map[string]any) {
-		rec := rejectKeys(entry, "file", "origin", "markdown", "binder")
+		rec := rejectKeys(entry, "file", "origin", "markdown", "binder",
+			"base", "path", "size", "sha256", "finder_tags", "finder_comment")
 		binders := index.NormalizeBinders(entry["binder"])
 		if len(binders) == 0 {
 			if r := index.NewRefRecord(rec); r.Valid() {
@@ -301,6 +331,36 @@ func cmdUnmarshal(args []string) int {
 			reasons = append(reasons, fmt.Sprintf("%s — id %s belongs to a local URL record (%s)", label, id, u))
 			continue
 		}
+		if _, newFormat := entry["base"]; newFormat || (head != nil && entry["origin"] == nil) {
+			r := placeEntry(db, entry, label, inner, pl, collections, force)
+			if r.reason != "" {
+				parked++
+				reasons = append(reasons, r.reason)
+				continue
+			}
+			if r.fatal != nil {
+				fmt.Fprintln(os.Stderr, "register:", r.fatal)
+				return 1
+			}
+			ok, rm := bindFile(db, r.target, id, entry, index.AsStrings(entry["finder_tags"]),
+				index.AsString(entry["finder_comment"]), entry["finder_tags"] != nil)
+			if ok {
+				dbDirty = true
+			} else {
+				bookmarkFailed++
+				fmt.Fprintf(os.Stderr, "  Warning: bookmark save failed for %s (id %s)\n", filepath.Base(r.target), id)
+			}
+			for _, m := range rm {
+				remarks = append(remarks, fmt.Sprintf("%s — %s", label, m))
+			}
+			if r.adopted {
+				adopted++
+			}
+			appendRefs(entry)
+			imported++
+			continue
+		}
+
 		origin := entry["origin"]
 		fRel := entry["file"]
 		if origin == nil || fRel == nil {
@@ -413,7 +473,14 @@ func cmdUnmarshal(args []string) int {
 			keptNotes = append(keptNotes, fmt.Sprintf("%s — not a Markdown note (kept staged)", filepath.Base(src)))
 			continue
 		}
-		if _, inVault := containedJoin(jsonlRoot, index.AsString(n["origin"])); !inVault {
+		inVault := false
+		if _, newFormat := n["base"]; newFormat {
+			inVault = index.AsString(n["base"]) == baseNotes &&
+				strings.HasPrefix(path.Clean(index.AsString(n["path"])), "collections/")
+		} else {
+			_, inVault = containedJoin(jsonlRoot, index.AsString(n["origin"]))
+		}
+		if !inVault {
 			scatteredNotes = append(scatteredNotes, index.AsString(n["file"]))
 			continue
 		}
@@ -433,6 +500,15 @@ func cmdUnmarshal(args []string) int {
 	}
 
 	fmt.Printf("Imported %d record(s) into %s\n", imported, notesDir)
+	if adopted > 0 {
+		fmt.Printf("Took over %d file(s) already in place with the same content\n", adopted)
+	}
+	if len(remarks) > 0 {
+		fmt.Println("Remarks:")
+		for _, r := range remarks {
+			fmt.Printf("  - %s\n", r)
+		}
+	}
 	if bookmarkFailed > 0 {
 		fmt.Printf("%d record(s) imported with a BROKEN bookmark — run: register repair\n", bookmarkFailed)
 	}
@@ -474,4 +550,68 @@ func findManifest(root string) string {
 		return nil
 	})
 	return found
+}
+
+// placed is where placeEntry put a file, or why it did not.
+type placed struct {
+	target  string
+	adopted bool   // the file was already there with the same content
+	reason  string // parked, for the report
+	fatal   error
+}
+
+// placeEntry places the file of a format-2 manifest line: at its base and
+// path, taken over when the same content is already there, never written
+// over unless force.
+func placeEntry(db map[string]string, entry map[string]any, label, inner string, pl *placement, collections string, force bool) placed {
+	base, rel := index.AsString(entry["base"]), index.AsString(entry["path"])
+	fRel := index.AsString(entry["file"])
+	if fRel == "" {
+		return placed{reason: fmt.Sprintf("%s — no file in container", label)}
+	}
+	src, why := stagedFile(inner, fRel)
+	if why != "" {
+		return placed{reason: fmt.Sprintf("%s — %s", label, why)}
+	}
+	target, why := pl.target(base, rel)
+	if why != "" {
+		return placed{reason: fmt.Sprintf("%s — %s (%s %s)", label, why, base, rel)}
+	}
+	if decomposedTwin(pl.rawTarget(base, rel), target) {
+		return placed{reason: fmt.Sprintf("%s — the file exists with a decomposed (NFD) name at %s; rename it to NFC, then unmarshal again", label, target)}
+	}
+	if why := protectedTarget(target, underDir(target, collections)); why != "" {
+		return placed{reason: fmt.Sprintf("%s — target is %s (%s)", label, why, target)}
+	}
+	if fi, err := os.Stat(target); err == nil {
+		sum := index.AsString(entry["sha256"])
+		if fi.Mode().IsRegular() && sum != "" && sameContent(target, fi.Size(), manifestInt(entry["size"]), sum) {
+			if why := placeRefusal(target); why != "" {
+				return placed{reason: fmt.Sprintf("%s — %s", label, why)}
+			}
+			if other := otherIdentity(db, target, index.AsString(entry["id"])); other != "" {
+				return placed{reason: fmt.Sprintf("%s — %s is already registered here as id %s", label, target, other)}
+			}
+			os.Remove(src)
+			return placed{target: target, adopted: true}
+		}
+		if !force {
+			return placed{reason: fmt.Sprintf("%s — a different file exists at %s", filepath.Base(target), target)}
+		}
+	}
+	if why := placeRefusal(target); why != "" {
+		return placed{reason: fmt.Sprintf("%s — %s", label, why)}
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return placed{fatal: err}
+	}
+	if _, _, err := copyFileHashed(src, target); err != nil {
+		return placed{fatal: err}
+	}
+	if why := placeRefusal(target); why != "" {
+		os.Remove(target)
+		return placed{reason: fmt.Sprintf("%s — %s", label, why)}
+	}
+	os.Remove(src)
+	return placed{target: target}
 }

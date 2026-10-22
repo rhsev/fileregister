@@ -142,3 +142,24 @@ const (
 // Unicode forms of a name as one file, and Spotlight and bookmarks need no
 // roots; a volume without extended attributes gets AppleDouble files.
 func addRefusal(path string) string { return "" }
+
+// volumeOfPath names the volume p lies on and its mount point, or "", "".
+func volumeOfPath(p string) (string, string) {
+	name := volumeName(p)
+	if name == "" {
+		return "", ""
+	}
+	return name, volumesDir + "/" + name
+}
+
+// placeName is the name a placed file gets. APFS keeps one file for both
+// Unicode forms, so the recorded name stays as it was.
+func placeName(rel string) string { return rel }
+
+// decomposedTwin is the Linux check for a file that exists only under the
+// decomposed spelling of target. On APFS both spellings are one file.
+func decomposedTwin(raw, target string) bool { return false }
+
+// placeRefusal says why a file must not be placed or taken over at target,
+// or "". On macOS the engine works on every volume.
+func placeRefusal(target string) string { return "" }

@@ -154,7 +154,7 @@ func containerGolden(t *testing.T, tgz string) string {
 	var b strings.Builder
 	b.WriteString("=== manifest ===\n")
 	for _, l := range manifestMultiset(t, filepath.Join(root, "manifest.jsonl")) {
-		b.WriteString(l + "\n")
+		b.WriteString(headNeutral(l) + "\n")
 	}
 	tree := treeContents(t, root)
 	keys := keysOf(tree)
@@ -162,6 +162,24 @@ func containerGolden(t *testing.T, tgz string) string {
 		b.WriteString("=== " + k + " ===\n" + tree[k])
 	}
 	return b.String()
+}
+
+// headNeutral replaces the head line's base roots (temp folders) with their
+// names and the system with a placeholder, so the golden does not depend on
+// where the test ran.
+func headNeutral(line string) string {
+	var obj map[string]any
+	if json.Unmarshal([]byte(line), &obj) != nil || obj["type"] != "head" {
+		return line
+	}
+	if bases, ok := obj["bases"].(map[string]any); ok {
+		for k := range bases {
+			bases[k] = "$" + k
+		}
+	}
+	obj["system"] = "$system"
+	out, _ := json.Marshal(obj)
+	return string(out)
 }
 
 func assertMarshal(t *testing.T, label string, env []string, extraArgs ...string) {

@@ -4,13 +4,17 @@ package main
 //
 // Container layout:
 //   <name>/
-//     manifest.jsonl   index records; file/markdown are paths relative to <name>/,
-//                      plus one {"type":"note",…} line per packed annotation note
+//     manifest.jsonl   a {"type":"head",…} line (system, bases), the index
+//                      records, one {"type":"note",…} line per packed note
 //     files/           the target files
 //     notes/           the associated Markdown annotation notes
 //
-// The archive carries no xattrs — unmarshal rebuilds metadata from the manifest,
-// keeping the format OS-neutral.
+// Each record with a file says where the file was (base and path, see
+// transfer.go), its size and sha256, its free Finder tags and comment; file
+// and markdown are paths relative to <name>/. The archive carries no xattrs —
+// unmarshal rebuilds metadata from the manifest, keeping the format OS-neutral.
+// Containers before format 2 carry origin (relative to collections/) instead
+// of base and path; unmarshal still reads them.
 //
 // Note on manifest key order: the manifest preserves the record's input
 // key order; this Go port emits map order. The manifest is machine-read by
@@ -24,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -77,6 +82,7 @@ func cmdMarshal(args []string) int {
 	binder := ""
 	out := ""
 	allNotes := false
+	withFinder := true
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -92,8 +98,10 @@ func cmdMarshal(args []string) int {
 			out = strings.TrimPrefix(a, "--out=")
 		case a == "--all-notes":
 			allNotes = true
+		case a == "--no-finder":
+			withFinder = false
 		case a == "-h" || a == "--help":
-			fmt.Println("Usage: register marshal --binder <name> [--out <file>.tar.gz]")
+			fmt.Println("Usage: register marshal --binder <name> [--out <file>.tar.gz] [--all-notes] [--no-finder]")
 			return 0
 		case a == "-v" || a == "--version":
 			fmt.Println("register marshal " + registerVersion)
@@ -153,7 +161,11 @@ func cmdMarshal(args []string) int {
 
 	// Resolve every record's bookmark (URL records carry no path and are handled
 	// without a file payload below).
-	resolved, rerr := resolveRecordPaths(records)
+	resolutions, rerr := resolveRecords(records)
+	resolved := map[string]string{}
+	for id, r := range resolutions {
+		resolved[id] = r.Path
+	}
 	if rerr != nil {
 		fmt.Fprintf(os.Stderr, "Error: fileanchor batch resolve failed: %v — container would be incomplete\n", rerr)
 		return 1
@@ -211,10 +223,12 @@ func cmdMarshal(args []string) int {
 		return 1
 	}
 
+	classifier := newBaseClassifier(notesDir)
+
 	// notePack: note path → {file, origin}. Binder notes (origin inside
 	// collections/) always travel; scattered notes (origin escaping via ..) only
 	// with --all-notes.
-	type packEntry struct{ file, origin string }
+	type packEntry struct{ file, origin, path string }
 	notePack := map[string]packEntry{}
 	notesTaken := map[string]bool{}
 	var noteKeys []string
@@ -243,7 +257,8 @@ func cmdMarshal(args []string) int {
 			fmt.Fprintln(os.Stderr, "register:", err)
 			return 1
 		}
-		notePack[note] = packEntry{file: "notes/" + name, origin: origin}
+		_, notePath := classifier.classify(realNote)
+		notePack[note] = packEntry{file: "notes/" + name, origin: origin, path: notePath}
 	}
 
 	// Preferred annotation note per id — binder notes win over scattered ones.
@@ -270,7 +285,7 @@ func cmdMarshal(args []string) int {
 	}
 
 	fileRel := map[string]string{}
-	originRel := map[string]string{}
+	facts := map[string]map[string]any{}
 	filesTaken := map[string]bool{}
 	var manifest []map[string]any
 
@@ -281,26 +296,28 @@ func cmdMarshal(args []string) int {
 		if index.URLRef(rec) {
 			urls++ // pure data — no file payload to stage
 		} else if _, done := fileRel[id]; !done {
+			f := map[string]any{}
 			if src != "" && index.FileExists(src) {
 				name := marshalUniqueName(filepath.Base(src), filesTaken)
-				if err := copyFile(src, filepath.Join(filesDir, name)); err != nil {
-					fmt.Fprintln(os.Stderr, "register:", err)
+				size, sum, cerr := copyFileHashed(src, filepath.Join(filesDir, name))
+				if cerr != nil {
+					fmt.Fprintln(os.Stderr, "register:", cerr)
 					return 1
 				}
 				fileRel[id] = "files/" + name
-				realSrc, rerr := filepath.EvalSymlinks(src)
-				if rerr != nil {
-					realSrc = src
-				}
-				if rel, rlerr := filepath.Rel(jsonlRoot, realSrc); rlerr == nil {
-					originRel[id] = rel
-				} else {
-					originRel[id] = realSrc
+				f["base"], f["path"] = classifier.classify(src)
+				f["size"], f["sha256"] = size, sum
+				if withFinder {
+					addFinderFields(f, rec, src)
 				}
 			} else {
 				missing++
+				if base, rel := classifier.classify(resolutions[id].LastPath); base != "" {
+					f["base"], f["path"] = base, rel
+				}
 				fmt.Fprintf(os.Stderr, "  Warning: file for id %s not found — record marshaled without its file\n", id)
 			}
+			facts[id] = f
 		}
 
 		entry := map[string]any{}
@@ -309,8 +326,10 @@ func cmdMarshal(args []string) int {
 				entry[k] = v
 			}
 		}
+		for k, v := range facts[id] {
+			entry[k] = v
+		}
 		entry["file"] = nilIfEmpty(fileRel[id])
-		entry["origin"] = nilIfEmpty(originRel[id])
 		entry["markdown"] = nilIfEmpty(mdForID[id])
 		manifest = append(manifest, entry)
 	}
@@ -319,11 +338,15 @@ func cmdMarshal(args []string) int {
 	for _, note := range noteKeys {
 		if pack, ok := notePack[note]; ok {
 			manifest = append(manifest, map[string]any{
-				"type": "note", "file": pack.file, "origin": pack.origin,
+				"type": "note", "file": pack.file, "base": baseNotes, "path": pack.path,
 			})
 		}
 	}
 	notesPacked := len(notePack)
+
+	head := map[string]any{"type": "head", "format": 2, "register": registerVersion,
+		"system": runtime.GOOS, "bases": classifier.roots, "finder": withFinder}
+	manifest = append([]map[string]any{head}, manifest...)
 
 	// Checked writes: a short write here (ENOSPC while staging) would tar a
 	// silently truncated manifest that imports as a subset on the other side.
