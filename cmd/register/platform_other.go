@@ -199,6 +199,11 @@ func addRefusal(path string) string {
 	if unorm.NFC.String(path) != path {
 		return "its path is decomposed (NFD); on Linux a registered file needs a precomposed (NFC) name — rename it first"
 	}
+	// Asking the engine starts it; a missing or broken engine would otherwise
+	// read as "not searchable" and blame the roots.
+	if err := index.EngineError(); err != nil {
+		return "the fileanchor engine is not available: " + err.Error()
+	}
 	if s, _ := index.Searchable(path); !s {
 		return "it lies outside fileanchor's roots, where a moved file could not be found again — add its folder to ~/.config/fileanchor/roots"
 	}

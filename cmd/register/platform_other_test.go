@@ -3,6 +3,7 @@
 package main
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -204,5 +205,54 @@ func TestAddRefusesAFileOutsideTheRoots(t *testing.T) {
 	writeFile(t, f, "a")
 	if _, se, code := runGoAdd(t, env, f, "--binder", "Akte"); code == 0 || !strings.Contains(se, "outside fileanchor's roots") {
 		t.Errorf("add outside the roots: %d %q", code, se)
+	}
+}
+
+// Without its engine, add says so instead of blaming the roots.
+func TestAddNamesAMissingEngine(t *testing.T) {
+	notes := seedNotes(t)
+	env := addEnv(t, notes, filepath.Join(t.TempDir(), "no-such-fileanchor"))
+	f := filepath.Join(t.TempDir(), "a.txt")
+	writeFile(t, f, "a")
+	_, se, code := runGoAdd(t, env, f, "--binder", "Akte")
+	if code == 0 || !strings.Contains(se, "engine is not available") || strings.Contains(se, "outside fileanchor's roots") {
+		t.Errorf("add without an engine: %d %q", code, se)
+	}
+}
+
+// A record whose file sits on a disk that is not mounted is not judged: audit
+// names it apart and does not send it to repair, nor exit 1 for it.
+func TestAuditLeavesAnAbsentVolumeUnjudged(t *testing.T) {
+	anchor := engineBin(t)
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	vol := filepath.Join(root, "ralf", "Platte")
+	mounted := true
+	fakeMounts(t, nil, "ralf")
+	detachableRoots = []string{root}
+	mountPoints = func() []string {
+		if mounted {
+			return []string{"/", vol}
+		}
+		return []string{"/"}
+	}
+	if err := os.MkdirAll(vol, 0755); err != nil {
+		t.Fatal(err)
+	}
+	f := filepath.Join(vol, "x.txt")
+	writeFile(t, f, "x")
+	notes := seedNotes(t)
+	env := addEnv(t, notes, anchor)
+	if _, e, code := runGoAdd(t, env, f, "--binder", "Akte"); code != 0 {
+		t.Fatalf("add: %d %s", code, e)
+	}
+	os.RemoveAll(vol) // the disk goes away
+	mounted = false
+
+	out, errOut, code := runGoAudit(t, env)
+	if !strings.Contains(out, "ON AN ABSENT VOLUME (1)") || strings.Contains(out, "BROKEN BOOKMARK") || code != 0 {
+		t.Errorf("exit %d, want 0 with the file on an absent disk:\n%s%s", code, out, errOut)
 	}
 }
