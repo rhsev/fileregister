@@ -121,9 +121,9 @@ The section every consumer of `collections/*.jsonl` relies on. Producers and con
 
 ### Markdown entry contract (normative)
 
-The entry unit: a heading + optional prose + one fenced ```yaml block. Producers and consumers today: **register** (promote/annotate/delete, writing), **grubber** (read), **jot** (`jot prose`, reading and replacing the prose), **matterbase** (section extraction).
+The entry unit: a heading + optional prose + one fenced ```yaml block. Producers and consumers today: **register** (promote/annotate/delete, writing), **grubber** (read), **commenter** (in the grubber repo, reading and replacing the prose), **matterbase** (section extraction).
 
-The workspace-wide rules for where an entry's prose starts and ends are jot's (`jot/entry.go`, cases in `jot/testdata/entries`). In short: only a ```` ```yaml ```` fence is data, a ```` ```yml ```` fence is an example; the prose is the text between the block and the nearest boundary above it (a heading of any level, the end of another data block, a `---` line, the end of the frontmatter, the start of the file); text after a block belongs to no entry. `annotate --prose` still rebuilds the section from the heading to the next heading, which agrees with these rules for an entry of one heading and one block.
+The workspace-wide rules for where an entry's prose starts and ends are those of grubber's package `entry` (cases in `entry/testdata/entries`), which `commenter` applies. In short: only a ```` ```yaml ```` fence is data, a ```` ```yml ```` fence is an example; the prose is the text between the block and the nearest boundary above it (a heading of any level, the end of another data block, a `---` line, the end of the frontmatter, the start of the file); text after a block belongs to no entry. `annotate --prose` still rebuilds the section from the heading to the next heading, which agrees with these rules for an entry of one heading and one block.
 
 **Heading levels (the layering rule):**
 
@@ -154,7 +154,7 @@ The H3 heading is the filename (human recognition); the YAML block is the back-r
 
 A note can itself be a member of a binder, so register rewrites a note **in place** and keeps its inode: a temp file renamed over it would give it a new inode, and its bookmark would break on the next rename. The extended attributes, the creation date, flags, ACLs and hard links stay with the file as well. The index files are not notes and keep the temp-file-and-rename write above.
 
-Crash safety comes from a journal. The new content is first written and synced to `.<name>.journal` next to the note, then the note is overwritten and synced, then the journal is removed. If a write stops halfway, the journal holds the complete new content, and every later write of that note refuses until the user has compared the two and removed the journal. `jot prose` writes notes the same way and uses the same journal name. A note that does not exist yet is created through the temp file.
+Crash safety comes from a journal. The new content is first written and synced to `.<name>.journal` next to the note, then the note is overwritten and synced, then the journal is removed. If a write stops halfway, the journal holds the complete new content, and every later write of that note refuses until the user has compared the two and removed the journal. `commenter` writes notes the same way and uses the same journal name. A note that does not exist yet is created through the temp file.
 
 ### Binder names
 

@@ -11,8 +11,8 @@ package index
 // written next to the note and synced first, then the note is overwritten and
 // synced, then the journal goes. If the write stops halfway, the journal holds
 // the complete new content, and every later write refuses until it is
-// resolved. jot uses the same journal name, so either tool sees what the other
-// left behind.
+// resolved. commenter (grubber's package entry) uses the same journal name, so
+// either tool sees what the other left behind.
 
 import (
 	"errors"
