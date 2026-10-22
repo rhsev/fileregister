@@ -619,16 +619,26 @@ exit 1.
 #### `register restore <snapshot> [--into <folder>] [--map <base>=<folder>]... [--dry-run]`
 
 Only into an empty register: when an index file in the target's `collections/`
-holds records, restore refuses. Merging is `unmarshal`'s job. The exception is
-a register whose index files are byte for byte the snapshot's, as an earlier
-restore of it left them. Then restore goes on: a record whose bookmark finds its
-file counts as already restored, the index is not written again, and the rest
-is handled as below. So a parked file can be put in place by hand, or a conflict
-cleared, and the same snapshot restored again. The earlier run's staging folder
-is unpacked anew. The index files
-come back under their names, the notes at their paths below the notes folder.
-An existing note with the same bytes counts as placed; a different one is not
-overwritten, and the snapshot's note stays parked.
+holds records, restore refuses. Merging is `unmarshal`'s job. The index files
+come back under their names, byte for byte as the snapshot holds them: the same
+bytes in the same order, nothing parsed and written anew, so key order, spacing
+and the Unicode form of every name stay as they were. The notes come back at
+their paths below the notes folder. An existing note with the same bytes counts
+as placed; a different one is not overwritten, and the snapshot's note stays
+parked.
+
+**A second run.** restore also goes on in a register that an earlier restore of
+the same snapshot filled. It recognizes that register by its index: the same
+index files under the same names, with the same lines in the same order. A line
+may differ from the snapshot's in one way only. It is a ref record whose fields
+other than `filename` are the same, compared after parsing, so key order does
+not count. That is the change `refresh` makes for a renamed file. Any other
+change, a record added, removed or edited, or lines in another order, makes it
+another register, and restore refuses. On a second run a record whose bookmark
+finds its file counts as already restored, the index is not written again, and
+the rest is handled as in the first run. So a parked file can be put in place by
+hand, or a conflict cleared, and the same snapshot restored again. The earlier
+run's staging folder is unpacked anew.
 
 Per file record, at the target path from its base:
 
@@ -641,8 +651,7 @@ Per file record, at the target path from its base:
 | nothing | no | looked for below the bases' folders, by size first and sha256 only then. One match is taken over and reported as moved; several are parked; none leaves the record without a file |
 
 A file found under another name keeps its old `filename` in the index; restore
-says so and leaves the update to `refresh`. A second restore accepts an index
-whose records differ from the snapshot's in `filename` alone.
+says so and leaves the update to `refresh`.
 
 Taking over or creating a file means a bookmark under the same id, the id
 attributes, the binder attribute per backend, ★ for a member, the free Finder
