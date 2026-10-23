@@ -3,7 +3,9 @@ package main
 // cmd_snapshot — pack the whole register into one tar.gz: every index file
 // byte for byte, every note with ref blocks, and one line per file record with
 // where the file was (base and path), its size and sha256, its free Finder
-// tags and comment, and by default the file itself.
+// tags and comment, and by default the file itself. Each line also carries the
+// file's modification time, so that a later snapshot taken --since this one
+// reads only the files that changed.
 //
 // Container layout:
 //   register-snapshot-<date>/
@@ -32,11 +34,11 @@ import (
 const snapshotFormat = "register-snapshot"
 const snapshotVersion = 1
 
-const snapshotUsage = "Usage: register snapshot [--out <file>.tar.gz] [--no-files] [--no-finder]"
+const snapshotUsage = "Usage: register snapshot [--out <file>.tar.gz] [--no-files [--since <snapshot>]] [--no-finder]"
 
 func cmdSnapshot(args []string) int {
 	vals, bools, pos, unknown := parseFlags(args,
-		map[string]bool{"--out": true},
+		map[string]bool{"--out": true, "--since": true},
 		map[string]bool{"--no-files": true, "--no-finder": true})
 	if bools["--help"] {
 		fmt.Println(snapshotUsage)
@@ -55,6 +57,23 @@ func cmdSnapshot(args []string) int {
 	}
 	withFiles := !bools["--no-files"]
 	withFinder := !bools["--no-finder"]
+
+	// --since: a file whose size and modification time are those the earlier
+	// snapshot recorded keeps that snapshot's sha256 and is not read. The same
+	// quick check rsync makes; a change that keeps both is not noticed. A
+	// snapshot with the files reads them anyway, so it takes no --since.
+	var since map[string]map[string]any
+	if sp := vals["--since"]; sp != "" {
+		if withFiles {
+			fmt.Fprintf(os.Stderr, "Error: --since only goes with --no-files\n%s\n", snapshotUsage)
+			return 1
+		}
+		var serr error
+		if since, serr = snapshotFileLines(sp); serr != nil {
+			fmt.Fprintln(os.Stderr, "Error:", serr)
+			return 1
+		}
+	}
 
 	notesDir, err := notesDir()
 	if err != nil {
@@ -200,7 +219,7 @@ func cmdSnapshot(args []string) int {
 	classifier := newBaseClassifier(notesDir)
 	var lines []map[string]any
 	var unresolved []string
-	packed := 0
+	packed, hashed, reused := 0, 0, 0
 	for _, id := range ids {
 		rec := recByID[id]
 		res := resolved[id]
@@ -239,13 +258,22 @@ func cmdSnapshot(args []string) int {
 				return fail(ferr)
 			}
 			line["size"], line["sha256"], line["file"] = size, sum, name
+			line["mtime"] = fileMtime(fi)
 			packed++
 		default:
+			mtime := fileMtime(fi)
+			if old := since[id]; old != nil && manifestInt(old["size"]) == fi.Size() &&
+				index.AsString(old["mtime"]) == mtime && index.AsString(old["sha256"]) != "" {
+				line["size"], line["sha256"], line["mtime"] = fi.Size(), index.AsString(old["sha256"]), mtime
+				reused++
+				break
+			}
 			size, sum, ferr := fileDigest(p)
 			if ferr != nil {
 				fmt.Fprintf(os.Stderr, "  Warning: cannot read %s: %v — recorded without size and checksum\n", p, ferr)
 			} else {
-				line["size"], line["sha256"] = size, sum
+				line["size"], line["sha256"], line["mtime"] = size, sum, mtime
+				hashed++
 			}
 		}
 		if withFinder {
@@ -298,6 +326,9 @@ func cmdSnapshot(args []string) int {
 		fmt.Printf("  files packed : %d\n", packed)
 	} else {
 		fmt.Printf("  files        : not packed (--no-files)\n")
+		if since != nil {
+			fmt.Printf("  checksums    : %d read, %d unchanged since the earlier snapshot\n", hashed, reused)
+		}
 	}
 	fmt.Printf("  notes        : %d\n", len(noteKeys))
 	if len(badLines) > 0 {
@@ -332,4 +363,10 @@ func orUnknown(s string) string {
 		return "unknown"
 	}
 	return s
+}
+
+// fileMtime is a file's modification time as the manifest records it: UTC,
+// to the nanosecond the file system keeps.
+func fileMtime(fi os.FileInfo) string {
+	return fi.ModTime().UTC().Format(time.RFC3339Nano)
 }

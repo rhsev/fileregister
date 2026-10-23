@@ -583,6 +583,7 @@ kept, and after cleaning it must stay below the base's folder.
 | `base`, `path` | where the file was; `unmarshal` places by these when they are there |
 | `origin` | the path relative to `collections/`, the only placement a register before format 2 reads; written as well so that such a register can still unpack the container (with `--scatter` for files outside `collections/`) |
 | `size`, `sha256` | the content; confirms that a file found at the target is the right one, finds a moved one |
+| `mtime` | `snapshot` only: the file's modification time, UTC in RFC 3339 with the nanoseconds the file system keeps; `snapshot --since` compares it |
 | `finder_tags` | the free Finder tags: all but ★ and ☆ and, for a record with the `tags` backend, its binder names (names in `kept_tags` count as free); no colors |
 | `finder_comment` | the Finder comment as the engine reads it (the xattr; a comment only in `.DS_Store` is not seen) |
 | `file` | the content's place in the container; absent when it does not travel |
@@ -607,7 +608,7 @@ different file there is parked (`--force` overwrites it). A file that is
 already registered here under another id is parked, because taking it over
 would give it two identities.
 
-#### `register snapshot [--out <file>.tar.gz] [--no-files] [--no-finder]`
+#### `register snapshot [--out <file>.tar.gz] [--no-files [--since <snapshot>]] [--no-finder]`
 
 Container layout, below `register-snapshot-<date>/` (also the default file
 name):
@@ -628,6 +629,15 @@ size and checksum. The container is written all the same, the output names
 those files, and the exit code is 1 so that a scheduled backup notices. A line
 in an index file that is not a record is packed as it is and named, also with
 exit 1.
+
+**`--since <snapshot>`** (with `--no-files`) reads only the files that changed
+since an earlier snapshot. A file whose size and `mtime` equal what that
+snapshot recorded for its id keeps the snapshot's sha256 without being read.
+It is the quick check rsync makes, and like rsync's it misses a change that
+keeps both size and modification time. An earlier snapshot without `mtime`
+(made before this field existed) gives nothing to compare, and every file is
+read. The output counts the files read and those taken over. A snapshot with
+the files reads them anyway, so `--since` goes only with `--no-files`.
 
 #### `register restore <snapshot> [--into <folder>] [--map <base>=<folder>]... [--dry-run]`
 

@@ -401,11 +401,9 @@ type finderEntry struct {
 	comment string
 }
 
-// finderFromSnapshot reads the free Finder tags and the comment per record id
-// from a snapshot's files.jsonl. Records the snapshot holds without them
-// (taken with --no-finder) are left out.
-func finderFromSnapshot(container string) (map[string]finderEntry, error) {
-	tmp, err := os.MkdirTemp("", "register-finder")
+// snapshotFileLines reads a snapshot's files.jsonl, one line per record id.
+func snapshotFileLines(container string) (map[string]map[string]any, error) {
+	tmp, err := os.MkdirTemp("", "register-snapshot-lines")
 	if err != nil {
 		return nil, err
 	}
@@ -422,16 +420,29 @@ func finderFromSnapshot(container string) (map[string]finderEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := map[string]finderEntry{}
+	out := map[string]map[string]any{}
 	for _, line := range strings.Split(string(data), "\n") {
-		m := index.ParseJSONObject(strings.TrimSpace(line))
-		if m == nil {
-			continue
+		if m := index.ParseJSONObject(strings.TrimSpace(line)); m != nil {
+			out[index.AsString(m["id"])] = m
 		}
+	}
+	return out, nil
+}
+
+// finderFromSnapshot reads the free Finder tags and the comment per record id
+// from a snapshot's files.jsonl. Records the snapshot holds without them
+// (taken with --no-finder) are left out.
+func finderFromSnapshot(container string) (map[string]finderEntry, error) {
+	lines, err := snapshotFileLines(container)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]finderEntry{}
+	for id, m := range lines {
 		if _, has := m["finder_tags"]; !has {
 			continue
 		}
-		out[index.AsString(m["id"])] = finderEntry{index.AsStrings(m["finder_tags"]), index.AsString(m["finder_comment"])}
+		out[id] = finderEntry{index.AsStrings(m["finder_tags"]), index.AsString(m["finder_comment"])}
 	}
 	return out, nil
 }

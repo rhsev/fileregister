@@ -162,7 +162,7 @@ register <subcommand> [args...]
 | `aka` | Add or remove a record's `aka` handles later (`--add`, `--remove`) |
 | `marshal` | Pack a binder's files, notes and manifest into a portable tar.gz, with free Finder tags and comments |
 | `unmarshal` | Add a container's binder to this register; idempotent, conflicts parked. Files from outside the notes folder need `--into`, `--map` or `--scatter` |
-| `snapshot` | Pack the whole register into one tar.gz (index files, notes and, by default, the files); exits 1 when a file could not be reached |
+| `snapshot` | Pack the whole register into one tar.gz (index files, notes and, by default, the files); exits 1 when a file could not be reached. With `--no-files --since <snapshot>` only files that changed since then are read |
 | `restore` | Rebuild an empty register from a snapshot; `--into` and `--map` place it in another folder, `--dry-run` shows what would happen |
 | `reindex` | Rebuild the index from Markdown ref blocks; `--dry-run` to preview |
 | `order` | Arrange a binder for presentation (`show`/`move`) |
