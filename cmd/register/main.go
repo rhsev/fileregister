@@ -178,7 +178,7 @@ Register — the index (identity & membership):
   of        <file>                          (reverse lookup: file → id, aka, collection(s))
   aka       <id|aka> [--add <handle>]... [--remove <handle>]...  (edit a record's aka handles)
   rename    <old-name> <new-name> [--merge]
-  refresh   [--dry-run]
+  refresh   [--dry-run] [--snapshot <file>]  (with --snapshot: Finder tags back on files that lost their id)
   audit     [--binder <name>]
   repair    [--interactive]
   reindex   [--dry-run]                    (rebuild the index from Markdown ref blocks)
@@ -186,7 +186,8 @@ Register — the index (identity & membership):
   unmarshal <container>.tar.gz [--into <folder>] [--map <base>=<folder>]... [--scatter] [--force]
             (add a container's binder to this register; files outside the notes folder need
             --into or --map, or --scatter to put them where they were)
-  snapshot  [--out <file>.tar.gz] [--no-files] [--no-finder]  (pack the whole register: index, notes, files)
+  snapshot  [--out <file>.tar.gz] [--no-files [--since <snapshot>]] [--no-finder]
+            (pack the whole register: index, notes, files; --since reads only changed files)
   restore   <snapshot>.tar.gz [--into <folder>] [--map <base>=<folder>]... [--dry-run]
             (rebuild a register from a snapshot, into an empty register)
 

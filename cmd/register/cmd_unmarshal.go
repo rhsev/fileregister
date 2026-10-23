@@ -405,7 +405,7 @@ func cmdUnmarshal(args []string) int {
 		}
 
 		// Place the file, re-bookmark under the SAME id, regenerate binder xattr
-		// AND the ★ managed marker — a self-complete restore.
+		// AND the star — a self-complete restore.
 		os.MkdirAll(filepath.Dir(target), 0755)
 		if err := copyFile(src, target); err != nil {
 			fmt.Fprintln(os.Stderr, "register:", err)
