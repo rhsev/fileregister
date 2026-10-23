@@ -370,7 +370,9 @@ Pushes index state to macOS metadata. Reads every `type: ref` record from the in
 
 URL records are skipped (they have no file). A file in the Trash or a backup, and a file that several records resolve to, are skipped too and left to `register audit`. `--dry-run` writes nothing and lists what it would write.
 
-Exit status is 1 when a metadata write failed, a bookmark is broken or a file is missing, that is, anything that needs the user.
+A record for which this system's bookmark store has no entry at all is listed as **not bound on this system**, apart from the broken ones: another machine bound its file, or the file was never placed here, and `restore` from a snapshot binds it once the file is here. `repair` has nothing to repair there.
+
+Exit status is 1 when a metadata write failed, a bookmark is broken or a file is missing, that is, anything that needs the user. Records not bound on this system do not count.
 
 **`--snapshot <file>`** brings back the free Finder tags and the comment of a file that lost every attribute, from a snapshot (`register snapshot`, with or without `--no-files`). A file counts as such when neither id carrier holds its id: a program replaced it, or a copy stripped it. That state is read before refresh writes anything, since renewing a stale bookmark stamps the id again. Missing tags from the snapshot are added and the comment is set when the file has none; a comment of the file's own stays and is reported. A file that still has its id is left as it is, because a tag missing there was taken off on purpose. Records the snapshot does not hold, or holds without Finder fields (`--no-finder`), are skipped. The free tags and the comment are the one part of a file's metadata that has no source in the index, so this is how they come back; a regular snapshot taken while the files are intact is the condition.
 
@@ -440,11 +442,13 @@ Read-only consistency report. Three directions:
 
 A record whose bookmark does not resolve and whose file was last seen on a volume that is not mounted is reported as **on an absent volume**, not as a broken bookmark: it is not judged, `repair` would skip it too, and it does not change the exit status. Mounting the volume and running again settles it.
 
+A record for which this system's bookmark store has no entry at all is reported as **not bound on this system**, not as a broken bookmark, and is not judged either. It is the normal case on a second machine that shares the index but not the files: another machine bound the file, and `restore` from a snapshot binds it here once the file is here.
+
 Two more findings on the record side: a file whose bookmark followed it into the **Trash or a backup** (a bookmark tracks its file wherever it moves), and a **shared file** that several records resolve to (two identities on one file, the trace a bad re-bind leaves). `refresh` marks neither kind (it would re-mark a discarded file, or write the records' ids onto the file in turn).
 
 The record side also checks the identity layer `refresh` writes: the record id in `kMDItemInformation` (where `repair` looks first), the same id in `com.fileregister.id#S`, and the star for the record's state (★ in a binder, ☆ in none, never both). A file that lacks any of them or carries the wrong star is reported as **missing id**, with `register refresh` as the remedy. A file whose name differs from the record's `filename` is reported as **renamed**, also with `register refresh` as the remedy; it does not change the exit status, since the bookmark still finds the file.
 
-Output is plain text. Decisions stay with the user. Exit status is 1 while something needs the user: a broken bookmark, a missing file, a missing binder xattr or id, a file in the Trash or a backup, a shared file, a ghost entry, or an orphan, broken, dead or malformed bookmark entry. Copies and entries on an absent volume are reported but do not count, so a monitor can rely on the exit status.
+Output is plain text. Decisions stay with the user. Exit status is 1 while something needs the user: a broken bookmark, a missing file, a missing binder xattr or id, a file in the Trash or a backup, a shared file, a ghost entry, or an orphan, broken, dead or malformed bookmark entry. Copies, entries on an absent volume and records not bound on this system are reported but do not count, so a monitor can rely on the exit status.
 
 ### `register forget <id|aka>... [--dry-run]`
 

@@ -148,6 +148,10 @@ func BookmarkGet(id string) (string, error) {
 type Resolution struct {
 	Path, LastPath string
 	Stale          bool
+	// Unbound: this system's bookmark store has no entry for the id. Another
+	// machine bound the file, or it was never placed here; that is not a
+	// broken bookmark, and repair has nothing to repair.
+	Unbound bool
 }
 
 // BatchGet resolves many ids in one shot: id → path, "" for a missing blob or
@@ -191,7 +195,7 @@ func BatchResolve(ids []string) (map[string]Resolution, error) {
 
 	resps, err := fileAnchor().batch(reqs)
 	for i, p := range pairs {
-		var r Resolution
+		r := Resolution{Unbound: !p.has}
 		if p.has && i < len(resps) {
 			if ok, _ := resps[i]["ok"].(bool); ok {
 				r.Path, _ = resps[i]["path"].(string)

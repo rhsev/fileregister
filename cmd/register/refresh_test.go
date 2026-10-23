@@ -37,7 +37,8 @@ func runGoRefresh(t *testing.T, env []string, args ...string) (string, string, i
 }
 
 // setupRefreshCase seeds an index with a resolvable file ref, a broken ref, and a
-// URL record, plus a bookmarks.json (under home) that resolves only the first.
+// URL record, plus a bookmarks.json (under home) that resolves only the first:
+// the broken ref has a bookmark whose file is gone.
 func setupRefreshCase(t *testing.T, anchor string) (notes, home string) {
 	home = t.TempDir()
 	notes = t.TempDir()
@@ -53,7 +54,7 @@ func setupRefreshCase(t *testing.T, anchor string) (notes, home string) {
 	blob := engineSave(t, anchor, real)
 	share := filepath.Join(home, ".local", "share", "fileregister")
 	os.MkdirAll(share, 0755)
-	dbJSON, _ := json.Marshal(map[string]string{"800000001": blob})
+	dbJSON, _ := json.Marshal(map[string]string{"800000001": blob, "999999999": deadBlob(t, anchor, t.TempDir())})
 	writeFile(t, filepath.Join(share, "bookmarks.json"), string(dbJSON))
 
 	writeFile(t, filepath.Join(notes, "collections", "inbox.jsonl"),

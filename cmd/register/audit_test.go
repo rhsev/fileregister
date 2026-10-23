@@ -88,12 +88,16 @@ func TestAudit(t *testing.T) {
 	assertGolden(t, "audit_consistent", cliResult(cOut, cErr, cCode))
 
 	// broken: unresolvable bookmark → BROKEN BOOKMARK (normalize the notes dir).
-	bN := t.TempDir()
+	bN, bH := t.TempDir(), t.TempDir()
 	os.MkdirAll(filepath.Join(bN, "collections"), 0755)
 	writeFile(t, filepath.Join(bN, "collections", "inbox.jsonl"),
 		`{"type":"ref","id":"999999999","binder":["AudBroken"],"filename":"z.txt"}`+"\n")
-	bOut, bErr, bCode := runGoAudit(t, auditEnv(t, bN, t.TempDir(), anchor))
-	repl := map[string]string{bN: "<NOTES>"}
+	os.MkdirAll(filepath.Join(bH, ".local", "share", "fileregister"), 0755)
+	dead, _ := json.Marshal(map[string]string{"999999999": deadBlob(t, anchor, bH)})
+	writeFile(t, filepath.Join(bH, ".local", "share", "fileregister", "bookmarks.json"), string(dead))
+	bOut, bErr, bCode := runGoAudit(t, auditEnv(t, bN, bH, anchor))
+	realH, _ := filepath.EvalSymlinks(bH)
+	repl := map[string]string{bN: "<NOTES>", realH: "<HOME>"}
 	assertGolden(t, "audit_broken", cliResult(norm(bOut, repl), norm(bErr, repl), bCode))
 
 	// empty index.

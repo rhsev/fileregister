@@ -11,5 +11,13 @@ BROKEN BOOKMARK (1) — bookmark does not resolve:
 === Direction 2: File → Record (1 binder(s) via the engine's search) ===
 
 No ghost xattr entries found.
+
+=== Direction 3: Bookmark → Record (1 entry(ies)) ===
+
+  DEAD [999999999] z.txt
+    last seen: <HOME>/gone.txt
+    → neither resolvable nor carried by any file — nothing to repair
+
+1 of 1 bookmark(s) need attention: 0 orphan, 0 broken, 1 dead, 0 malformed, 0 unreachable.
 === stderr ===
 Collecting type:ref records…

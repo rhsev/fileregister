@@ -78,7 +78,7 @@ them without a file instead of parking them inside the notes folder:
 register restore register.tar.gz --map volume:Archive=/tmp/empty
 ```
 
-`register audit` on Mac B lists them as broken bookmarks. That is expected.
+`register audit` and `register refresh` on Mac B list them as not bound on this system. That is expected and does not count as a fault.
 
 ## Lost attributes
 

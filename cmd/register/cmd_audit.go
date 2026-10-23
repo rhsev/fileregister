@@ -151,7 +151,7 @@ func cmdAudit(args []string) int {
 		missing        []string
 	}
 	var missingIdentity []missingIdentityT
-	var brokenBookmark []brokenT
+	var brokenBookmark, unbound []brokenT
 	var missingFile []missingFileT
 	var inTrash []missingFileT
 	shared := sharedPaths(checked, resolved)
@@ -207,6 +207,12 @@ func cmdAudit(args []string) int {
 
 		refPath := resolved[id]
 		if refPath == "" {
+			// No bookmark on this system: another machine bound the file, or
+			// it was never placed here. Listed, not judged.
+			if res[id].Unbound {
+				unbound = append(unbound, brokenT{binders, noteFile, label})
+				continue
+			}
 			if vol := unmountedVolume(res[id].LastPath); vol != "" {
 				absent = append(absent, absentT{binders, label, vol, res[id].LastPath})
 				continue
@@ -263,7 +269,7 @@ func cmdAudit(args []string) int {
 	}
 
 	needsYou := len(brokenBookmark)+len(missingFile)+len(missingXattr)+len(missingIdentity)+len(inTrash)+len(shared)+len(notCanonical) > 0
-	if !needsYou && len(absent) == 0 {
+	if !needsYou && len(absent) == 0 && len(unbound) == 0 {
 		fmt.Printf("All %d record(s) are consistent.\n", okCount)
 	} else {
 		if okCount > 0 {
@@ -351,6 +357,16 @@ func cmdAudit(args []string) int {
 			fmt.Printf("    last seen: %s\n", a.where)
 		}
 		fmt.Println("  → mount the volume and run again")
+	}
+
+	if len(unbound) > 0 {
+		fmt.Println("")
+		fmt.Printf("NOT BOUND ON THIS SYSTEM (%d) — no bookmark here, so not judged:\n", len(unbound))
+		for _, b := range unbound {
+			fmt.Printf("  [%s] %s\n", binderTag(b.binders), b.label)
+			fmt.Printf("    in: %s\n", b.noteFile)
+		}
+		fmt.Println("  → restore from a snapshot binds a file once it is here")
 	}
 
 	if len(renamed) > 0 {

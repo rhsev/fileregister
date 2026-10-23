@@ -109,7 +109,7 @@ func cmdRefresh(args []string) int {
 		binders        []string
 		refPath, label string
 	}
-	var broken []brokenEntry
+	var broken, unbound []brokenEntry
 	var missing []missingEntry
 	var skippedTrash, skippedShared []string
 	shared := sharedPaths(allRefs, resolved)
@@ -129,7 +129,13 @@ func cmdRefresh(args []string) int {
 
 		refPath := resolved[id]
 		if refPath == "" {
-			broken = append(broken, brokenEntry{binders, noteFile, refLabel(rec)})
+			// No bookmark on this system at all is not a broken one: another
+			// machine bound the file, and restore binds it once it is here.
+			if resolutions[id].Unbound {
+				unbound = append(unbound, brokenEntry{binders, noteFile, refLabel(rec)})
+			} else {
+				broken = append(broken, brokenEntry{binders, noteFile, refLabel(rec)})
+			}
 			continue
 		}
 		if !index.FileExists(refPath) {
@@ -312,6 +318,14 @@ func cmdRefresh(args []string) int {
 		}
 	}
 
+	if len(unbound) > 0 {
+		fmt.Println("")
+		fmt.Printf("Not bound on this system (%d) — no bookmark here; restore binds a file once it is here:\n", len(unbound))
+		for _, b := range unbound {
+			fmt.Printf("  [%s] %s (in: %s)\n", binderTag(b.binders), b.label, filepath.Base(b.noteFile))
+		}
+	}
+
 	if len(missing) > 0 {
 		fmt.Println("")
 		fmt.Printf("Missing files (%d) — file no longer exists at resolved path:\n", len(missing))
@@ -320,7 +334,8 @@ func cmdRefresh(args []string) int {
 		}
 	}
 
-	// Non-zero while something needs the user, so a monitor can tell.
+	// Non-zero while something needs the user, so a monitor can tell. Records
+	// not bound on this system are information, not a fault.
 	if failed > 0 || len(broken) > 0 || len(missing) > 0 {
 		return 1
 	}
