@@ -308,7 +308,7 @@ func cmdRefresh(args []string) int {
 		fmt.Println("")
 		fmt.Printf("Broken bookmarks (%d) — run 'register repair' to fix:\n", len(broken))
 		for _, b := range broken {
-			fmt.Printf("  [%s] %s (in: %s)\n", strings.Join(b.binders, ", "), b.label, filepath.Base(b.noteFile))
+			fmt.Printf("  [%s] %s (in: %s)\n", binderTag(b.binders), b.label, filepath.Base(b.noteFile))
 		}
 	}
 
@@ -316,7 +316,7 @@ func cmdRefresh(args []string) int {
 		fmt.Println("")
 		fmt.Printf("Missing files (%d) — file no longer exists at resolved path:\n", len(missing))
 		for _, m := range missing {
-			fmt.Printf("  [%s] %s → %s\n", strings.Join(m.binders, ", "), m.label, m.refPath)
+			fmt.Printf("  [%s] %s → %s\n", binderTag(m.binders), m.label, m.refPath)
 		}
 	}
 

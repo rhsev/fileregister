@@ -55,3 +55,17 @@ func TestRefreshBringsBackFinderFromASnapshot(t *testing.T) {
 		t.Errorf("a missing snapshot: exit %d, %q", code, se)
 	}
 }
+
+// A record in no binder is labelled as audit labels it, not with empty
+// brackets.
+func TestRefreshLabelsARecordInNoBinder(t *testing.T) {
+	anchor := engineBin(t)
+	fx := makeSnapFixture(t, anchor)
+	if err := os.Remove(filepath.Join(fx.home, "Ablage", "lose.txt")); err != nil {
+		t.Fatal(err)
+	}
+	so, se, _ := runIn(t, fx.env, cmdRefresh)
+	if !strings.Contains(so, "[no binder] lose.txt") || strings.Contains(so, "[] ") {
+		t.Errorf("refresh:\n%s\n%s", so, se)
+	}
+}
