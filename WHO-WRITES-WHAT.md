@@ -22,8 +22,8 @@ sidecars). This page shows which command writes to which of them.
 - **`list`, `resolve`, `of`, `audit`, `album` (without `--title`), `order show`,
   `marshal` and `snapshot` only read.** They write nothing to any of the four places.
 - **Free Finder tags and the Finder comment** are written only by `unmarshal`
-  and `restore`, from the container. Tags are added, the comment is set only on
-  a file that has none.
+  and `restore`, from the container, and by `refresh --snapshot` on a file that
+  lost its id. Tags are added, the comment is set only on a file that has none.
 
 The tables below give the detail. They are derived from the code (the calls each
 command makes), not from intent.

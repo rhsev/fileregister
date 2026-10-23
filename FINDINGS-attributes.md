@@ -130,10 +130,33 @@ directions between macOS 15.8 and 27.2:
 **OpenCloud transfers file content only, not a single xattr, not even Finder
 tags.** The sending Mac fares worse. When the file is edited on the other Mac,
 OpenCloud *replaces* the local copy (new inode), and the local xattrs are gone
-too (★, both ids and the binder cache) within seconds. The bookmark still
-resolves (by path) but reports `stale`. `register refresh` renews it and
-rewrites both ids, ★ and the binder layer from the index. Until then the
-file has no ★ and no id for Finder, Spotlight or repair's id search.
+too (the star, both ids and the binder cache) within seconds. The bookmark
+still resolves (by path) but reports `stale`. `register refresh` renews it and
+rewrites both ids, the star and the binder layer from the index. Until then
+the file has no star and no id for Finder, Spotlight or repair's id search.
+
+### Cross-device: Unison with `xattrs = true` (both directions)
+
+Unison 2.54 over ssh between macOS 27.2 on both Macs, test folders, verified
+2026-10-23. With `xattrs = true` in the profile, every xattr arrives: Finder
+tags, the Finder comment, `com.fileregister.id#S`, the Apple metadata keys,
+`com.apple.quarantine`, `kMDLabel_*` and app attributes. Adding and removing a
+tag travels both ways.
+
+- **`com.apple.provenance` has to be ignored**
+  (`xattrignore = Path com.apple.provenance`). macOS sets it itself and refuses
+  a copy; Unison then reports every file as failed.
+- **A change to attributes only** is written into the existing file: same
+  inode, so a register bookmark stays valid.
+- **A change to the content** arrives as a new copy with a new inode and the
+  sender's attributes. The bookmark resolves by path and is `stale`.
+- **Conflicts** (attributes changed on both sides, or content on one and
+  attributes on the other) are skipped and reported, nothing is overwritten.
+- **A loss passes on.** When a program drops a file's attributes on one Mac,
+  the next sync removes them on the other as well.
+
+Without `xattrs` Unison carries content only and replaces a changed file on
+the receiving side, like OpenCloud.
 
 ### Transport summary
 
@@ -143,10 +166,11 @@ file has no ★ and no id for Finder, Spotlight or repair's id search.
 | Resilio Sync | ✅ | ✗ | ✗ |
 | AirDrop | ✅ | ✅ | ✅ |
 | OpenCloud | ✗ | ✗ | ✗ |
+| Unison with `xattrs = true` | ✅ | ✅ | ✅ |
 
-**No transport is relied on.** The table records the four services that were
-tested; others may behave differently. ★ survived three of them, the id two, the
-binder cache one. fileregister therefore does not depend on a sync service
+**No transport is relied on.** The table records the five services that were
+tested; others may behave differently. ★ survived four of them, the id three,
+the binder cache two. fileregister therefore does not depend on a sync service
 carrying metadata. Files move between Macs with `register marshal` and
 `unmarshal`, which re-creates the bookmarks under the same ids, and
 `register refresh` then rebuilds the xattrs, ★ included. After any sync that
