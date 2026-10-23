@@ -337,8 +337,8 @@ func addFinderFields(line, rec map[string]any, path string) {
 var setFileComment = index.SetFileComment
 
 // bindFile makes target the file of record id on this system: bookmark under
-// the same id, id attributes, binder attribute per backend, ★ for a member or ☆ for a record in no binder,
-// the free Finder tags added and the comment set when the file has none.
+// the same id, id attributes, binder attribute per backend, ★ for a member or
+// ☆ for a record in no binder, and with finder the Finder part (writeFinder).
 // Returns false when the bookmark could not be made, and remarks for the
 // report (a comment the file keeps, a tag the engine refused).
 func bindFile(db map[string]string, target, id string, rec map[string]any, tags []string, comment string, finder bool) (bool, []string) {
@@ -356,13 +356,28 @@ func bindFile(db map[string]string, target, id string, rec map[string]any, tags 
 	if !finder {
 		return ok, remarks
 	}
+	_, remarks = writeFinder(target, tags, comment)
+	return ok, remarks
+}
+
+// writeFinder adds the free Finder tags the file lacks and sets the comment
+// when the file has none; a comment of its own stays. It reports whether
+// anything was written, and remarks for the report (a comment the file keeps,
+// a tag the engine refused).
+func writeFinder(target string, tags []string, comment string) (bool, []string) {
+	var remarks []string
+	wrote := false
 	for _, t := range tags {
-		if r := index.AddTag(target, t); r != "added" && r != "noop" {
+		switch r := index.AddTag(target, t); r {
+		case "added":
+			wrote = true
+		case "noop":
+		default:
 			remarks = append(remarks, fmt.Sprintf("tag '%s' not set (%s)", t, r))
 		}
 	}
 	if comment == "" {
-		return ok, remarks
+		return wrote, remarks
 	}
 	have, err := index.FileComment(target)
 	switch {
@@ -371,11 +386,54 @@ func bindFile(db map[string]string, target, id string, rec map[string]any, tags 
 	case have == "":
 		if err := setFileComment(target, comment); err != nil {
 			remarks = append(remarks, fmt.Sprintf("comment not set (%v)", err))
+		} else {
+			wrote = true
 		}
 	case have != comment:
 		remarks = append(remarks, fmt.Sprintf("keeps its own comment %q; the container has %q", have, comment))
 	}
-	return ok, remarks
+	return wrote, remarks
+}
+
+// finderEntry is what a snapshot recorded of a file's Finder side.
+type finderEntry struct {
+	tags    []string
+	comment string
+}
+
+// finderFromSnapshot reads the free Finder tags and the comment per record id
+// from a snapshot's files.jsonl. Records the snapshot holds without them
+// (taken with --no-finder) are left out.
+func finderFromSnapshot(container string) (map[string]finderEntry, error) {
+	tmp, err := os.MkdirTemp("", "register-finder")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmp)
+	_, entries, err := extractContainer(container, tmp, func(n string) bool { return n == "files.jsonl" })
+	if err != nil {
+		return nil, err
+	}
+	fe, ok := entries["files.jsonl"]
+	if !ok {
+		return nil, fmt.Errorf("%s is not a register snapshot (no files.jsonl)", container)
+	}
+	data, err := os.ReadFile(fe.path)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]finderEntry{}
+	for _, line := range strings.Split(string(data), "\n") {
+		m := index.ParseJSONObject(strings.TrimSpace(line))
+		if m == nil {
+			continue
+		}
+		if _, has := m["finder_tags"]; !has {
+			continue
+		}
+		out[index.AsString(m["id"])] = finderEntry{index.AsStrings(m["finder_tags"]), index.AsString(m["finder_comment"])}
+	}
+	return out, nil
 }
 
 // bookmarkElsewhere returns the path an existing bookmark for id leads to

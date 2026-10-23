@@ -29,14 +29,25 @@ func nonEmptyBinders(rec map[string]any) []string {
 	return out
 }
 
+const refreshUsage = "Usage: register refresh [--dry-run] [--snapshot <file>]"
+
 func cmdRefresh(args []string) int {
 	dryRun := false
-	for _, a := range args {
+	snapshotPath := ""
+	for i := 0; i < len(args); i++ {
+		a := args[i]
 		switch a {
 		case "--dry-run":
 			dryRun = true
+		case "--snapshot":
+			if i+1 >= len(args) {
+				fmt.Fprintln(os.Stderr, refreshUsage)
+				return 1
+			}
+			i++
+			snapshotPath = args[i]
 		case "-h", "--help":
-			fmt.Println("Usage: register refresh [options]")
+			fmt.Println(refreshUsage)
 			return 0
 		case "-v", "--version":
 			fmt.Println("register refresh " + registerVersion)
@@ -51,6 +62,19 @@ func cmdRefresh(args []string) int {
 	nd, err := notesDir()
 	if err != nil {
 		return 1
+	}
+
+	// With --snapshot, a file that lost its id lost every attribute (a program
+	// replaced it, or a copy stripped it): its free Finder tags and comment
+	// come back from the snapshot. A file that still has its id keeps the tags
+	// it has, since a missing tag there was taken off on purpose.
+	var finder map[string]finderEntry
+	if snapshotPath != "" {
+		finder, err = finderFromSnapshot(snapshotPath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			return 1
+		}
 	}
 
 	fmt.Fprintln(os.Stderr, "Collecting type:ref records…")
@@ -90,7 +114,7 @@ func cmdRefresh(args []string) int {
 	var skippedTrash, skippedShared []string
 	shared := sharedPaths(allRefs, resolved)
 	refreshed, noop, failed, skippedNone, skippedURL, restoredIDs := 0, 0, 0, 0, 0, 0
-	starsSet := 0
+	starsSet, finderBack := 0, 0
 
 	for _, rec := range allRefs {
 		id := index.AsString(rec["id"])
@@ -138,6 +162,12 @@ func cmdRefresh(args []string) int {
 			}
 		}
 
+		// Whether the file lost its id is read before anything writes it back:
+		// renewing a stale bookmark stamps the id again.
+		fe, inSnap := finder[id]
+		lost := inSnap && (len(fe.tags) > 0 || fe.comment != "") &&
+			!index.HasDescriptionID(refPath, id) && index.SyncID(refPath) != id
+
 		// A stale bookmark still resolves, but macOS asks for it to be saved
 		// anew; left alone it degrades until it no longer resolves at all.
 		if resolutions[id].Stale && !dryRun {
@@ -161,6 +191,10 @@ func cmdRefresh(args []string) int {
 				fmt.Printf("[dry-run] %s → %s\n", index.StatusStar(member), filepath.Base(refPath))
 				starsSet++
 			}
+			if lost {
+				fmt.Printf("[dry-run] Finder tags and comment from the snapshot → %s\n", filepath.Base(refPath))
+				finderBack++
+			}
 		} else {
 			index.SetSyncXattr(refPath, id)
 			if restored, why := index.RestoreDescriptionID(refPath, id); why != "" {
@@ -177,6 +211,16 @@ func cmdRefresh(args []string) int {
 				} else {
 					starsSet++
 					fmt.Printf("%s → %s\n", index.StatusStar(member), filepath.Base(refPath))
+				}
+			}
+			if lost {
+				wrote, remarks := writeFinder(refPath, fe.tags, fe.comment)
+				if wrote {
+					finderBack++
+					fmt.Printf("Finder tags and comment from the snapshot → %s\n", filepath.Base(refPath))
+				}
+				for _, r := range remarks {
+					fmt.Fprintf(os.Stderr, "Warning: %s: %s\n", filepath.Base(refPath), r)
 				}
 			}
 		}
@@ -239,6 +283,9 @@ func cmdRefresh(args []string) int {
 	}
 	if starsSet > 0 {
 		fmt.Printf("  Stars set    : %d (★ in a binder, ☆ in none)\n", starsSet)
+	}
+	if finderBack > 0 {
+		fmt.Printf("  From snapshot: %d (Finder tags and comment of files that had lost their id)\n", finderBack)
 	}
 	if renamedNames > 0 {
 		fmt.Printf("  File names updated in the index: %d\n", renamedNames)
