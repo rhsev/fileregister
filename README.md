@@ -307,6 +307,7 @@ empties the set. See SPEC §Records in no binder.
 - [SPEC.md](SPEC.md): on-disk format, data model, design decisions
 - [WHO-WRITES-WHAT.md](WHO-WRITES-WHAT.md): what each command writes to the index, the bookmark store, the file and the notes
 - [WORKFLOWS.md](WORKFLOWS.md): organizing and querying collections
+- [TWO-MACS.md](TWO-MACS.md): one register on two Macs, with the notes folder synced by Unison
 - [ORDERING.md](ORDERING.md): `sort:` keys and `register order`
 - [ALBUM.md](ALBUM.md): a binder in order, as data
 
