@@ -4,7 +4,7 @@ A **collection** is the practice of organizing files (PDFs, Pages, photos, mail
 exports, anything) into named **binders**. A file can belong to several binders
 at once. Membership is a canonical plain-text record in the central **JSONL
 index**; curation *adds* a lean Markdown annotation linked by id. A macOS
-bookmark finds the file again, and xattrs on the file (id, binder names, ★) are
+bookmark finds the file again, and xattrs on the file (id, binder names, star) are
 a cache that `register refresh` rebuilds. The `register` CLI manages membership;
 [grubber](https://github.com/rhsev/grubber) and
 [matterbase](https://github.com/rhsev/matterbase) query it.
