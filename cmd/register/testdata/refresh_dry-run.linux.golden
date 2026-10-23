@@ -1,12 +1,14 @@
 exit: 1
 === stdout ===
 [dry-run] id 800000001 → id attribute of doc.txt
+[dry-run] ★ → doc.txt
 [dry-run] (itemprojects) doc.txt → Docs
 
 Refresh complete (dry-run):
   Refreshed    : 1
   Already ok   : 0
   IDs restored : 1 (id attribute, so a search by id finds them again)
+  Stars set    : 1 (★ in a binder, ☆ in none)
   Skipped (url) : 1
 
 Broken bookmarks (1) — run 'register repair' to fix:

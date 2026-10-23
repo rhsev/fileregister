@@ -90,6 +90,7 @@ func cmdRefresh(args []string) int {
 	var skippedTrash, skippedShared []string
 	shared := sharedPaths(allRefs, resolved)
 	refreshed, noop, failed, skippedNone, skippedURL, restoredIDs := 0, 0, 0, 0, 0, 0
+	starsSet := 0
 
 	for _, rec := range allRefs {
 		id := index.AsString(rec["id"])
@@ -149,10 +150,16 @@ func cmdRefresh(args []string) int {
 		// carriers, and the star, ★ for a member and ☆ for a record in no
 		// binder. kMDItemInformation is the one Spotlight searches and iCloud
 		// strips; the #S copy is the one that travels.
+		member := len(binders) > 0
+		starOK := index.StatusMarked(refPath, member)
 		if dryRun {
 			if !index.HasDescriptionID(refPath, id) {
 				fmt.Printf("[dry-run] id %s → %s of %s\n", id, idLayerName, filepath.Base(refPath))
 				restoredIDs++
+			}
+			if !starOK {
+				fmt.Printf("[dry-run] %s → %s\n", index.StatusStar(member), filepath.Base(refPath))
+				starsSet++
 			}
 		} else {
 			index.SetSyncXattr(refPath, id)
@@ -163,7 +170,15 @@ func cmdRefresh(args []string) int {
 				restoredIDs++
 				fmt.Printf("Restored id %s → %s of %s\n", id, idLayerName, filepath.Base(refPath))
 			}
-			index.StatusMark(refPath, len(binders) > 0)
+			if !starOK {
+				if index.StatusMark(refPath, member) == "failed" {
+					failed++
+					fmt.Fprintf(os.Stderr, "Warning: setting %s on %s failed: %s\n", index.StatusStar(member), filepath.Base(refPath), index.LastEngineError())
+				} else {
+					starsSet++
+					fmt.Printf("%s → %s\n", index.StatusStar(member), filepath.Base(refPath))
+				}
+			}
 		}
 
 		if len(binders) == 0 {
@@ -221,6 +236,9 @@ func cmdRefresh(args []string) int {
 	}
 	if restoredIDs > 0 {
 		fmt.Printf("  IDs restored : %d %s\n", restoredIDs, idRestoredNote)
+	}
+	if starsSet > 0 {
+		fmt.Printf("  Stars set    : %d (★ in a binder, ☆ in none)\n", starsSet)
 	}
 	if renamedNames > 0 {
 		fmt.Printf("  File names updated in the index: %d\n", renamedNames)
