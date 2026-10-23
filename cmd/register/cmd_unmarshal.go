@@ -425,9 +425,7 @@ func cmdUnmarshal(args []string) int {
 		for _, b := range binders {
 			index.XattrBackendAdd(target, index.AsString(b), backend)
 		}
-		if len(binders) > 0 {
-			index.ManagedMark(target) // ★ marks membership only
-		}
+		index.StatusMark(target, len(binders) > 0)
 
 		appendRefs(entry)
 		os.Remove(src) // imported → drop from staging

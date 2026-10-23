@@ -17,7 +17,7 @@ Four layers carry the information, with different roles:
 | JSONL index, the central directory ("yellow pages") | Mandatory metadata: id, binder, filename, kind | Source of truth for membership |
 | Markdown YAML annotations | Optional custom metadata + prose, linked to the index by `id` | Source of truth for that custom data |
 | Bookmark store (`~/.local/share/fileregister/bookmarks.json`, id → bookmark blob) | Anchor that finds the file again when its path changes | Anchor; `repair` re-binds it and `unmarshal` re-creates it under the same id, `refresh` renews a stale one |
-| xattrs on the file (id, binder names, ★) | Cache for Spotlight | Derived; `refresh` rebuilds it from the index |
+| xattrs on the file (id, binder names, ★ or ☆) | Cache for Spotlight | Derived; `refresh` rebuilds it from the index |
 
 Every record lives in the **index**, one central JSONL store per notes directory (`<notes_dir>/collections/inbox.jsonl`). It is the authoritative directory of what belongs to which binder, and the core reads it directly (no scan-and-union step). The bookmark blob is not part of the index row; it lives in `bookmarks.json`, keyed by the record's id.
 
@@ -162,9 +162,9 @@ A binder ends up on files as a Finder tag or a `kMDItemProjects` entry, so its
 name follows fileanchor's label rule, which holds for every platform's engine
 (fileanchor's PLATFORMS.md): **no comma** (Linux keeps tags as a
 comma-separated list), no control characters, no leading or trailing
-whitespace, at most 255 bytes. A binder may also not be named `★` alone,
-because that is the managed marker, and removing such a binder would strip the
-marker from files still in other binders. Spaces, colons (`2024:berlin`) and
+whitespace, at most 255 bytes. A binder may also not be named `★` or `☆`
+alone, because those are the status stars, and removing such a binder would
+strip the star from files still in the register. Spaces, colons (`2024:berlin`) and
 any other Unicode are fine.
 
 Two names name the same binder when they are equal in NFC (`index.SameBinder`). A name typed by hand or pasted from the Finder can stand in a note decomposed (NFD), looks the same, and is found by grubber's filters. Case is kept, so `Trip` and `trip` are two binders. Readers and writers compare alike, or a reader would find a block the writer then misses.
@@ -181,7 +181,7 @@ A record whose `binder` set is **empty** (absent or `[]`) is **in no binder**, t
 
 A record in no binder arises two ways, indistinguishable and both legitimate:
 
-- **Created directly.** `register add <file>` with no `--binder` registers the file in no binder (id + optional `aka`, empty set, no binder xattr, no ★).
+- **Created directly.** `register add <file>` with no `--binder` registers the file in no binder (id + optional `aka`, empty set, no binder xattr, ☆).
 - **Emptied by removal.** `register remove` deletes a binder from the set; when the last one goes, the record remains in no binder. Removal never destroys the record or its annotations.
 
 **A record in no binder is never deleted automatically.** The record disappears only by explicit human choice, with `register forget`. Re-adding a binder is a plain set-insert on the existing record; there is nothing to "reclaim" and no duplicate to avoid.
@@ -194,7 +194,7 @@ In Markdown, an annotation block must be preceded by a heading at any level. mat
 
 A `type: ref` record may reference a **URL** instead of a file, such as a DEVONthink item link (`x-devonthink-item://UUID`), a web page, or a `message:` link. The bookmark was never the essence of a record; it is the macOS anchor for the *file* locator. A record either points to a file (a **file record**) or to a URL (a **URL record**). A URL record is the same record with a different locator. Identity (`id`), membership (`binder`), aka, annotations, and promote all work identically, and `register resolve` returns the URL, so `open "$(register resolve <key>)"` works the same for both (milan needs no change).
 
-What does **not** apply is the entire macOS side: no bookmark, no xattr cache, no ★, no Spotlight, no `repair`, no `of`. URL records are implicitly `xattr: none`, living in the index and annotations only, with the same standing `none`-backend files already have. `refresh`/`audit`/`repair` skip them (counted); `marshal` carries them as pure data (no file payload). Created with `register add --url <URL> --binder <name> [--label <name>]`; `filename` holds the optional display label (its human-recognition role; the repair-anchor role is moot). Removed with `register remove <url> --binder <name>`. Idempotent over `(url, binder)`.
+What does **not** apply is the entire macOS side: no bookmark, no xattr cache, no star, no Spotlight, no `repair`, no `of`. URL records are implicitly `xattr: none`, living in the index and annotations only, with the same standing `none`-backend files already have. `refresh`/`audit`/`repair` skip them (counted); `marshal` carries them as pure data (no file payload). Created with `register add --url <URL> --binder <name> [--label <name>]`; `filename` holds the optional display label (its human-recognition role; the repair-anchor role is moot). Removed with `register remove <url> --binder <name>`. Idempotent over `(url, binder)`.
 
 ### macOS metadata layer (derived)
 
@@ -204,19 +204,19 @@ When `register refresh` (or `register add` at write time) runs, the referenced f
 |---|---|---|
 | `com.apple.metadata:kMDItemInformation` | Record `id` (multiple ids space-separated, stored as a binary-plist string, because Spotlight ignores a raw multi-id string) | The `Bookmarks` module on `add`/`repair`, via the **fileanchor** engine; `refresh` restores a missing id |
 | `com.fileregister.id#S` | Record `id` (single value), the cross-device file→record key | The `Bookmarks` module on `add`/`repair`; `refresh` backfills |
-| `com.apple.metadata:_kMDItemUserTags` == ★ | The managed marker (U+2605), the one status tag fileregister owns | `add` (any backend); removed by `remove` on last membership; `refresh` backfills |
+| `com.apple.metadata:_kMDItemUserTags` == ★ or ☆ | The status star, one of the two tags fileregister owns: ★ (U+2605) in a binder, ☆ (U+2606) in no binder | `add` (any backend); `remove` trades ★ for ☆ on last membership; `forget` takes it off; `refresh` backfills |
 | `com.apple.metadata:kMDItemProjects` | Binder names, as a real array (Spotlight matches per element; names may contain spaces) | default backend (`itemprojects`) |
 | `com.apple.metadata:_kMDItemUserTags` == \<binder\> | Binder name (Finder Tag, binary plist array) | Tags backend, opt-in per record |
 
 **Copies.** `cp` and Finder's Duplicate copy the id xattrs, so a copy carries the original's id. A file's id counts as its own only if the id's bookmark does not resolve to a *different* existing file; a copy is therefore not taken for the original by `add` or `remove`. Adding a copy gives it a new id, which replaces the copied one on the file. An id whose bookmark no longer resolves still counts; that is how a moved file is recognized. `add` reads the id from `kMDItemInformation`, else from `com.fileregister.id#S`. A file that carries no id at all, because it could not be written (a locked or read-only file, a volume without xattrs) or was stripped, is looked up among the records with its filename; the one whose bookmark resolves to this very file is it. `add` warns when it cannot store the id on a file.
 
-The id layers (`kMDItemInformation` plus the syncable `com.fileregister.id#S`) are the id cache, derived from the record's id; ★ marks management; the Projects and UserTags layers are the membership cache. The membership backend is chosen **per file** via the one `xattr:` field on the record.
+The id layers (`kMDItemInformation` plus the syncable `com.fileregister.id#S`) are the id cache, derived from the record's id; the star marks registration and membership; the Projects and UserTags layers are the membership cache. The membership backend is chosen **per file** via the one `xattr:` field on the record.
 
 Which command writes which of these layers, and how, is one table: [WHO-WRITES-WHAT.md](WHO-WRITES-WHAT.md).
 
 **Cross-device id.** `kMDItemInformation` is the local file→id store, but the Apple `com.apple.metadata:kMDItem*` namespace is **stripped by iCloud Drive** even with a `#S` (syncable) flag (verified on macOS 26.4, re-verified 2026-09 between 15.8 and 27.2). A **custom** `#S` name survives, so the id is mirrored to `com.fileregister.id#S`, the one xattr that lets a refreshed/AirDropped file be mapped back to its record by id on another Mac. It belongs to the id cache, is written regardless of the binder-name `--xattr` backend (even `none`), and is single-valued (one file ↔ one id). The `#S` is part of the stored name; read it back with the suffix. (It also has standalone **local** value, as a file→record mapping for `reindex` / `register of <file>` without `bookmarks.json`.) Transports that strip all custom xattrs (e.g. Resilio) lose it; reconcile then falls back to filename (see [FINDINGS-attributes.md](FINDINGS-attributes.md)).
 
-**Managed marker (★).** Every managed file carries one Finder Tag, ★ (U+2605), stored in `_kMDItemUserTags` (with underscore). It is written on first membership by `add`, **backend-independent**, so even `--xattr none` files get it, because ★ marks *membership*, not the binder-name cache. `remove` drops it only when the file leaves its **last** binder (checked against the index across all binders); a file in two binders keeps ★ until both memberships are gone. `refresh` backfills it on every member; `repair` re-applies it to a relocated file. Whether ★ survives a sync service depends on the service (see [FINDINGS-attributes.md](FINDINGS-attributes.md)); `register refresh` puts it back after one that drops it. ★ is a recognition mark, part of the derived cache and not an anchor. It shows in Finder which files fileregister manages, and `mdfind 'kMDItemUserTags == "★"'` lists them (query key without underscore). There is exactly one status tag. Binders never enter the tag namespace (that stays the opt-in `tags` backend); see [FINDINGS-attributes.md](FINDINGS-attributes.md).
+**Status star (★, ☆).** Every registered file carries one of two Finder tags, stored in `_kMDItemUserTags` (with underscore): ★ (U+2605) while its record is in at least one binder, ☆ (U+2606) while it is in the index but in no binder. Both show in Finder that the file is registered, so that it is handled with care. The star follows the record's state, **backend-independent**, so a `--xattr none` member gets ★ too, because the star marks the record, not the binder-name cache. `add` writes the star for the record's state, and a file joining its first binder trades ☆ for ★. `remove` trades ★ back for ☆ when the file leaves its **last** binder (checked against the index across all binders); a file in two binders keeps ★ until both memberships are gone. `forget` takes the star off together with the file's last id. `refresh` writes the right star on every file record and takes the wrong one off; `repair` re-applies it to a relocated file. Whether a star survives a sync service depends on the service (see [FINDINGS-attributes.md](FINDINGS-attributes.md)); `register refresh` puts it back after one that drops it. The stars are recognition marks, part of the derived cache and not an anchor. `mdfind 'kMDItemUserTags == "★"'` lists the files in a binder, `mdfind 'kMDItemUserTags == "☆"'` those in no binder (query key without underscore). There are exactly two status tags. Binders never enter the tag namespace (that stays the opt-in `tags` backend); see [FINDINGS-attributes.md](FINDINGS-attributes.md).
 
 #### Backend choice
 
@@ -305,12 +305,12 @@ No watchers, no auto-sync. Reconciliation is explicit, invoked when the user wan
 
 (URL form: `register add --url <URL> [--binder <name>] [--label NAME] [--aka KEY]`, with no bookmark and no xattr; see [URL records](#url-records).)
 
-The user-facing entry point for registering one or more files. With `--binder` the files join that binder (set-insert); **without `--binder` each file is registered [in no binder](#records-in-no-binder)**: an empty `binder` set, no binder xattr cache, no ★. This replaces the former `link` subcommand; a binderless add does what `link` did. The full flow:
+The user-facing entry point for registering one or more files. With `--binder` the files join that binder (set-insert); **without `--binder` each file is registered [in no binder](#records-in-no-binder)**: an empty `binder` set, no binder xattr cache, ☆ on the file. This replaces the former `link` subcommand; a binderless add does what `link` did. The full flow:
 
 1. **Register** every file with the bookmark functions in `internal/index/bookmarks.go`. This creates the `id`, stores the bookmark in `~/.local/share/fileregister/bookmarks.json` and writes the id to the file (`kMDItemInformation` and `com.fileregister.id#S`). For batches this goes through `index.AddMany`, which loads and saves the bookmark DB **once** for the whole batch. The engine's save still runs per file (each file needs its own blob), but the DB write is O(1) instead of one full rewrite per file
 2. **Write the index record** via `index.JSONLWriteMany`, which reads the target (`collections/inbox.jsonl`, or the `--target *.jsonl` index file) **once**, indexes existing records by `id`, then for each file **set-inserts** the binder into the matching record's `binder` array (or creates a new record, with an empty set when no `--binder` was given), and writes the target **once**. One record per file; a binder already in the set is a no-op, so no duplicate can arise. The chosen backend is recorded as `xattr:` in the record (omitted when default `itemprojects`)
 3. **Write the annotation (optional)**. With `--md` (→ `collections/binder_<name>.md`) or `--target *.md`, a lean annotation is also written for each new record via `promoteRecords` (idempotent). The index entry from step 2 stays authoritative
-4. **Write the xattr layer** for each file according to the chosen backend, through `index.XattrBackendAdd`, and set ★ on each file that joined a binder:
+4. **Write the xattr layer** for each file according to the chosen backend, through `index.XattrBackendAdd`, and set the star on each file: ★ when it is in a binder, ☆ when it is not:
    - `itemprojects` (default): the binder name in `kMDItemProjects`
    - `tags`: the binder name as a Finder tag (`kMDItemUserTags`)
    - `none`: no xattr write
@@ -362,7 +362,7 @@ Pushes index state to macOS metadata. Reads every `type: ref` record from the in
 - renews the bookmark under the same id when macOS reports it as stale
 - writes the file's current name into the record's `filename` when the file was renamed (the two Unicode forms of a name count as one)
 - writes the id: `com.fileregister.id#S` always, and `kMDItemInformation` where the id is missing there (added, never set)
-- sets ★ when the record is in at least one binder
+- sets ★ when the record is in at least one binder, ☆ when it is in none, and takes the other star off
 - ensures each binder name in the layer of the record's `xattr:` backend:
   - `itemprojects` → `kMDItemProjects`
   - `tags` → `kMDItemUserTags` (Finder tags)
@@ -395,7 +395,7 @@ For records with broken bookmarks (typical after cross-volume move or transfer t
    2. `mdfind 'kMDItemFSName == "<filename>"'`: by the YAML `filename` field; exact on-disk basename match, works even when xattr is gone
    3. `mdfind` on the appropriate xattr layer (`kMDItemProjects` or `kMDItemUserTags` per record) restricted to files whose basename matches `filename`
    Candidates in the Trash or a backup (`.Trash`, `.Trashes`, Time Machine), and files that are another record's (they carry a registered id of their own), are ignored.
-2. If found: re-bind the bookmark **under the file's existing id** via `index.Rebind` (a fresh blob stored under the same id), then refresh the id xattrs, the binder xattr layer and, for a record in a binder, ★. The id is the file's **permanent identity**. Only the broken blob is renewed, so the id goes nowhere new. If the file was renamed, the index line's `filename` takes the new name, since it is the label `list` and `album` show; note headings stay as they are. This happens **without asking only** for a single candidate from stage 1 (the id) on the volume the file was on. A hit by name, or on another volume, is some file that may or may not be this one.
+2. If found: re-bind the bookmark **under the file's existing id** via `index.Rebind` (a fresh blob stored under the same id), then refresh the id xattrs, the binder xattr layer and the star. The id is the file's **permanent identity**. Only the broken blob is renewed, so the id goes nowhere new. If the file was renamed, the index line's `filename` takes the new name, since it is the label `list` and `album` show; note headings stay as they are. This happens **without asking only** for a single candidate from stage 1 (the id) on the volume the file was on. A hit by name, or on another volume, is some file that may or may not be this one.
 3. Otherwise: list the candidates; with `--interactive`, prompt to choose (also for a single one)
 4. If not found: report; in `--interactive` mode prompt for an explicit path
 
@@ -440,7 +440,7 @@ A record whose bookmark does not resolve and whose file was last seen on a volum
 
 Two more findings on the record side: a file whose bookmark followed it into the **Trash or a backup** (a bookmark tracks its file wherever it moves), and a **shared file** that several records resolve to (two identities on one file, the trace a bad re-bind leaves). `refresh` marks neither kind (it would re-mark a discarded file, or write the records' ids onto the file in turn).
 
-The record side also checks the identity layer `refresh` writes: the record id in `kMDItemInformation` (where `repair` looks first), the same id in `com.fileregister.id#S`, and ★ on a record in a binder. A file that lacks any of them is reported as **missing id**, with `register refresh` as the remedy. A file whose name differs from the record's `filename` is reported as **renamed**, also with `register refresh` as the remedy; it does not change the exit status, since the bookmark still finds the file.
+The record side also checks the identity layer `refresh` writes: the record id in `kMDItemInformation` (where `repair` looks first), the same id in `com.fileregister.id#S`, and the star for the record's state (★ in a binder, ☆ in none, never both). A file that lacks any of them or carries the wrong star is reported as **missing id**, with `register refresh` as the remedy. A file whose name differs from the record's `filename` is reported as **renamed**, also with `register refresh` as the remedy; it does not change the exit status, since the bookmark still finds the file.
 
 Output is plain text. Decisions stay with the user. Exit status is 1 while something needs the user: a broken bookmark, a missing file, a missing binder xattr or id, a file in the Trash or a backup, a shared file, a ghost entry, or an orphan, broken, dead or malformed bookmark entry. Copies and entries on an absent volume are reported but do not count, so a monitor can rely on the exit status.
 
@@ -464,7 +464,7 @@ The inverse of `register add`. It removes a file from a binder without destroyin
 For the record whose `id` matches the file's id:
 
 1. **Set-delete the binder** from the `binder` array in the index line. The record's other binders and all annotations stay intact. When the last binder is removed, the record remains [in no binder](#records-in-no-binder).
-2. **Remove the binder name** from the appropriate xattr layer per record's `xattr:` backend (`kMDItemProjects` or `kMDItemUserTags`; `none`-backend records have no xattr to touch). The backend is taken from the index record. A Finder tag listed in the record's `kept_tags` is the user's and stays. When the file has no binder left, its ★ comes off.
+2. **Remove the binder name** from the appropriate xattr layer per record's `xattr:` backend (`kMDItemProjects` or `kMDItemUserTags`; `none`-backend records have no xattr to touch). The backend is taken from the index record. A Finder tag listed in the record's `kept_tags` is the user's and stays. When the file has no binder left, its ★ turns into ☆.
 
 Idempotent. Removing from a binder the file isn't in is a no-op.
 
@@ -581,7 +581,7 @@ kept, and after cleaning it must stay below the base's folder.
 | `base`, `path` | where the file was; `unmarshal` places by these when they are there |
 | `origin` | the path relative to `collections/`, the only placement a register before format 2 reads; written as well so that such a register can still unpack the container (with `--scatter` for files outside `collections/`) |
 | `size`, `sha256` | the content; confirms that a file found at the target is the right one, finds a moved one |
-| `finder_tags` | the free Finder tags: all but ★ and, for a record with the `tags` backend, its binder names (names in `kept_tags` count as free); no colors |
+| `finder_tags` | the free Finder tags: all but ★ and ☆ and, for a record with the `tags` backend, its binder names (names in `kept_tags` count as free); no colors |
 | `finder_comment` | the Finder comment as the engine reads it (the xattr; a comment only in `.DS_Store` is not seen) |
 | `file` | the content's place in the container; absent when it does not travel |
 
@@ -665,7 +665,7 @@ A file found under another name keeps its old `filename` in the index; restore
 says so and leaves the update to `refresh`.
 
 Taking over or creating a file means a bookmark under the same id, the id
-attributes, the binder attribute per backend, ★ for a member, the free Finder
+attributes, the binder attribute per backend, the star (★ or ☆), the free Finder
 tags and the comment. A record without a file stays in the index; `audit` lists
 it, and a second restore or `repair --interactive` binds it later. Parked files wait in
 `collections/import/<snapshot>/`. An id that already has a bookmark on this
@@ -736,7 +736,7 @@ Collection lifecycle (add, remove, refresh, audit, repair, rename, cleanup, rein
 
 The `write` subcommand (`register write`) is the record-write helper. It reads JSONL records from stdin and ensures each one exists in its target file. `cmdWrite` (`cmd_write.go`) groups the records by target and dispatches on the extension: a `.jsonl` target goes to `index.JSONLWriteMany`, which folds the records into a JSONL store, and a `.md` target goes to `mdFileWriteMany`, which appends YAML blocks to a Markdown note. `register add` calls `index.JSONLWriteMany` directly for its index write. The other lifecycle subcommands modify records in place via the Markdown editor (`md_writer.go`) or the JSONL editor (`jsonl_editor.go`), chosen by the record's `_note_file` extension, when more surgical edits (drop a field, rename within a record) are needed.
 
-`register write` also handles the membership layer as an opt-in side-effect via the `_ref_path` input field, the way `add` does. The binder goes to the file through the record's backend (the stored one for an existing record, else the input's `xattr`; `none` writes nothing), plus the ★ marker. Only a write to an index `.jsonl` is a membership (a Markdown block is annotation), and a record in no binder has none.
+`register write` also handles the membership layer as an opt-in side-effect via the `_ref_path` input field, the way `add` does. The binder goes to the file through the record's backend (the stored one for an existing record, else the input's `xattr`; `none` writes nothing), plus ★. Only a write to an index `.jsonl` is a membership (a Markdown block is annotation), and a record in no binder has none.
 
 A `.jsonl` target inside a `collections/` folder is part of an index, and `write` keeps its rules: a record whose id is recorded in *another* file of the index, or whose aka belongs to another record, is refused (the status line says where). `SCHEMA` is stamped only there. `binder` must be a single string, because the stream is one membership per line.
 
@@ -788,7 +788,7 @@ Required fields:
 Optional fields:
 - `binder`: one string; without it the record is in no binder
 - `filename`, `kind`, `aka`, `xattr`: record content (a `tags` key is ignored with a note; labels belong in the block)
-- `_ref_path`: path to the referenced file. When set, the file exists and the target is an index `.jsonl`, `register write` writes the membership to the file through the record's backend and sets ★ (idempotent)
+- `_ref_path`: path to the referenced file. When set, the file exists and the target is an index `.jsonl`, `register write` writes the membership to the file through the record's backend and sets ★ (idempotent); a record written without a binder gets ☆ from the next `refresh`
 
 Example:
 ```json
@@ -886,7 +886,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | `annotate` | Edits an existing annotation block: `--set`/`--unset` custom fields, `--prose` replaces the entry's prose. Reserved keys (`id`, `binder`, `sort`) are refused with the command that owns them. |
 | `remove` | Set-deletes the binder from the index record and removes the binder name from the xattr layer; annotation blocks stay (`cleanup` reviews stale ones). With an emptied set the record stays, in no binder. |
 | `forget` | Deletes a record in no binder: index line, bookmark entry, its id in the notes' blocks (the blocks stay) and on the file. The only command that deletes a record. |
-| `refresh` | Rebuilds the derived metadata on the file from the index (the id, the ★ marker, the binder xattr through ItemProjects, Tags, or skipped for `none`), renews stale bookmarks and writes a renamed file's name into the index. Idempotent. |
+| `refresh` | Rebuilds the derived metadata on the file from the index (the id, the star ★ or ☆, the binder xattr through ItemProjects, Tags, or skipped for `none`), renews stale bookmarks and writes a renamed file's name into the index. Idempotent. |
 | `audit` | Read-only consistency report: dangling records, broken bookmarks, mismatched/ghost xattr in both layers. |
 | `repair` | Re-binds a moved file's broken bookmark under its **unchanged** `id`; locates the file through the engine's search, Spotlight on macOS and the walk over its roots on Linux (id lookup first, backend-agnostic). |
 | `rename` | Renames a binder across both stores (index + annotations), the ordering config, the canonical note file, and the per-record xattr backend. |

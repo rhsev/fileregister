@@ -93,7 +93,7 @@ func candidateProblem(path, id string, db map[string]string, indexIDs map[string
 }
 
 // repairRecord re-binds the relocated file under its EXISTING id, refreshing the
-// binder xattr + ★. Returns the (unchanged) id, or "" on failure.
+// binder xattr + its star. Returns the (unchanged) id, or "" on failure.
 // The second result lists what could not be written on the file; the bookmark
 // is renewed either way, and refresh can fill in the rest later.
 func repairRecord(rec map[string]any, newPath string) (string, []string) {
@@ -111,8 +111,8 @@ func repairRecord(rec map[string]any, newPath string) (string, []string) {
 			failed = append(failed, "binder '"+b+"'")
 		}
 	}
-	if len(binders) > 0 && index.ManagedMark(newPath) == "failed" {
-		failed = append(failed, "the ★ marker")
+	if index.StatusMark(newPath, len(binders) > 0) == "failed" {
+		failed = append(failed, "the "+index.StatusStar(len(binders) > 0)+" mark")
 	}
 	return id, failed
 }

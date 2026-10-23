@@ -206,7 +206,7 @@ func removeTarget(nd, binder, targetArg string) int {
 			}
 		}
 
-		// ★ managed marker: drop it only when the file has no remaining binder
+		// Star: ★ turns into ☆ only when the file has no remaining binder
 		// membership across ALL its ids. The id xattr is multi-valued, so a file
 		// may carry ids that were never in the removed binder (and so aren't in
 		// `matching`) yet still hold the file in another binder — enumerate the
@@ -229,8 +229,8 @@ func removeTarget(nd, binder, targetArg string) int {
 				break
 			}
 		}
-		if !stillMember && index.ManagedUnmark(filePath) == "removed" {
-			fmt.Println("Unmarked ★ (no remaining membership)")
+		if !stillMember && index.StatusMark(filePath, false) == "added" {
+			fmt.Println("★ → ☆ (in the index, in no binder)")
 		}
 	}
 

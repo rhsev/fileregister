@@ -222,8 +222,9 @@ succeeds. Outside a Spotlight index, for example under `/private/tmp`,
 **Replaces the file and loses the xattrs.** After a save the bookmark is
 `stale` and resolves through its path, but the file has no id. `audit`
 reports MISSING ID. `register refresh` renews the bookmark and writes the id
-back, for members also ★ and the binder layer (see OpenCloud above). If the
-file is renamed before `refresh`, nothing on the file points to its record.
+back, the star (★ or ☆) and, for members, the binder layer (see OpenCloud
+above). If the file is renamed before `refresh`, nothing on the file points to
+its record.
 `repair` then searches by the old file name, finds nothing and leaves the
 record unresolved. `register repair --interactive` accepts the new path.
 
@@ -244,8 +245,9 @@ the xattrs.
 
 - **ASCII** or **NFC-stable single codepoints** are safest. mdfind matching depends
   on Unicode normalization; the wrong glyph silently fails to match.
-- **Safe:** `★` U+2605, `°` U+00B0, `~` U+007E, with no decomposition under any
-  normalization form. (★ verified as a working tag value + mdfind match.)
+- **Safe:** `★` U+2605, `☆` U+2606, `°` U+00B0, `~` U+007E, with no
+  decomposition under any normalization form. (★ and ☆ verified as working tag
+  values + mdfind match, ☆ on macOS 27.2.)
 - **Avoid:** composed / ZWJ / skin-tone emoji, and **dead-key diacritics** like
   `˚` U+02DA RING ABOVE. It NFKD-decomposes to space + combining ring and has
   three look-alikes (`° ∘ ◦`), so it is both unreproducible and match-fragile.

@@ -289,8 +289,8 @@ func TestSnapshotRestoreIntoAnotherRoot(t *testing.T) {
 	if got := strings.Join(engineTags(t, anchor, vertrag), ","); got != "Steuer 2026,★" {
 		t.Errorf("vertrag.pdf tags = %s, want the free tag and ★", got)
 	}
-	if got := strings.Join(engineTags(t, anchor, filepath.Join(into, "Ablage", "lose.txt")), ","); got != "" {
-		t.Errorf("a record in no binder got tags: %s", got)
+	if got := strings.Join(engineTags(t, anchor, filepath.Join(into, "Ablage", "lose.txt")), ","); got != "☆" {
+		t.Errorf("a record in no binder has tags %q, want ☆", got)
 	}
 	if comments["vertrag.pdf"] != "Original im Ordner" || len(comments) != 1 {
 		t.Errorf("comment writes = %v", comments)

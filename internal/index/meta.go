@@ -77,23 +77,66 @@ func tagsGet(path string) []string {
 	return out
 }
 
-// managedMarker is ★ (U+2605), the one Finder Tag fileregister owns.
-const managedMarker = "★"
+// The two Finder tags fileregister owns. Every registered file carries one of
+// them: ★ (U+2605) when its record is in at least one binder, ☆ (U+2606) when
+// it is in the index but in no binder. Both say "handle with care".
+const (
+	managedMarker    = "★"
+	registeredMarker = "☆"
+)
 
-// ManagedMarked reports whether the file carries the ★ managed marker.
-func ManagedMarked(path string) bool {
-	for _, t := range tagsGet(path) {
-		if t == managedMarker {
-			return true
-		}
+// StatusStar is the star a file whose record is (member) or is not in a
+// binder carries.
+func StatusStar(member bool) string {
+	if member {
+		return managedMarker
 	}
-	return false
+	return registeredMarker
 }
 
-// ManagedMark writes the ★ managed marker (Managed.mark → Tags.add).
-func ManagedMark(path string) string {
-	resp, _ := fileAnchor().request(map[string]any{"op": "tag", "path": path, "value": managedMarker})
-	return anchorSymbol(resp)
+// IsStatusStar reports whether tag is one of the two stars fileregister owns.
+func IsStatusStar(tag string) bool {
+	return tag == managedMarker || tag == registeredMarker
+}
+
+// StatusStars reports which of the two stars the file carries.
+func StatusStars(path string) (filled, open bool) {
+	for _, t := range tagsGet(path) {
+		switch t {
+		case managedMarker:
+			filled = true
+		case registeredMarker:
+			open = true
+		}
+	}
+	return filled, open
+}
+
+// StatusMarked reports whether the file carries the right star, and only it.
+func StatusMarked(path string, member bool) bool {
+	filled, open := StatusStars(path)
+	if member {
+		return filled && !open
+	}
+	return open && !filled
+}
+
+// StatusMark gives the file the star for its state and takes the other one
+// off. Returns "added" when the right star was written, "noop" when it was
+// there, "failed" when the engine refused.
+func StatusMark(path string, member bool) string {
+	result := tagsAdd(path, StatusStar(member))
+	if result != "failed" {
+		tagsRemove(path, StatusStar(!member))
+	}
+	return result
+}
+
+// StatusUnmark takes both stars off: the file has left the register.
+func StatusUnmark(path string) bool {
+	a := tagsRemove(path, managedMarker) == "removed"
+	b := tagsRemove(path, registeredMarker) == "removed"
+	return a || b
 }
 
 // tagsAdd adds a Finder tag (Tags.add).
@@ -160,11 +203,6 @@ func XattrBackendRemove(path, binder, backend string) string {
 	default:
 		return itemProjectsRemove(path, binder)
 	}
-}
-
-// ManagedUnmark drops the ★ managed marker (Managed.unmark → Tags.remove).
-func ManagedUnmark(path string) string {
-	return tagsRemove(path, managedMarker)
 }
 
 // itemProjectsMembers returns the binders in the file's kMDItemProjects array.
@@ -282,8 +320,8 @@ func SetFileComment(path, comment string) error {
 	return nil
 }
 
-// FreeTags is the part of a file's tags that belongs to the user: all but ★
-// and, for a record with the tags backend, its binder names. A binder name in
+// FreeTags is the part of a file's tags that belongs to the user: all but
+// the two stars and, for a record with the tags backend, its binder names. A binder name in
 // kept_tags was the user's tag before it was the binder's, so it stays free.
 func FreeTags(rec map[string]any, tags []string) []string {
 	binderTag := map[string]bool{}
@@ -294,7 +332,7 @@ func FreeTags(rec map[string]any, tags []string) []string {
 	}
 	var out []string
 	for _, t := range tags {
-		if t == managedMarker {
+		if IsStatusStar(t) {
 			continue
 		}
 		if binderTag[NFC(t)] && !IsKeptTag(rec, t) {

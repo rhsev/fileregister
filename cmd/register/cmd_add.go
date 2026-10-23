@@ -1,6 +1,6 @@
 package main
 
-// cmd_add — add a file (or URL) to a binder: index + bookmark + xattr + ★,
+// cmd_add — add a file (or URL) to a binder: index + bookmark + xattr + star,
 // optionally with a Markdown annotation (--md / .md --target).
 
 import (
@@ -394,8 +394,8 @@ func cmdAdd(args []string) int {
 	}
 	ensureSchema(nd)
 
-	// 4. Membership layer per file (binder xattr + ★). Both mark membership, so a
-	//    bookmark add (no binder) writes neither.
+	// 4. Membership layer per file (binder xattr) and the star: ★ for a file
+	//    in a binder, ☆ for one in the index but in no binder.
 	appended, noop := 0, 0
 	usedBackends := map[string]bool{}
 	keptChanges := map[string]map[string]map[string]bool{} // index file → id → tag → keep
@@ -441,9 +441,11 @@ func cmdAdd(args []string) int {
 					noteKept(i, false)
 				}
 			}
-			if index.ManagedMark(path) == "failed" {
-				fmt.Fprintf(os.Stderr, "  Warning: failed to set ★ on %s: %s\n", filepath.Base(path), index.LastEngineError())
-			}
+		}
+		// A record added again without --binder keeps the binders it has.
+		member := binderSet || len(index.NormalizeBinders(recByID[records[i].ID]["binder"])) > 0
+		if index.StatusMark(pathByIdx[i], member) == "failed" {
+			fmt.Fprintf(os.Stderr, "  Warning: failed to set %s on %s: %s\n", index.StatusStar(member), filepath.Base(pathByIdx[i]), index.LastEngineError())
 		}
 		if i < len(actions) && actions[i] == "noop" {
 			noop++

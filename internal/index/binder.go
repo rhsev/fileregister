@@ -34,11 +34,11 @@ func SameBinder(a, b string) bool { return SameLabel(a, b) }
 // unmarshal); existing binders stay usable, so one with a comma can still be
 // renamed away.
 func BinderNameProblem(name string) string {
-	// The tags backend writes a binder as a Finder tag, and ★ is the tag
-	// fileregister owns as its managed marker: removing such a binder would
-	// strip the marker from files still in other binders.
-	if norm.NFC.String(name) == managedMarker {
-		return "is the managed marker ★"
+	// The tags backend writes a binder as a Finder tag, and ★ and ☆ are the
+	// tags fileregister owns as its status marks: removing such a binder would
+	// strip the mark from files still in the register.
+	if n := norm.NFC.String(name); IsStatusStar(n) {
+		return "is the status mark " + n
 	}
 	if strings.Contains(name, ",") {
 		return "contains a comma"

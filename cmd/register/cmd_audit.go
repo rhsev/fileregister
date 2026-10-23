@@ -113,7 +113,7 @@ func cmdAudit(args []string) int {
 			active = append(active, r)
 		} else {
 			// A record in no binder still needs a bookmark that resolves and
-			// its id on the file; it carries no binder xattr and no ★.
+			// its id on the file and ☆; it carries no binder xattr.
 			bookmarks = append(bookmarks, r)
 		}
 	}
@@ -226,7 +226,7 @@ func cmdAudit(args []string) int {
 			renamed = append(renamed, renamedT{label, now, refPath})
 		}
 		// The identity layer refresh writes: the id where Spotlight searches it
-		// (repair's first lookup), the copy that travels, ★ on members.
+		// (repair's first lookup), the copy that travels, and the star for its state.
 		var lacks []string
 		if !index.HasDescriptionID(refPath, id) {
 			lacks = append(lacks, idLayerName)
@@ -234,8 +234,9 @@ func cmdAudit(args []string) int {
 		if index.SyncID(refPath) != id {
 			lacks = append(lacks, syncLayerName)
 		}
-		if len(binders) > 0 && !index.ManagedMarked(refPath) {
-			lacks = append(lacks, "★")
+		member := len(binders) > 0
+		if filled, open := index.StatusStars(refPath); member && (!filled || open) || !member && (!open || filled) {
+			lacks = append(lacks, index.StatusStar(member))
 		}
 		if len(lacks) > 0 {
 			missingIdentity = append(missingIdentity, missingIdentityT{binders, refPath, label, lacks})

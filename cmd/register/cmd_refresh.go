@@ -146,8 +146,8 @@ func cmdRefresh(args []string) int {
 		}
 
 		// Identity layer for every record (idempotent): the id in both its
-		// carriers, ★ for members only (a record in no binder does not get
-		// it). kMDItemInformation is the one Spotlight searches and iCloud
+		// carriers, and the star, ★ for a member and ☆ for a record in no
+		// binder. kMDItemInformation is the one Spotlight searches and iCloud
 		// strips; the #S copy is the one that travels.
 		if dryRun {
 			if !index.HasDescriptionID(refPath, id) {
@@ -163,9 +163,7 @@ func cmdRefresh(args []string) int {
 				restoredIDs++
 				fmt.Printf("Restored id %s → %s of %s\n", id, idLayerName, filepath.Base(refPath))
 			}
-			if len(binders) > 0 {
-				index.ManagedMark(refPath)
-			}
+			index.StatusMark(refPath, len(binders) > 0)
 		}
 
 		if len(binders) == 0 {

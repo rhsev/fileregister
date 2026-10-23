@@ -164,9 +164,12 @@ func cmdOf(args []string) int {
 	if filename != "" {
 		fmt.Printf("filename: %s\n", filename)
 	}
-	if index.ManagedMarked(path) {
-		fmt.Println("managed:  ★ yes")
-	} else {
+	switch filled, open := index.StatusStars(path); {
+	case filled:
+		fmt.Println("managed:  ★ in a binder")
+	case open:
+		fmt.Println("managed:  ☆ in the index, in no binder")
+	default:
 		fmt.Println("managed:  no")
 	}
 	if matchedByBookmark {

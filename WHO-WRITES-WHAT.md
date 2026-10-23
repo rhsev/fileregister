@@ -11,10 +11,12 @@ sidecars). This page shows which command writes to which of them.
   the record, in no binder once its last binder goes.
 - **A note block is deleted only by `cleanup --interactive`**, and only when you
   confirm it. `forget` takes the id out of a block and leaves the block itself.
-- **Every attribute on a file can be rebuilt.** The id, ★ and the binder tags
-  derive from the index and the bookmark store, and `refresh` writes them back.
+- **Every attribute on a file can be rebuilt.** The id, the star and the binder
+  tags derive from the index and the bookmark store, and `refresh` writes them
+  back.
   A run with nothing to restore changes no file.
-- **★ leaves a file only with its last binder** (`remove`).
+- **★ turns into ☆ with the file's last binder** (`remove`), and the star leaves
+  the file only with its record (`forget`).
 - **A note's frontmatter has one writer**, `album --title`, and it touches one
   field, `album:`.
 - **`list`, `resolve`, `of`, `audit`, `album` (without `--title`), `order show`,
@@ -39,24 +41,24 @@ The columns for the file and the index:
 
 - `kMDItemInformation`: the id, where Spotlight searches it
 - `id#S` (`com.fileregister.id#S`): the same id, where iCloud Drive leaves it
-- ★: the managed marker, on members only
+- Star: ★ on a file in a binder, ☆ on a file in the index but in no binder
 - Binder tags: the binder names, in `kMDItemProjects` or in Finder tags, per the
   record's `xattr:` backend
 - `kept_tags`, an index field: Finder tags the user had before a binder of that
   name
 
-| Command | Index | Bookmark store | `kMDItemInformation` | `id#S` | ★ | Binder tags | `kept_tags` |
+| Command | Index | Bookmark store | `kMDItemInformation` | `id#S` | Star | Binder tags | `kept_tags` |
 |---|---|---|---|---|---|---|---|
-| `add` (new file) | new record | new | set | set | set (member) | add | set¹ |
-| `add` (file has an id) | binder added (new record if the id is unknown) | — | — | — | set (member) | add | set¹ |
-| `remove` | binder out | — | — | — | out (last binder) | out (not a kept tag) | — |
-| `forget`† | record out | out | id out | out | — | — | — |
+| `add` (new file) | new record | new | set | set | ★ or ☆ | add | set¹ |
+| `add` (file has an id) | binder added (new record if the id is unknown) | — | — | — | ★ or ☆ | add | set¹ |
+| `remove` | binder out | — | — | — | ★ → ☆ (last binder) | out (not a kept tag) | — |
+| `forget`† | record out | out | id out | out | out (last id) | — | — |
 | `rename`† | binder renamed | — | — | — | — | old out, new add | renamed |
-| `refresh` | `filename` edited (renamed file) | renewed (stale) | restore | set | set (member) | add | — |
-| `repair` | `filename` edited (renamed file) | re-bound | add | set | set (member) | add | — |
-| `unmarshal` | new records | new | add | set | set (member) | add | — |
-| `restore` | index files placed | new | add | set | set (member) | add | — |
-| `write` (`.jsonl` target) | records | — | — | — | set (`_ref_path`) | add (`_ref_path`) | — |
+| `refresh` | `filename` edited (renamed file) | renewed (stale) | restore | set | ★ or ☆ | add | — |
+| `repair` | `filename` edited (renamed file) | re-bound | add | set | ★ or ☆ | add | — |
+| `unmarshal` | new records | new | add | set | ★ or ☆ | add | — |
+| `restore` | index files placed | new | add | set | ★ or ☆ | add | — |
+| `write` (`.jsonl` target) | records | — | — | — | ★ (`_ref_path`) | add (`_ref_path`) | — |
 | `cleanup --prune`, `--interactive`† | — | entries no record needs out | — | — | — | — | — |
 
 Read only: `list`, `resolve`, `of`, `audit`, `snapshot`.
@@ -70,7 +72,8 @@ notes or not.
   add it, and only `forget` takes it off. `add` on a file that already has its
   id takes it over without rewriting the carriers. `refresh` restores what is
   missing, and writes `kMDItemInformation` only where the id is not there yet.
-- **A record in no binder carries no ★**, so `forget` has none to take off.
+- **A record in no binder carries ☆.** `forget` takes it off with the file's
+  last id; a file another record still claims keeps its star.
 
 ## With notes
 

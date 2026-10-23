@@ -2,6 +2,6 @@ exit: 0
 === stdout ===
 Removed 'Docs' from 1 record(s) in inbox.jsonl
 Removed 'Docs' from groups attribute
-Unmarked ★ (no remaining membership)
+★ → ☆ (in the index, in no binder)
 Done: doc.txt removed from 'Docs'
 === stderr ===

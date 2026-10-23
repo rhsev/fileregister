@@ -252,7 +252,7 @@ func cmdWrite(args []string) int {
 						}
 					}
 					xattrStatus = index.XattrBackendAdd(items[i].refPath, rec.Binder, backend)
-					index.ManagedMark(items[i].refPath)
+					index.StatusMark(items[i].refPath, true)
 				}
 			}
 			items[i].status = writeStatusOK(target, actions[j], xattrStatus)

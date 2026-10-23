@@ -59,11 +59,12 @@ func TestTagsBackendKeepsTheUsersOwnTags(t *testing.T) {
 			t.Fatalf("remove %s: %d %s", f, code, e)
 		}
 	}
-	if got := fileTags(t, anchor, mine); strings.Join(got, ",") != "Wichtig" {
-		t.Errorf("remove took the user's own tag: %v", got)
+	// Out of its last binder, a file keeps ☆: it is still in the index.
+	if got := fileTags(t, anchor, mine); strings.Join(got, ",") != "Wichtig,☆" {
+		t.Errorf("remove took the user's own tag, or left ★: %v", got)
 	}
-	if got := fileTags(t, anchor, plain); len(got) != 0 {
-		t.Errorf("remove left fileregister's tag behind: %v", got)
+	if got := fileTags(t, anchor, plain); strings.Join(got, ",") != "☆" {
+		t.Errorf("remove left the binder tag or ★ behind: %v", got)
 	}
 
 	// rename: the old name's tag stays where it was the user's.

@@ -1,10 +1,10 @@
 package main
 
 // cmd_forget — take a record out of the register for good: its index line, its
-// bookmark entry, its id in the notes and on the file. What the notes say
-// about it stays: a block keeps its heading and fields and only loses its id,
-// so reindex cannot bring the record back from it, and promote reattaches it
-// should the file ever return (by its heading, the file name).
+// bookmark entry, its id in the notes and on the file, and the star. What the
+// notes say about it stays: a block keeps its heading and fields and only
+// loses its id, so reindex cannot bring the record back from it, and promote
+// reattaches it should the file ever return (by its heading, the file name).
 //
 // Only records in no binder. A member leaves its binders with remove first,
 // which also takes the membership marks off the file; forget is the last step.
@@ -165,6 +165,11 @@ func cmdForget(args []string) int {
 				fmt.Fprintf(os.Stderr, "  Warning: the id stays on %s: %s\n", p, why)
 			} else if removed {
 				parts = append(parts, "id on the file")
+			}
+			// The star goes with the last id: a file another record still
+			// claims stays marked.
+			if len(index.OfFileIDs(p)) == 0 && index.StatusUnmark(p) {
+				parts = append(parts, "☆ on the file")
 			}
 		}
 		fmt.Printf("Forgot %s: %s\n", refLabel(rec), strings.Join(parts, ", "))

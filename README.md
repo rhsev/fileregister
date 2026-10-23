@@ -34,7 +34,9 @@ rename or a move to another disk. When it breaks, `register repair` binds it ane
 under the same id, and on a second Mac `register unmarshal` does the same. What
 is written onto the file itself (xattrs for the id, the binder names and Finder
 tags) is a cache derived from the index, and `register refresh` rebuilds it
-whenever it drifts or a copy strips it.
+whenever it drifts or a copy strips it. Every registered file carries a star
+as a Finder tag, ★ when it is in a binder and ☆ when it is not, so Finder shows
+which files the register knows.
 
 Most of the OS-specific work lives behind the
 [fileanchor](https://github.com/rhsev/fileanchor) engine. It is released for

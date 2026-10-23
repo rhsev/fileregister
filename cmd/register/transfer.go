@@ -337,7 +337,7 @@ func addFinderFields(line, rec map[string]any, path string) {
 var setFileComment = index.SetFileComment
 
 // bindFile makes target the file of record id on this system: bookmark under
-// the same id, id attributes, binder attribute per backend, ★ for a member,
+// the same id, id attributes, binder attribute per backend, ★ for a member or ☆ for a record in no binder,
 // the free Finder tags added and the comment set when the file has none.
 // Returns false when the bookmark could not be made, and remarks for the
 // report (a comment the file keeps, a tag the engine refused).
@@ -352,9 +352,7 @@ func bindFile(db map[string]string, target, id string, rec map[string]any, tags 
 	for _, b := range binders {
 		index.XattrBackendAdd(target, index.AsString(b), backend)
 	}
-	if len(binders) > 0 {
-		index.ManagedMark(target)
-	}
+	index.StatusMark(target, len(binders) > 0)
 	if !finder {
 		return ok, remarks
 	}
