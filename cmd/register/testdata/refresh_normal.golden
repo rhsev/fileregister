@@ -11,7 +11,7 @@ Refresh complete:
   Stars set    : 1 (★ in a binder, ☆ in none)
   Skipped (url) : 1
 
-Broken bookmarks (1) — run 'register repair' to fix:
+Broken bookmarks (1) — run 'register repair --interactive' to fix:
   [Ghost] z.txt (999999999) (in: inbox.jsonl)
 === stderr ===
 Collecting type:ref records…

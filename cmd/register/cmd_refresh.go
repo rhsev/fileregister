@@ -312,7 +312,7 @@ func cmdRefresh(args []string) int {
 
 	if len(broken) > 0 {
 		fmt.Println("")
-		fmt.Printf("Broken bookmarks (%d) — run 'register repair' to fix:\n", len(broken))
+		fmt.Printf("Broken bookmarks (%d) — run 'register repair --interactive' to fix:\n", len(broken))
 		for _, b := range broken {
 			fmt.Printf("  [%s] %s (in: %s)\n", binderTag(b.binders), b.label, filepath.Base(b.noteFile))
 		}

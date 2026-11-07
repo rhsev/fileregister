@@ -400,7 +400,7 @@ For records with broken bookmarks (typical after cross-volume move or transfer t
    3. `mdfind` on the appropriate xattr layer (`kMDItemProjects` or `kMDItemUserTags` per record) restricted to files whose basename matches `filename`
    Candidates in the Trash or a backup (`.Trash`, `.Trashes`, Time Machine), and files that are another record's (they carry a registered id of their own), are ignored.
 2. If found: re-bind the bookmark **under the file's existing id** via `index.Rebind` (a fresh blob stored under the same id), then refresh the id xattrs, the binder xattr layer and the star. The id is the file's **permanent identity**. Only the broken blob is renewed, so the id goes nowhere new. If the file was renamed, the index line's `filename` takes the new name, since it is the label `list` and `album` show; note headings stay as they are. This happens **without asking only** for a single candidate from stage 1 (the id) on the volume the file was on. A hit by name, or on another volume, is some file that may or may not be this one.
-3. Otherwise: list the candidates; with `--interactive`, prompt to choose (also for a single one)
+3. Otherwise: list the candidates with the reason they need confirmation (found by name, several files with the id, or the file with the id on another volume); with `--interactive`, prompt to choose (also for a single one). `refresh` therefore points to `register repair --interactive` for broken bookmarks.
 4. If not found: report; in `--interactive` mode prompt for an explicit path
 
 Exit status is 1 while a record stays unresolved or a repaired file is missing metadata, so a monitor can tell. Records on a volume that is not mounted do not count, since they need only the volume.

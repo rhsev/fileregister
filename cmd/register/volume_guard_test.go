@@ -120,3 +120,23 @@ func TestAuditLeavesAnAbsentVolumeUnjudged(t *testing.T) {
 		t.Errorf("exit %d, want 0 with the file on an absent volume:\n%s%s", code, out, errOut)
 	}
 }
+
+// repair says why it asks: a hit by name, several files with the id, or the
+// one file with the id on another volume than the bookmark recorded.
+func TestConfirmReason(t *testing.T) {
+	for _, c := range []struct {
+		byID       bool
+		candidates []string
+		lastPath   string
+		want       string
+	}{
+		{false, []string{"/Volumes/docs/a.pdf"}, "/Users/me/a.pdf", "1 file(s) with the same name, none with the id"},
+		{true, []string{"/Volumes/docs/a.pdf", "/Volumes/copy/a.pdf"}, "/Users/me/a.pdf", "2 files carry the id"},
+		{true, []string{"/Volumes/docs/a.pdf"}, "/Users/me/Downloads/a.pdf", "Found by id on /Volumes/docs, but the file was on the startup volume"},
+		{true, []string{"/Users/me/a.pdf"}, "/Volumes/docs/a.pdf", "Found by id on the startup volume, but the file was on /Volumes/docs"},
+	} {
+		if got := confirmReason(c.byID, c.candidates, c.lastPath); got != c.want {
+			t.Errorf("confirmReason(%v, %v, %q) = %q, want %q", c.byID, c.candidates, c.lastPath, got, c.want)
+		}
+	}
+}

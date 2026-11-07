@@ -48,6 +48,30 @@ func locateCandidates(id, binder, filename, backend string) ([]string, bool) {
 	return uniqStrings(candidates, false), false
 }
 
+// confirmReason says why repair asks before it binds candidates: they were
+// found by name, several files carry the id, or the one file with the id lies
+// on another volume than before. A copy on another volume, a clone for
+// instance, carries the same id as the file that went missing.
+func confirmReason(byID bool, candidates []string, lastPath string) string {
+	switch {
+	case !byID:
+		return fmt.Sprintf("%d file(s) with the same name, none with the id", len(candidates))
+	case len(candidates) > 1:
+		return fmt.Sprintf("%d files carry the id", len(candidates))
+	default:
+		return fmt.Sprintf("Found by id on %s, but the file was on %s",
+			volumeLabel(volumeOf(candidates[0])), volumeLabel(volumeOf(lastPath)))
+	}
+}
+
+// volumeLabel names a mount for a message; "/" is the startup volume.
+func volumeLabel(mount string) string {
+	if mount == "/" {
+		return "the startup volume"
+	}
+	return mount
+}
+
 // sharedPaths maps each resolved path that more than one record resolves to
 // onto those ids — two identities on one file, the trace a bad re-bind leaves.
 func sharedPaths(records []map[string]any, resolved map[string]string) map[string][]string {
@@ -272,8 +296,9 @@ func cmdRepair(args []string) int {
 			newPath = candidates[0]
 			fmt.Printf("  Found: %s\n", newPath)
 		} else if len(candidates) > 0 {
+			why := confirmReason(byID, candidates, lastPath)
 			if interactive {
-				fmt.Fprintln(os.Stderr, "  Candidates found — please confirm:")
+				fmt.Fprintf(os.Stderr, "  %s — please confirm:\n", why)
 				for i, c := range candidates {
 					fmt.Fprintf(os.Stderr, "    %d. %s\n", i+1, c)
 				}
@@ -286,7 +311,7 @@ func cmdRepair(args []string) int {
 					}
 				}
 			} else {
-				fmt.Printf("  %d candidate(s) to confirm — rerun with --interactive to choose:\n", len(candidates))
+				fmt.Printf("  %s — rerun with --interactive to confirm:\n", why)
 				for _, c := range candidates {
 					fmt.Printf("    %s\n", c)
 				}
