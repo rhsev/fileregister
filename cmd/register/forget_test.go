@@ -155,3 +155,49 @@ func TestPromoteDoesNotGuessBetweenBlocks(t *testing.T) {
 		t.Errorf("want the two orphans untouched and one new block:\n%s", got)
 	}
 }
+
+// A member whose file is gone is forgotten in one step: there are no marks
+// left on a file to take off. While the place cannot be searched, forget
+// cannot tell a gone file from one nobody looked for, and refuses.
+func TestForgetMemberWhoseFileIsGone(t *testing.T) {
+	real := engineBin(t)
+	for _, c := range []struct {
+		name, reply string
+		wantCode    int
+		want        string
+	}{
+		{"covered", `{"ok":true,"searchable":true}`, 0, "(file gone, was in B): index"},
+		{"not covered", `{"ok":true,"searchable":false}`, 1, "cannot be told"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			anchor := stubSearchable(t, real, c.reply)
+			notes := t.TempDir()
+			os.MkdirAll(filepath.Join(notes, "collections"), 0755)
+			env := forgetEnv(t, notes, anchor)
+			f := filepath.Join(t.TempDir(), "f.txt")
+			writeFile(t, f, "f")
+			if _, e, code := runGoAdd(t, env, f, "--binder", "B"); code != 0 {
+				t.Fatalf("add: %d %s", code, e)
+			}
+			if err := os.Remove(f); err != nil {
+				t.Fatal(err)
+			}
+			id := inboxByFilename(t, notes)["f.txt"]["id"].(string)
+
+			if c.wantCode == 0 {
+				out, e, code := runGoForget(t, env, id, "--dry-run")
+				if code != 0 || !strings.Contains(out, "(file gone, was in B): index line") {
+					t.Fatalf("dry run: exit %d\n%s%s", code, out, e)
+				}
+			}
+			out, e, code := runGoForget(t, env, id)
+			if code != c.wantCode || !strings.Contains(out+e, c.want) {
+				t.Fatalf("forget: exit %d, want %d with %q\n%s%s", code, c.wantCode, c.want, out, e)
+			}
+			_, still := inboxByFilename(t, notes)["f.txt"]
+			if still != (c.wantCode != 0) {
+				t.Errorf("index line still there: %v", still)
+			}
+		})
+	}
+}

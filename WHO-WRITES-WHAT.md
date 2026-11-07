@@ -7,8 +7,8 @@ sidecars). This page shows which command writes to which of them.
 
 ## Key points
 
-- **Only `forget` deletes a record**, and only one in no binder. `remove` keeps
-  the record, in no binder once its last binder goes.
+- **Only `forget` deletes a record**, and only one in no binder or one whose
+  file is gone. `remove` keeps the record, in no binder once its last binder goes.
 - **A note block is deleted only by `cleanup --interactive`**, and only when you
   confirm it. `forget` takes the id out of a block and leaves the block itself.
 - **Every attribute on a file can be rebuilt.** The id, the star and the binder

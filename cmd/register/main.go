@@ -170,7 +170,7 @@ Register — the index (identity & membership):
             (no --binder: a record in no binder, id + optional aka)
   add       --url <URL> [--binder <name>] [--label <name>] [--aka <key>]  (URL record, e.g. x-devonthink-item://…)
   remove    <file>...|<url> --binder <name>
-  forget    <id|aka>... [--dry-run]   (a record in no binder, for good: index, bookmark, id in notes and on the file; blocks stay)
+  forget    <id|aka>... [--dry-run]   (a record in no binder or whose file is gone, for good: index, bookmark, id in notes and on the file; blocks stay)
   list      [<binder>] [--inbox|--curated]  (all binders with counts, or files in one)
             [<binder> --paths [--print0]]   (absolute paths only, one per line, or NUL-separated)
             [<binder> --json]               (JSONL per member: id, aka, filename, kind, path)

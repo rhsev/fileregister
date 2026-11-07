@@ -452,7 +452,7 @@ Output is plain text. Decisions stay with the user. Exit status is 1 while somet
 
 ### `register forget <id|aka>... [--dry-run]`
 
-Takes a record out of the register for good. It is the one command that deletes a record. Only a record in **no binder** qualifies; a member leaves its binders with `remove` first, which also takes the membership marks off the file. Every key must name such a record, or nothing happens.
+Takes a record out of the register for good. It is the one command that deletes a record. A record in **no binder** qualifies, and so does a member whose **file is gone**. A member whose file exists leaves its binders with `remove` first, which also takes the membership marks off the file. A gone file has no marks left, and `remove` cannot name it, so `forget` takes such a member directly. Gone is judged as `audit` judges a dead bookmark: it does not resolve, no file carries the id, and the search covers the place the file was. A member without a bookmark on this system, one whose file a search finds (`repair`), and one on a volume that is not mounted or not indexed are refused. URL records in a binder are refused too; `remove` takes them out by their URL. Every key must name a record that qualifies, or nothing happens. Output and `--dry-run` name the binders a gone member leaves.
 
 The steps run in this order, so that an interruption leaves nothing `reindex` could bring back:
 
@@ -901,7 +901,7 @@ The contract is subprocess + JSONL. `register write` has since been ported from 
 | `promote` | Adds a per-binder Markdown context block for a binder's records (binder- or record-granularity). Additive; the index entry stays. |
 | `annotate` | Edits an existing annotation block: `--set`/`--unset` custom fields, `--prose` replaces the entry's prose. Reserved keys (`id`, `binder`, `sort`) are refused with the command that owns them. |
 | `remove` | Set-deletes the binder from the index record and removes the binder name from the xattr layer; annotation blocks stay (`cleanup` reviews stale ones). With an emptied set the record stays, in no binder. |
-| `forget` | Deletes a record in no binder: index line, bookmark entry, its id in the notes' blocks (the blocks stay) and on the file. The only command that deletes a record. |
+| `forget` | Deletes a record in no binder, or a member whose file is gone: index line, bookmark entry, its id in the notes' blocks (the blocks stay) and on the file. The only command that deletes a record. |
 | `refresh` | Rebuilds the derived metadata on the file from the index (the id, the star ★ or ☆, the binder xattr through ItemProjects, Tags, or skipped for `none`), renews stale bookmarks and writes a renamed file's name into the index. Idempotent. |
 | `audit` | Read-only consistency report: dangling records, broken bookmarks, mismatched/ghost xattr in both layers. |
 | `repair` | Re-binds a moved file's broken bookmark under its **unchanged** `id`; locates the file through the engine's search, Spotlight on macOS and the walk over its roots on Linux (id lookup first, backend-agnostic). |
