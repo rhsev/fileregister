@@ -170,10 +170,12 @@ func TestForgetMemberWhoseFileIsGone(t *testing.T) {
 		{"not covered", `{"ok":true,"searchable":false}`, 1, "cannot be told"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			anchor := stubSearchable(t, real, c.reply)
 			notes := t.TempDir()
 			os.MkdirAll(filepath.Join(notes, "collections"), 0755)
-			env := forgetEnv(t, notes, anchor)
+			// add runs on the real engine: on Linux it asks searchable too,
+			// and the stub's "no" would refuse the file. Only forget sees the
+			// stub, in the same HOME so it finds the bookmark add stored.
+			env := forgetEnv(t, notes, real)
 			f := filepath.Join(t.TempDir(), "f.txt")
 			writeFile(t, f, "f")
 			if _, e, code := runGoAdd(t, env, f, "--binder", "B"); code != 0 {
@@ -182,6 +184,7 @@ func TestForgetMemberWhoseFileIsGone(t *testing.T) {
 			if err := os.Remove(f); err != nil {
 				t.Fatal(err)
 			}
+			env = append(filterEnv(env, "FILEANCHOR"), "FILEANCHOR="+stubSearchable(t, real, c.reply))
 			id := inboxByFilename(t, notes)["f.txt"]["id"].(string)
 
 			if c.wantCode == 0 {
