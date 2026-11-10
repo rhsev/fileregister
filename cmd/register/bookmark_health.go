@@ -123,6 +123,11 @@ func classifyBookmarks(db map[string]string, records []map[string]any) (bookmark
 		case rep.blind:
 			out = append(out, bookmarkFinding{bmUnreachable, id, label, "",
 				"this fileanchor does not report the recorded path — update to 1.2.0 so a gone file can be told from an absent volume"})
+		case r.LastPath == "":
+			// One entry without a recorded path among others that have one:
+			// there is no place to ask about, so no verdict.
+			out = append(out, bookmarkFinding{bmUnreachable, id, label, "",
+				"the bookmark does not say where the file was — cannot tell a gone file from an absent volume"})
 		case !volumeMounted(r.LastPath):
 			out = append(out, bookmarkFinding{bmUnreachable, id, label, r.LastPath,
 				"the volume is not mounted — cannot tell a moved file from a gone one"})

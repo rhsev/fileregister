@@ -236,7 +236,7 @@ var albumMdlsKeys = []string{
 	"kMDItemNumberOfPages", "kMDItemDurationSeconds", "kMDItemContentType",
 }
 
-var mdlsLineRe = regexp.MustCompile(`(?m)^(kMDItem\w+)\s*=\s*(.+)$`)
+var mdlsLineRe = regexp.MustCompile(`^(kMDItem\w+)\s*=\s*(.+)$`)
 
 // albumFileMeta is what a file says about itself: size and modification time
 // from the file system, the rest from Spotlight (IPTC/EXIF for images, page
@@ -267,13 +267,37 @@ func albumFileMeta(path string) map[string]any {
 	return out
 }
 
+// closesQuote reports whether s ends a quoted mdls value: on a quote that is
+// not escaped.
+func closesQuote(s string) bool {
+	s = strings.TrimRight(s, " \t")
+	return strings.HasSuffix(s, `"`) && !strings.HasSuffix(s, `\"`)
+}
+
 // albumSpotlightFields maps mdls output onto the file keys.
 func albumSpotlightFields(raw string) map[string]any {
 	md := map[string]string{}
-	for _, m := range mdlsLineRe.FindAllStringSubmatch(raw, -1) {
+	lines := strings.Split(raw, "\n")
+	for i := 0; i < len(lines); i++ {
+		m := mdlsLineRe.FindStringSubmatch(lines[i])
+		if m == nil {
+			continue
+		}
 		v := strings.TrimSpace(m[2])
 		if v == "(null)" || v == "(" {
 			continue // absent, or an array mdls spreads over several lines
+		}
+		// A quoted value with a line break in it (an IPTC caption) goes on
+		// until the line that closes the quote.
+		if strings.HasPrefix(v, `"`) && !closesQuote(v[1:]) {
+			for i+1 < len(lines) && mdlsLineRe.FindStringSubmatch(lines[i+1]) == nil {
+				i++
+				v += "\n" + lines[i]
+				if closesQuote(lines[i]) {
+					break
+				}
+			}
+			v = strings.TrimRight(v, " \t")
 		}
 		md[m[1]] = strings.TrimSuffix(strings.TrimPrefix(v, `"`), `"`)
 	}

@@ -616,7 +616,8 @@ would give it two identities. Exit 0 only when nothing is parked.
 #### `register snapshot [--out <file>.tar.gz] [--no-files [--since <snapshot>]] [--no-finder]`
 
 Container layout, below `register-snapshot-<date>/` (also the default file
-name):
+name; with `--no-files` the default file name ends in `-no-files`, so it does
+not replace a full snapshot of the same day):
 
 - `snapshot.json`: format, time, register version, system, bases, whether the
   files are included, counts

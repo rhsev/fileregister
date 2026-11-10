@@ -42,13 +42,18 @@ func ReadIndex(notesDir string) ([]Record, error) {
 
 	var recs []Record
 	for _, f := range entries {
+		// As in ReadAllRefs: a file or line that cannot be read is an error
+		// naming the place. Skipped, its memberships would be missing from
+		// the list without a word.
 		fh, err := os.Open(f)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("cannot read index file %s: %w", f, err)
 		}
 		scanner := bufio.NewScanner(fh)
 		scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024) // same limit as ReadAllRefs
+		n := 0
 		for scanner.Scan() {
+			n++
 			line := strings.TrimSpace(scanner.Text())
 			if line == "" {
 				continue
@@ -57,7 +62,8 @@ func ReadIndex(notesDir string) ([]Record, error) {
 			dec.UseNumber()
 			var raw map[string]json.RawMessage
 			if err := dec.Decode(&raw); err != nil {
-				continue
+				fh.Close()
+				return nil, fmt.Errorf("%s:%d is not one JSON record — fix or remove that line", f, n)
 			}
 			// type must be "ref"
 			var typ string
@@ -102,10 +108,11 @@ func ReadIndex(notesDir string) ([]Record, error) {
 			}
 			recs = append(recs, Record{Type: typ, ID: id, Binders: binders})
 		}
-		if err := scanner.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: reading %s aborted: %v\n", f, err)
-		}
+		err = scanner.Err()
 		fh.Close()
+		if err != nil {
+			return nil, fmt.Errorf("reading %s stopped after line %d: %w", f, n, err)
+		}
 	}
 	return recs, nil
 }

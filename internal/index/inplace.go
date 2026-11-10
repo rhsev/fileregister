@@ -45,6 +45,11 @@ func WriteInPlace(path string, data []byte) error {
 	}
 
 	if err := writeSynced(journal, data); err != nil {
+		// A journal that appeared since the check above is another
+		// writer's: it stays.
+		if errors.Is(err, fs.ErrExist) {
+			return fmt.Errorf("%s: another write is under way; %s is its journal", path, journal)
+		}
 		os.Remove(journal)
 		return err
 	}

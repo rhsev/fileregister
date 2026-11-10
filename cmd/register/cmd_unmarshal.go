@@ -299,6 +299,26 @@ func cmdUnmarshal(args []string) int {
 		}
 	}
 
+	// flush saves what the run has done so far: the bookmarks made and the
+	// records taken in. A run that stops halfway calls it too, so a file that
+	// is placed and stamped has its bookmark and its index line.
+	flush := func() bool {
+		ok := true
+		if dbDirty {
+			if err := index.SaveDB(db); err != nil {
+				fmt.Fprintln(os.Stderr, "register:", err)
+				ok = false
+			}
+		}
+		if ok && len(indexRefs) > 0 {
+			if _, err := index.JSONLWriteMany(indexRefs, inbox); err != nil {
+				fmt.Fprintln(os.Stderr, "register:", err)
+				ok = false
+			}
+		}
+		return ok
+	}
+
 	for _, entry := range refLines {
 		id := index.AsString(entry["id"])
 		label := id
@@ -340,6 +360,7 @@ func cmdUnmarshal(args []string) int {
 			}
 			if r.fatal != nil {
 				fmt.Fprintln(os.Stderr, "register:", r.fatal)
+				flush()
 				return 1
 			}
 			ok, rm := bindFile(db, r.target, id, entry, index.AsStrings(entry["finder_tags"]),
@@ -409,6 +430,7 @@ func cmdUnmarshal(args []string) int {
 		os.MkdirAll(filepath.Dir(target), 0755)
 		if err := copyFile(src, target); err != nil {
 			fmt.Fprintln(os.Stderr, "register:", err)
+			flush()
 			return 1
 		}
 		// Re-bookmark under the same id using the shared DB (saved once, after the
@@ -432,18 +454,8 @@ func cmdUnmarshal(args []string) int {
 		imported++
 	}
 
-	if dbDirty {
-		if err := index.SaveDB(db); err != nil {
-			fmt.Fprintln(os.Stderr, "register:", err)
-			return 1
-		}
-	}
-
-	if len(indexRefs) > 0 {
-		if _, err := index.JSONLWriteMany(indexRefs, inbox); err != nil {
-			fmt.Fprintln(os.Stderr, "register:", err)
-			return 1
-		}
+	if !flush() {
+		return 1
 	}
 	ensureSchema(notesDir) // stamp schema on the foreign machine too
 

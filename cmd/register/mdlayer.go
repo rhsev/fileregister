@@ -95,15 +95,46 @@ func readAnnotations(notesDir string) ([]map[string]any, error) {
 }
 
 // annotatedIDs is the set of record ids that carry a Markdown ref block somewhere
-// under notesDir — the inbox-vs-annotated distinction for list.
+// under notesDir — the inbox-vs-annotated distinction for list. A block
+// reaches its record as it does for annotate, aka and order: by the id, by a
+// handle in the id: slot, or, without an id, by a handle in its aka: list.
 func annotatedIDs(notesDir string) (map[string]bool, error) {
 	blocks, err := readAnnotations(notesDir)
 	if err != nil {
 		return nil, err
 	}
+	refs, err := index.ReadAllRefs(notesDir)
+	if err != nil {
+		return nil, err
+	}
+	known := map[string]bool{}
+	akaToID := map[string]string{}
+	for _, r := range refs {
+		id := index.AsString(r["id"])
+		known[id] = true
+		for _, a := range index.AsStrings(r["aka"]) {
+			akaToID[index.CanonLabel(a)] = id
+		}
+	}
 	ids := map[string]bool{}
 	for _, b := range blocks {
-		ids[index.AsString(b["id"])] = true
+		bid := index.AsString(b["id"])
+		switch {
+		case bid != "" && known[bid]:
+			ids[bid] = true
+		case bid != "":
+			if real, ok := akaToID[index.CanonLabel(bid)]; ok {
+				ids[real] = true
+			} else {
+				ids[bid] = true // a block of no record; harmless here
+			}
+		default:
+			for _, a := range index.AsStrings(b["aka"]) {
+				if real, ok := akaToID[index.CanonLabel(a)]; ok {
+					ids[real] = true
+				}
+			}
+		}
 	}
 	return ids, nil
 }

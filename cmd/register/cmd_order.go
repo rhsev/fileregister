@@ -175,6 +175,9 @@ func cmdOrder(args []string) int {
 	case "-h", "--help":
 		fmt.Println(orderUsage)
 		return 0
+	case "-v", "--version":
+		fmt.Println("register order " + registerVersion)
+		return 0
 	default:
 		fmt.Fprintf(os.Stderr, "register order: unknown subcommand '%s'\n", sub)
 		fmt.Fprintln(os.Stderr, "Run 'register order --help' for usage.")

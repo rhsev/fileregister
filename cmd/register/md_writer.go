@@ -739,6 +739,11 @@ func mdDeleteBlock(path, id, binder string) (int, error) {
 			b.WriteString(content[start:end])
 		} else {
 			changes++
+			// A heading with a second block right below this one is that
+			// block's heading too, and stays.
+			if m[2] >= 0 && mdFenceOpenRe.MatchString(firstLine(content[end:])) {
+				b.WriteString(content[m[2]:m[3]])
+			}
 		}
 		last = end
 	}
@@ -885,4 +890,12 @@ func orDefault(v, def string) string {
 		return def
 	}
 	return v
+}
+
+// firstLine is s up to its first line break.
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
 }

@@ -84,6 +84,11 @@ func cmdSnapshot(args []string) int {
 	out := vals["--out"]
 	if out == "" {
 		out = top + ".tar.gz"
+		// A snapshot without the files gets a name of its own: under the
+		// day's default name it would replace a full one made earlier.
+		if !withFiles {
+			out = top + "-no-files.tar.gz"
+		}
 	}
 	if abs, aerr := filepath.Abs(out); aerr == nil {
 		out = abs

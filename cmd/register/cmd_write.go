@@ -164,6 +164,10 @@ func cmdWrite(args []string) int {
 	// record must not fork an id recorded in another of its files, nor take
 	// an aka another record has. Each index is read once, in full.
 	indexes := map[string][]map[string]any{}
+	// The same two rules within the batch: its lines are not in the index
+	// yet, so the index alone would let two of them through.
+	batchTarget := map[string]string{} // collections folder + id → target
+	batchAka := map[string]string{}    // collections folder + handle → id
 	for i := range items {
 		it := &items[i]
 		if !it.queued || !it.isJSONL {
@@ -182,9 +186,23 @@ func cmdWrite(args []string) int {
 			}
 			indexes[col] = refs
 		}
-		if why := writeIndexProblem(refs, it.rec, it.target); why != "" {
+		why := writeIndexProblem(refs, it.rec, it.target)
+		if prev, ok := batchTarget[col+"\x00"+it.rec.ID]; why == "" && ok && !index.PathsEqual(prev, it.target) {
+			why = "id " + it.rec.ID + " goes to " + filepath.Base(prev) + " earlier in this batch — write it there"
+		}
+		for _, h := range index.AsStrings(it.rec.Aka) {
+			if other, ok := batchAka[col+"\x00"+index.CanonLabel(h)]; why == "" && ok && other != it.rec.ID {
+				why = "aka '" + h + "' is given to record " + other + " earlier in this batch"
+			}
+		}
+		if why != "" {
 			it.queued = false
 			it.status = writeStatusErr(it.target, why)
+			continue
+		}
+		batchTarget[col+"\x00"+it.rec.ID] = it.target
+		for _, h := range index.AsStrings(it.rec.Aka) {
+			batchAka[col+"\x00"+index.CanonLabel(h)] = it.rec.ID
 		}
 	}
 

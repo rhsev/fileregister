@@ -123,7 +123,21 @@ func volumeName(path string) string {
 // volume is not a volume question.
 func volumeMounted(lastPath string) bool {
 	name := volumeName(lastPath)
-	return name == "" || volumeOf(name) == name
+	return name == "" || volumeOf(name) == name || holdsEntries(name)
+}
+
+// holdsEntries reports whether dir is a folder with something in it. A plain
+// folder under /mnt or /media that holds files is no volume that went away:
+// the files live on the file system below it. The mount point of an absent
+// volume is missing (udisks) or empty.
+func holdsEntries(dir string) bool {
+	d, err := os.Open(dir)
+	if err != nil {
+		return false
+	}
+	defer d.Close()
+	names, _ := d.Readdirnames(1)
+	return len(names) > 0
 }
 
 // unmountedVolume returns the volume p lies on when that volume is not

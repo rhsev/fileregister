@@ -243,14 +243,18 @@ func cmdRestore(args []string) int {
 	}
 
 	if !dry {
+		// Nothing is placed yet at these exits, so the unpacked snapshot
+		// goes: left in import/, it would be synced along with the notes.
 		if lerr := index.LockBookmarks(); lerr != nil {
 			fmt.Fprintln(os.Stderr, "register:", lerr)
+			cleanupStaging(dry, staging, notesDir)
 			return 1
 		}
 	}
 	db, err := index.LoadDB()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
+		cleanupStaging(dry, staging, notesDir)
 		return 1
 	}
 
@@ -266,6 +270,7 @@ func cmdRestore(args []string) int {
 		res, rerr := index.BatchResolve(ids)
 		if rerr != nil {
 			fmt.Fprintf(os.Stderr, "Error: fileanchor batch resolve failed: %v\n", rerr)
+			cleanupStaging(dry, staging, notesDir)
 			return 1
 		}
 		for id, r := range res {
@@ -481,7 +486,12 @@ func cmdRestore(args []string) int {
 			if again {
 				break // the index is the snapshot's already
 			}
-			data, _ := os.ReadFile(entries["index/"+n].path)
+			data, rerr := os.ReadFile(entries["index/"+n].path)
+			if rerr != nil {
+				// An unread index must not be written out as an empty one.
+				fmt.Fprintf(os.Stderr, "Error: reading %s from the snapshot failed: %v\n", n, rerr)
+				return 1
+			}
 			if err := index.AtomicWrite(filepath.Join(collections, n), data); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", n, err)
 				return 1

@@ -231,9 +231,19 @@ func membersNotGone(targets []map[string]any, db map[string]string, refs []map[s
 	for _, f := range rep.findings {
 		verdict[f.id] = f
 	}
+	// A bookmark can resolve to a path where no file is any more (audit
+	// calls it MISSING FILE). That file is gone as well, and remove cannot
+	// take the record out, so forget does.
+	paths, perr := resolveRecordPaths(members)
+	if perr != nil {
+		return fmt.Sprintf("fileanchor batch resolve failed: %v — nothing forgotten", perr)
+	}
 	for _, rec := range members {
 		f, judged := verdict[index.AsString(rec["id"])]
 		if judged && f.kind == bmDead {
+			continue
+		}
+		if p := paths[index.AsString(rec["id"])]; !judged && p != "" && !index.FileExists(p) && unmountedVolume(p) == "" {
 			continue
 		}
 		bs := strings.Join(nonEmptyBinders(rec), ", ")

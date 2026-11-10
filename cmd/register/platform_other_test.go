@@ -84,6 +84,27 @@ func TestVolumeGuardOnLinux(t *testing.T) {
 	}
 }
 
+// A plain folder below a detachable root that holds files is no absent
+// volume. An empty one is the mount point of a volume that is away.
+func TestAFolderWithFilesIsNoAbsentVolume(t *testing.T) {
+	root := t.TempDir()
+	fakeMounts(t, []string{"/"}, "ralf")
+	detachableRoots = []string{root}
+	os.MkdirAll(filepath.Join(root, "data", "sub"), 0755)
+	os.WriteFile(filepath.Join(root, "data", "sub", "kept.pdf"), []byte("x"), 0644)
+	os.MkdirAll(filepath.Join(root, "stick"), 0755)
+
+	if got := unmountedVolume(filepath.Join(root, "data", "sub", "gone.pdf")); got != "" {
+		t.Errorf("a folder that holds files reads as the absent volume %q", got)
+	}
+	if got := unmountedVolume(filepath.Join(root, "stick", "gone.pdf")); got != filepath.Join(root, "stick") {
+		t.Errorf("an empty mount point = %q, want it named as absent", got)
+	}
+	if got := unmountedVolume(filepath.Join(root, "never", "gone.pdf")); got != filepath.Join(root, "never") {
+		t.Errorf("a missing mount point = %q, want it named as absent", got)
+	}
+}
+
 func TestTrashOnLinux(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("HOME", "/home/ralf")

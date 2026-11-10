@@ -140,3 +140,33 @@ func TestConfirmReason(t *testing.T) {
 		}
 	}
 }
+
+// refresh: with its volume away, a bookmark that does not resolve says
+// nothing about the file. It is listed apart and is no failure.
+func TestRefreshLeavesAnAbsentVolumeUnjudged(t *testing.T) {
+	anchor := engineBin(t)
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := volumesDir
+	volumesDir = root
+	defer func() { volumesDir = old }()
+	vol := filepath.Join(root, "Platte")
+	if err := os.MkdirAll(vol, 0755); err != nil {
+		t.Fatal(err)
+	}
+	f := filepath.Join(vol, "x.txt")
+	writeFile(t, f, "x")
+	notes := seedNotes(t)
+	env := addEnv(t, notes, anchor)
+	if _, e, code := runGoAdd(t, env, f, "--binder", "Akte"); code != 0 {
+		t.Fatalf("add: %d %s", code, e)
+	}
+	os.RemoveAll(vol)
+
+	out, errOut, code := runGoRefresh(t, env)
+	if !strings.Contains(out, "On an absent volume (1)") || strings.Contains(out, "Broken") || code != 0 {
+		t.Errorf("exit %d, want 0 with the file on an absent volume:\n%s%s", code, out, errOut)
+	}
+}

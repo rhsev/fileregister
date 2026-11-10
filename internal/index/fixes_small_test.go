@@ -66,3 +66,16 @@ func TestSetKeptTagsComparesLabels(t *testing.T) {
 		t.Errorf("kept_tags after dropping the tag by its decomposed name: %q", got)
 	}
 }
+
+// ReadIndex stops at a line it cannot read, as ReadAllRefs does. Skipping it
+// would leave its memberships out of the list without a word.
+func TestReadIndexStopsOnABrokenLine(t *testing.T) {
+	notes := t.TempDir()
+	col := filepath.Join(notes, "collections")
+	os.MkdirAll(col, 0755)
+	os.WriteFile(filepath.Join(col, "inbox.jsonl"),
+		[]byte(`{"type":"ref","id":"1","binder":["a"]}`+"\n"+`{"type":"ref","id":"2","binder":["a"`+"\n"), 0644)
+	if _, err := ReadIndex(notes); err == nil || !strings.Contains(err.Error(), "inbox.jsonl:2") {
+		t.Errorf("a torn line: err = %v, want it named", err)
+	}
+}
