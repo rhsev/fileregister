@@ -111,9 +111,14 @@ func containsBinder(arr []any, s string) bool {
 }
 
 // backfillIndexFields adds scalar fields the existing record lacks (never overwrites).
+//
+// xattr is not among them. A record without the field uses the default
+// backend, and its memberships are written there; the caller keeps to that
+// stored backend whatever --xattr says. Filling the field in from the flag
+// made the record name a layer its memberships are not in.
 func backfillIndexFields(existing map[string]any, record RefRecord) {
 	src := record.ToH()
-	for _, k := range []string{"url", "filename", "kind", "aka", "xattr"} {
+	for _, k := range []string{"url", "filename", "kind", "aka"} {
 		if v, ok := src[k]; ok {
 			if ev, present := existing[k]; !present || ev == nil || ev == "" {
 				existing[k] = v
@@ -157,6 +162,10 @@ func JSONLWriteMany(records []RefRecord, targetPath string) ([]string, error) {
 			}
 			lines = append(lines, l)
 		}
+	} else if !os.IsNotExist(err) {
+		// Unreadable is not absent: appending now would give an id that is
+		// already in the file a second line.
+		return nil, err
 	} else if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		return nil, err
 	}

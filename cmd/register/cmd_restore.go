@@ -280,6 +280,7 @@ func cmdRestore(args []string) int {
 	for _, p := range bound {
 		claimed[p] = true
 	}
+	creating := map[string]bool{} // targets a file of this snapshot is placed at
 	var searching []*restoreItem
 	for _, it := range items {
 		if p, ok := bound[it.id]; ok && it.action == "" {
@@ -306,14 +307,17 @@ func cmdRestore(args []string) int {
 			it.action, it.reason = "park", "the file exists with a decomposed (NFD) name; rename it to NFC, then run the same restore again"
 			continue
 		}
-		if why := protectedTarget(target, underDir(target, collections)); why != "" && why != "an existing annotation note" {
+		if why := protectedTarget(target, underDirOnDisk(target, collections)); why != "" && why != "an existing annotation note" {
 			it.action, it.reason = "park", "target is "+why
 			continue
 		}
 		fi, lerr := os.Lstat(target)
 		switch {
+		case lerr != nil && it.content != "" && creating[target]:
+			it.action, it.reason = "park", "another file of this snapshot goes to "+target
 		case lerr != nil && it.content != "":
 			it.action = "create"
+			creating[target] = true
 		case lerr != nil && it.sum != "" && it.size >= 0:
 			it.action = "search"
 			searching = append(searching, it)
@@ -487,6 +491,16 @@ func cmdRestore(args []string) int {
 		for i := range notes {
 			ni := &notes[i]
 			if ni.why != "" || ni.there {
+				continue
+			}
+			// A registered file that is itself a note is packed twice, and
+			// the file loop above has placed and bound it by now.
+			if index.FileExists(ni.target) {
+				if sameBytes(ni.target, ni.src) {
+					ni.there = true
+				} else {
+					ni.why = "a different note of that name exists (" + ni.target + ")"
+				}
 				continue
 			}
 			if err := moveOrCopy(ni.src, ni.target, entries["notes/"+ni.rel].mtime); err != nil {
@@ -718,6 +732,27 @@ func sameContent(p string, have, size int64, sum string) bool {
 func underDir(p, dir string) bool {
 	r, err := filepath.Rel(dir, p)
 	return err == nil && r != "." && r != ".." && !strings.HasPrefix(r, ".."+string(filepath.Separator))
+}
+
+// underDirOnDisk is underDir as the file system sees it: a path that reaches
+// dir under another spelling (Collections/ on a volume that ignores case, a
+// decomposed name, a symlink) lies under it too.
+func underDirOnDisk(p, dir string) bool {
+	if underDir(p, dir) {
+		return true
+	}
+	want, err := os.Stat(dir)
+	if err != nil {
+		return false
+	}
+	for parent := filepath.Dir(p); ; parent = filepath.Dir(parent) {
+		if fi, err := os.Stat(parent); err == nil && os.SameFile(fi, want) {
+			return true
+		}
+		if parent == filepath.Dir(parent) {
+			return false
+		}
+	}
 }
 
 // cleanupStaging removes a real run's staging folder, and import/ once empty.

@@ -158,7 +158,7 @@ func TestUnmarshalScatterGuard(t *testing.T) {
 	outside := filepath.Join(dest, "out.txt") // origin ../out.txt relative to collections/
 
 	gOut, _, code := runGoUnmarshal(t, unmarshalEnv(t, dest, anchor), container)
-	if code != 0 {
+	if code != 1 { // parked: something is left for the user
 		t.Fatalf("unmarshal (guarded) exit = %d", code)
 	}
 	if index.FileExists(outside) {
@@ -262,7 +262,7 @@ func TestUnmarshalRejectsTraversal(t *testing.T) {
 	// parked without --scatter despite not starting with "../".
 	escaped := filepath.Join(dest, "escaped.txt")
 	c2 := buildTraversalContainer(t, "files/decoy.txt", "sub/../../escaped.txt")
-	if _, _, code := runGoUnmarshal(t, unmarshalEnv(t, dest, anchor), c2); code != 0 {
+	if _, _, code := runGoUnmarshal(t, unmarshalEnv(t, dest, anchor), c2); code != 1 {
 		t.Fatalf("write-traversal (parked) exit = %d", code)
 	}
 	if index.FileExists(escaped) {

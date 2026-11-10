@@ -111,24 +111,46 @@ func headingText(s string) string {
 // readNote reads a Markdown note with its line endings as \n: every editor
 // here matches \n, and a note saved with \r\n (Windows, some sync setups)
 // looked empty — its blocks were invisible, and promote appended duplicates.
-// crlf tells the file's own style, so writeNote can put it back.
-func readNote(path string) (content string, crlf bool, err error) {
+// The style tells the file's own form, so writeNote can put it back.
+//
+// A byte order mark is taken off as well: with it in front, the frontmatter
+// and a heading on the first line were not recognized, and a second header
+// was written above the first.
+func readNote(path string) (content string, style noteStyle, err error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", false, err
+		return "", noteStyle{}, err
 	}
 	s := string(data)
-	if !strings.Contains(s, "\r\n") {
-		return s, false, nil
+	if strings.HasPrefix(s, utf8BOM) {
+		style.bom = true
+		s = s[len(utf8BOM):]
 	}
-	return strings.ReplaceAll(s, "\r\n", "\n"), true, nil
+	// The note's line ending is the one most of its lines have. One pasted
+	// \r\n line in an LF note must not turn every line into \r\n.
+	if n := strings.Count(s, "\r\n"); n > 0 {
+		style.crlf = 2*n > strings.Count(s, "\n")
+		s = strings.ReplaceAll(s, "\r\n", "\n")
+	}
+	return s, style, nil
+}
+
+const utf8BOM = "\xef\xbb\xbf"
+
+// noteStyle is what readNote took off a note and writeNote puts back.
+type noteStyle struct {
+	crlf bool // lines end in \r\n
+	bom  bool // the file starts with a byte order mark
 }
 
 // writeNote writes a note read by readNote back in its own line endings, in
 // place: the note may itself be a member, and its bookmark must survive.
-func writeNote(path, content string, crlf bool) error {
-	if crlf {
+func writeNote(path, content string, style noteStyle) error {
+	if style.crlf {
 		content = strings.ReplaceAll(content, "\n", "\r\n")
+	}
+	if style.bom {
+		content = utf8BOM + content
 	}
 	return index.WriteInPlace(path, []byte(content))
 }
@@ -332,7 +354,7 @@ func mdTransformFile(path string, fn func(lines []string, parsed map[string]any)
 	}
 	changes := 0
 	modified := mdYamlBlockRe.ReplaceAllStringFunc(content, func(match string) string {
-		body := strings.TrimSuffix(strings.TrimPrefix(match, "```yaml\n"), "\n```")
+		open, body, closing := splitFence(match)
 		var parsed map[string]any
 		if yaml.Unmarshal([]byte(body), &parsed) != nil || parsed == nil {
 			return match
@@ -341,9 +363,9 @@ func mdTransformFile(path string, fn func(lines []string, parsed map[string]any)
 			return match
 		}
 		repl, changed := fn(strings.Split(body, "\n"), parsed)
-		if changed && repl != match {
+		if changed && repl != canonBlock(body) {
 			changes++
-			return repl
+			return refence(repl, open, closing)
 		}
 		return match
 	})
@@ -405,9 +427,9 @@ func mdReattachBlock(path, binder, filename, id string) (bool, error) {
 	heading, fence := "", false
 	for i := 0; i < len(lines); i++ {
 		l := lines[i]
-		if l == "```yaml" && !fence {
+		if mdFenceOpenRe.MatchString(l) && !fence {
 			end := i + 1
-			for end < len(lines) && lines[end] != "```" {
+			for end < len(lines) && !mdFenceCloseRe.MatchString(lines[end]) {
 				end++
 			}
 			if end >= len(lines) {
@@ -424,7 +446,7 @@ func mdReattachBlock(path, binder, filename, id string) (bool, error) {
 			i = end
 			continue
 		}
-		if strings.HasPrefix(l, "```") {
+		if strings.HasPrefix(strings.TrimLeft(l, " \t"), "```") {
 			fence = !fence
 			continue
 		}
@@ -493,7 +515,7 @@ func mdRenameOrderingBinder(path, oldName, newName string) (int, error) {
 	}
 	changes := 0
 	modified := mdYamlBlockRe.ReplaceAllStringFunc(content, func(match string) string {
-		body := strings.TrimSuffix(strings.TrimPrefix(match, "```yaml\n"), "\n```")
+		open, body, closing := splitFence(match)
 		var parsed map[string]any
 		if yaml.Unmarshal([]byte(body), &parsed) != nil || parsed == nil {
 			return match
@@ -512,7 +534,7 @@ func mdRenameOrderingBinder(path, oldName, newName string) (int, error) {
 			}
 		}
 		changes++
-		return "```yaml\n" + strings.Join(lines, "\n") + "\n```"
+		return refence(canonBlock(strings.Join(lines, "\n")), open, closing)
 	})
 	if changes > 0 {
 		if err := writeNote(path, modified, crlf); err != nil {
@@ -673,7 +695,8 @@ func mdFileWriteMany(recs []index.RefRecord, targetPath string) []string {
 // Exactly ONE heading line, and only an entry heading (H3/H4): H1/H2 are
 // document structure (SPEC), so a section title directly above a block that
 // has no heading of its own stays.
-var mdDeleteBlockRe = regexp.MustCompile("(?ms)((?:^#{3,4}[ \t][^\n]*\n)\n*)?^```yaml\n(.*?)\n^```[ \t]*(?:\n(?:[ \t]*\n)*)?")
+// The fences follow mdYamlBlockRe.
+var mdDeleteBlockRe = regexp.MustCompile("(?ms)((?:^#{3,4}[ \t][^\n]*\n)\n*)?^[ \t]*```yaml[ \t]*\n(.*?)^[ \t]*```[ \t]*$(?:\n(?:[ \t]*\n)*)?")
 
 // mdDeleteBlock removes the block(s) matching (id, binder) — and their preceding
 // heading + trailing blanks — keeping the rest of the document byte-for-byte.

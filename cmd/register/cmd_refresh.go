@@ -110,6 +110,7 @@ func cmdRefresh(args []string) int {
 		refPath, label string
 	}
 	var broken, unbound []brokenEntry
+	var absent []string // on a volume that is not mounted: not judged
 	var missing []missingEntry
 	var skippedTrash, skippedShared []string
 	shared := sharedPaths(allRefs, resolved)
@@ -133,6 +134,10 @@ func cmdRefresh(args []string) int {
 			// machine bound the file, and restore binds it once it is here.
 			if resolutions[id].Unbound {
 				unbound = append(unbound, brokenEntry{binders, noteFile, refLabel(rec)})
+			} else if vol := unmountedVolume(resolutions[id].LastPath); vol != "" {
+				// As in audit and repair: with its volume away, a bookmark
+				// that does not resolve says nothing about the file.
+				absent = append(absent, fmt.Sprintf("%s — volume %s", refLabel(rec), vol))
 			} else {
 				broken = append(broken, brokenEntry{binders, noteFile, refLabel(rec)})
 			}
@@ -318,6 +323,13 @@ func cmdRefresh(args []string) int {
 		}
 	}
 
+	if len(absent) > 0 {
+		fmt.Println("")
+		fmt.Printf("On an absent volume (%d) — not mounted, so not judged:\n", len(absent))
+		for _, a := range absent {
+			fmt.Printf("  %s\n", a)
+		}
+	}
 	if len(unbound) > 0 {
 		fmt.Println("")
 		fmt.Printf("Not bound on this system (%d) — no bookmark here; restore binds a file once it is here:\n", len(unbound))

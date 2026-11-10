@@ -83,13 +83,27 @@ func cmdCleanup(args []string) int {
 		return 1
 	}
 
+	// Binder names are compared in their canonical form on both sides: an
+	// index that still holds a name decomposed (audit: NOT CANONICAL) must not
+	// make every block of that binder look stale. A block may name its record
+	// by a handle in the id slot; it is then that record's block.
 	indexIDs := map[string]bool{}
 	memberships := map[string]bool{}
+	akaToID := map[string]string{}
+	memberIDs := map[string]bool{}
 	for _, r := range refs {
 		id := index.AsString(r["id"])
 		indexIDs[id] = true
 		for _, b := range index.AsStrings(r["binder"]) {
-			memberships[id+"|"+b] = true
+			memberships[id+"|"+index.CanonLabel(b)] = true
+		}
+		for _, a := range index.AsStrings(r["aka"]) {
+			if a != "" {
+				akaToID[a] = id
+			}
+		}
+		if len(nonEmptyBinders(r)) > 0 {
+			memberIDs[id] = true
 		}
 	}
 
@@ -101,14 +115,18 @@ func cmdCleanup(args []string) int {
 		}
 		item := cleanupItem{rec: r, noteFile: index.AsString(r["_note_file"])}
 		if !indexIDs[id] {
-			unindexed = append(unindexed, item)
-			continue
+			if real, ok := akaToID[id]; ok {
+				id = real
+			} else {
+				unindexed = append(unindexed, item)
+				continue
+			}
 		}
 		// A block that names no binder claims no membership, so it cannot be
 		// stale — it is context for the record as a whole. A list names one
 		// membership per element; any one that is gone makes it stale.
 		for _, nb := range index.NormalizeBinders(r["binder"]) {
-			if !memberships[id+"|"+index.AsString(nb)] {
+			if !memberships[id+"|"+index.CanonLabel(index.AsString(nb))] {
 				stale = append(stale, item)
 				break
 			}
@@ -159,15 +177,22 @@ func cmdCleanup(args []string) int {
 	// (orphan, dead, malformed); a broken one belongs to `repair`, and an
 	// unreachable one was never judged. `register audit` shows all five.
 	db, dbErr := index.LoadDB()
-	var prunable, unreachable []bookmarkFinding
+	// held: dead entries of records that are still in a binder. The entry is
+	// what lets forget tell that the file is gone; dropped here, the record
+	// could be neither removed (no file) nor forgotten (no bookmark).
+	var prunable, unreachable, held []bookmarkFinding
+	var classifyErr error
 	if dbErr != nil {
 		fmt.Println("")
 		fmt.Println("=== Bookmark entries no record needs ===")
 		fmt.Printf("    bookmarks.json unreadable: %v\n", dbErr)
 	} else if len(db) > 0 {
 		rep, cerr := classifyBookmarks(db, refs)
+		classifyErr = cerr
 		for _, f := range rep.findings {
-			if f.prunable() {
+			if f.kind == bmDead && memberIDs[f.id] {
+				held = append(held, f)
+			} else if f.prunable() {
 				prunable = append(prunable, f)
 			} else if f.kind == bmUnreachable {
 				unreachable = append(unreachable, f)
@@ -191,9 +216,24 @@ func cmdCleanup(args []string) int {
 		if len(prunable) == 0 {
 			fmt.Println("(none)")
 		}
+		if len(held) > 0 {
+			fmt.Printf("    Kept: %d entry(ies) whose file is gone but whose record is still in a binder.\n", len(held))
+			for _, f := range held {
+				fmt.Printf("  • %s [%s] %s — run: register forget %s\n", f.kind, f.id, orDefault(f.label, "(no name)"), f.id)
+			}
+		}
 	}
 
 	if prune {
+		// Nothing was judged, so "nothing to prune" would be no finding.
+		if dbErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: bookmarks.json unreadable: %v — nothing pruned\n", dbErr)
+			return 1
+		}
+		if classifyErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: the bookmark entries could not be checked: %v — nothing pruned\n", classifyErr)
+			return 1
+		}
 		if dryRun {
 			fmt.Println("")
 			fmt.Printf("[dry-run] would drop %d bookmark entry(ies) no record needs.\n", len(prunable))

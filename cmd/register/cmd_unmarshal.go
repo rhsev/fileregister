@@ -529,25 +529,35 @@ func cmdUnmarshal(args []string) int {
 		os.RemoveAll(staging) // nothing left behind → clean up
 		os.Remove(importDir)  // and import/ itself once no other container waits there
 	}
-	if bookmarkFailed > 0 {
+	// As in restore: exit 0 only when nothing is left for the user.
+	if bookmarkFailed > 0 || parked > 0 || len(keptNotes) > 0 {
 		return 1
 	}
 	return 0
 }
 
-// findManifest returns the first manifest.jsonl under root (any depth).
+// findManifest returns the container's manifest.jsonl: the one at root, or
+// in the one folder a container unpacks to. A registered file of that name
+// lies deeper, under files/, and is not it.
 func findManifest(root string) string {
-	var found string
-	filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
-		if err != nil || found != "" {
-			return nil
+	if p := filepath.Join(root, "manifest.jsonl"); regularFile(p) {
+		return p
+	}
+	entries, _ := os.ReadDir(root)
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
 		}
-		if !d.IsDir() && d.Name() == "manifest.jsonl" {
-			found = p
+		if p := filepath.Join(root, e.Name(), "manifest.jsonl"); regularFile(p) {
+			return p
 		}
-		return nil
-	})
-	return found
+	}
+	return ""
+}
+
+func regularFile(p string) bool {
+	fi, err := os.Lstat(p)
+	return err == nil && fi.Mode().IsRegular()
 }
 
 // placed is where placeEntry put a file, or why it did not.
@@ -578,7 +588,7 @@ func placeEntry(db map[string]string, entry map[string]any, label, inner string,
 	if decomposedTwin(pl.rawTarget(base, rel), target) {
 		return placed{reason: fmt.Sprintf("%s — the file exists with a decomposed (NFD) name at %s; rename it to NFC, then unmarshal again", label, target)}
 	}
-	if why := protectedTarget(target, underDir(target, collections)); why != "" {
+	if why := protectedTarget(target, underDirOnDisk(target, collections)); why != "" {
 		return placed{reason: fmt.Sprintf("%s — target is %s (%s)", label, why, target)}
 	}
 	if fi, err := os.Stat(target); err == nil {

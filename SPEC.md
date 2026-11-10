@@ -495,7 +495,7 @@ Surfaces, for the user to decide:
 - **Stale context blocks**: a per-binder annotation block whose binder is *not* in the index record's `binder` set (e.g. an annotated block kept by `remove`). Either delete it (the context is obsolete) or re-add the binder (the membership was dropped by mistake).
 - **Unindexed annotations**: a `type: ref` block whose `id` has no index record at all (legacy data, hand-written refs). Usually resolved by `register reindex`, which pulls them into the index; cleanup flags any that should instead be deleted.
 - **Records in no binder, for review**: records with an empty `binder` set, listed so the user can prune ones no longer wanted. **Listed, never auto-deleted.** Pruning one is `register forget <id>`.
-- **Bookmark entries no record needs**: entries in the bookmark store that no record claims (orphan), whose file is gone (dead), or whose key was never a minted id (malformed). Since the store is register's alone, an orphan is a leftover, not something another tool may hold. A broken entry belongs to `repair`, and one whose volume is away or unindexed was never judged; both stay out of this section. `register audit` shows all five; the judging is one implementation shared by both commands.
+- **Bookmark entries no record needs**: entries in the bookmark store that no record claims (orphan), whose file is gone (dead), or whose key was never a minted id (malformed). Since the store is register's alone, an orphan is a leftover, not something another tool may hold. A broken entry belongs to `repair`, and one whose volume is away or unindexed was never judged; both stay out of this section. A dead entry whose record is still in a binder stays out as well and is listed with the command that takes it: `register forget <id>`. The entry is what tells `forget` that the file is gone, and without it the record could be neither removed nor forgotten. `register audit` shows all five; the judging is one implementation shared by both commands.
 
 `--prune` drops these entries without asking and **refuses to run while any entry could not be judged**, naming the volume or the missing engine capability. "Dead" means the blob does not resolve and no file carries the id, which is only true if the question could be asked. An unmounted volume, or a mounted one Spotlight does not index, makes every bookmark on it look dead. Whether the search covers a volume is the engine's answer (`searchable`), not register's guess. The mode acts only on a condition it has checked, not on what the system happens to report. `--dry-run` says what it would drop.
 
@@ -601,7 +601,8 @@ comment is named in the report.
 The manifest starts with a `{"type":"head"}` line (`format: 2`, system, bases),
 then one line per record and one `{"type":"note"}` line per packed note
 (`base: notes`, `path` below the notes folder). A file that does not resolve is
-packed without content, with a warning.
+packed without content, with a warning. So is a member that is a folder or a
+package. The container is written all the same, and the exit code is 1.
 
 #### `register unmarshal <container> [--into <folder>] [--map <base>=<folder>]... [--scatter] [--force]`
 
@@ -610,7 +611,7 @@ local note of the same name wins while the container's stays parked. A file
 already at the target with the same sha256 is taken over instead of copied; a
 different file there is parked (`--force` overwrites it). A file that is
 already registered here under another id is parked, because taking it over
-would give it two identities.
+would give it two identities. Exit 0 only when nothing is parked.
 
 #### `register snapshot [--out <file>.tar.gz] [--no-files [--since <snapshot>]] [--no-finder]`
 

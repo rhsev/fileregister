@@ -298,7 +298,16 @@ func cmdMarshal(args []string) int {
 			urls++ // pure data — no file payload to stage
 		} else if _, done := fileRel[id]; !done {
 			f := map[string]any{}
-			if src != "" && index.FileExists(src) {
+			if st, serr := os.Stat(src); src != "" && serr == nil && !st.Mode().IsRegular() {
+				// A folder or package (.graffle, .rtfd) has no single content
+				// to pack. The record goes along without it, and the rest of
+				// the binder is packed.
+				missing++
+				if base, rel := classifier.classify(src); base != "" {
+					f["base"], f["path"] = base, rel
+				}
+				fmt.Fprintf(os.Stderr, "  Warning: %s is a folder or package — record marshaled without its file\n", filepath.Base(src))
+			} else if src != "" && index.FileExists(src) {
 				name := marshalUniqueName(filepath.Base(src), filesTaken)
 				size, sum, cerr := copyFileHashed(src, filepath.Join(filesDir, name))
 				if cerr != nil {
@@ -370,9 +379,18 @@ func cmdMarshal(args []string) int {
 		return 1
 	}
 
-	os.Remove(out)
-	if err := tarCreate(out, tmp, filepath.Base(root)); err != nil {
+	// As in snapshot: a container already at out stays until the new one is
+	// complete, and a failed tar leaves no half-written file in its place.
+	partial := out + ".partial"
+	os.Remove(partial)
+	if err := tarCreate(partial, tmp, filepath.Base(root)); err != nil {
+		os.Remove(partial)
 		fmt.Fprintf(os.Stderr, "Error: tar failed to create %s\n", out)
+		return 1
+	}
+	if err := os.Rename(partial, out); err != nil {
+		os.Remove(partial)
+		fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", out, err)
 		return 1
 	}
 
@@ -393,6 +411,11 @@ func cmdMarshal(args []string) int {
 		for _, n := range skippedNotes {
 			fmt.Printf("    - %s\n", n)
 		}
+	}
+	// As in snapshot: the container is written, and the exit code says that
+	// a file is not in it.
+	if missing > 0 {
+		return 1
 	}
 	return 0
 }

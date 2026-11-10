@@ -107,7 +107,13 @@ func cmdForget(args []string) int {
 		fmt.Fprintln(os.Stderr, "Error: "+why)
 		return 1
 	}
-	resolved, _ := resolveRecordPaths(targets)
+	// Where the files are decides whether the id comes off them. Not
+	// knowing, forget would drop the record and leave its id on the file.
+	resolved, rerr := resolveRecordPaths(targets)
+	if rerr != nil {
+		fmt.Fprintf(os.Stderr, "Error: fileanchor batch resolve failed: %v — nothing forgotten\n", rerr)
+		return 1
+	}
 
 	if dry {
 		for _, rec := range targets {
@@ -157,6 +163,7 @@ func cmdForget(args []string) int {
 
 	// 3. The bookmark store, and 4. the id on the file where it still exists.
 	dropped := false
+	idStays := false
 	for _, rec := range targets {
 		id := index.AsString(rec["id"])
 		parts := []string{"index"}
@@ -168,6 +175,7 @@ func cmdForget(args []string) int {
 		if p := resolved[id]; p != "" && index.FileExists(p) {
 			if removed, why := index.ForgetFileID(p, id); why != "" {
 				fmt.Fprintf(os.Stderr, "  Warning: the id stays on %s: %s\n", p, why)
+				idStays = true
 			} else if removed {
 				parts = append(parts, "id on the file")
 			}
@@ -184,6 +192,9 @@ func cmdForget(args []string) int {
 			fmt.Fprintf(os.Stderr, "Error: saving bookmarks.json failed: %v — the bookmark entries stay\n", err)
 			return 1
 		}
+	}
+	if idStays {
+		return 1
 	}
 	return 0
 }

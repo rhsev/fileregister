@@ -257,10 +257,13 @@ func KeptTags(rec map[string]any) []string {
 	return AsStrings(rec["kept_tags"])
 }
 
-// IsKeptTag reports whether tag is one of the record's kept_tags.
+// IsKeptTag reports whether tag is one of the record's kept_tags. Compared as
+// labels, like every binder lookup: kept_tags are stored composed, and a
+// binder name pasted from the Finder arrives decomposed. Compared byte for
+// byte the guard missed, and remove took the user's own tag off the file.
 func IsKeptTag(rec map[string]any, tag string) bool {
 	for _, t := range KeptTags(rec) {
-		if t == tag {
+		if SameLabel(t, tag) {
 			return true
 		}
 	}

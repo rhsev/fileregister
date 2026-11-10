@@ -75,6 +75,10 @@ func cmdRename(args []string) int {
 	if err != nil {
 		return 1
 	}
+	if oldName == "" || newName == "" {
+		fmt.Fprintln(os.Stderr, "Error: a binder name cannot be empty")
+		return 1
+	}
 	if oldName == newName {
 		fmt.Fprintln(os.Stderr, "Error: old and new names are the same")
 		return 1
@@ -199,6 +203,14 @@ func cmdRename(args []string) int {
 			continue // one xattr update per file
 		}
 		seenIDs[id] = true
+		// Only a record of the index is a member. A note block left over from
+		// a membership that was removed (the block stays on purpose) names a
+		// file that is not in the binder, and must not get the new name
+		// written onto it.
+		fromIndex := strings.HasSuffix(strings.ToLower(index.AsString(rec["_note_file"])), ".jsonl")
+		if !fromIndex {
+			continue
+		}
 		label := refLabel(rec)
 		backend := index.XattrBackend(rec)
 		layer := layerName(backend)
@@ -231,12 +243,30 @@ func cmdRename(args []string) int {
 			continue
 		}
 		result := index.XattrBackendAdd(refPath, newName, backend)
-		if file := index.AsString(rec["_note_file"]); backend == "tags" && strings.HasSuffix(strings.ToLower(file), ".jsonl") &&
-			(result == "noop" || index.IsKeptTag(rec, newName)) {
-			if keptChanges[file] == nil {
-				keptChanges[file] = map[string]map[string]bool{}
+		if backend == "tags" {
+			// As in add: a tag that was already on the file is the user's
+			// own, unless the record is in the new binder already (--merge)
+			// and the tag is the one register set for it.
+			memberOfNew := false
+			for _, b := range nonEmptyBinders(rec) {
+				if index.SameBinder(b, newName) {
+					memberOfNew = true
+				}
 			}
-			keptChanges[file][id] = map[string]bool{newName: result == "noop"}
+			keep, note := false, false
+			switch {
+			case result == "noop" && !memberOfNew:
+				keep, note = true, true
+			case result == "added" && index.IsKeptTag(rec, newName):
+				keep, note = false, true
+			}
+			if note {
+				file := index.AsString(rec["_note_file"])
+				if keptChanges[file] == nil {
+					keptChanges[file] = map[string]map[string]bool{}
+				}
+				keptChanges[file][id] = map[string]bool{newName: keep}
+			}
 		}
 		if result == "failed" {
 			fmt.Fprintf(os.Stderr, "  Warning: failed to add '%s' to %s of %s: %s\n", newName, layer, filepath.Base(refPath), index.LastEngineError())

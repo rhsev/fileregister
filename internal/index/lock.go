@@ -37,6 +37,18 @@ func flockFile(lockPath string) error {
 	if err != nil {
 		return err
 	}
+	// The same lock file under another spelling of its path (a symlinked
+	// folder, another case on a file system that folds it) is held already.
+	// A second flock on it would wait for this very process, forever.
+	if fi, serr := f.Stat(); serr == nil {
+		for _, held := range lockHeld {
+			if hi, herr := held.Stat(); herr == nil && os.SameFile(fi, hi) {
+				f.Close()
+				lockHeld[lockPath] = held
+				return nil
+			}
+		}
+	}
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
 		f.Close()
 		return err

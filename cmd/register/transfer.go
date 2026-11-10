@@ -289,10 +289,16 @@ func copyFileHashed(src, dst string) (int64, string, error) {
 }
 
 // moveOrCopy puts src at dst: a rename when both lie on one file system,
-// else a copy. dst must not exist; the caller checked.
+// else a copy. dst must not exist. The caller checked, but it checked before
+// anything was placed, and two entries can come to one place (names that
+// differ in case on a file system that folds it, a file that is also packed
+// as a note). A rename would replace the first silently, so it is refused.
 func moveOrCopy(src, dst string, mtime time.Time) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 		return err
+	}
+	if _, err := os.Lstat(dst); err == nil {
+		return fmt.Errorf("%s exists already", dst)
 	}
 	if err := os.Rename(src, dst); err == nil {
 		return nil

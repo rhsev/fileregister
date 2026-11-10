@@ -253,7 +253,7 @@ func annotateValue(v string) string {
 func annotateEditBlocks(content string, keys map[string]bool, binder string, sets []annotateSet, unsets []string) (string, int) {
 	changed := 0
 	edited := mdYamlBlockRe.ReplaceAllStringFunc(content, func(match string) string {
-		body := strings.TrimSuffix(strings.TrimPrefix(match, "```yaml\n"), "\n```")
+		open, body, closing := splitFence(match)
 		var parsed map[string]any
 		if yaml.Unmarshal([]byte(body), &parsed) != nil || parsed == nil {
 			return match
@@ -318,11 +318,11 @@ func annotateEditBlocks(content string, keys map[string]bool, binder string, set
 				index.AsString(parsed["id"]))
 			return match
 		}
-		repl := "```yaml\n" + newBody + "\n```"
-		if repl != match {
-			changed++
+		if newBody == body {
+			return match
 		}
-		return repl
+		changed++
+		return refence(canonBlock(newBody), open, closing)
 	})
 	return edited, changed
 }

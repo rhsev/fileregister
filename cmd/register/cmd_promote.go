@@ -121,5 +121,8 @@ func cmdPromote(args []string) int {
 			}
 		}
 	}
+	if failed > 0 {
+		return 1
+	}
 	return 0
 }

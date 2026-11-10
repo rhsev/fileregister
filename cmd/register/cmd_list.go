@@ -80,7 +80,7 @@ func cmdList(args []string) int {
 	}
 
 	if binder != "" {
-		if err := listBinder(dir, binder, pathsOnly, jsonOnly, print0); err != nil {
+		if err := listBinder(dir, binder, filter, pathsOnly, jsonOnly, print0); err != nil {
 			fmt.Fprintln(os.Stderr, "register:", err)
 			return 1
 		}
@@ -205,7 +205,7 @@ func listAllFiltered(notesDir, filter string, jsonOnly bool) error {
 
 // listBinder lists the members of one binder: a table by default, or bare
 // locators (--paths) / neutral JSONL (--json).
-func listBinder(notesDir, binder string, pathsOnly, jsonOnly, print0 bool) error {
+func listBinder(notesDir, binder, filter string, pathsOnly, jsonOnly, print0 bool) error {
 	all, err := index.ReadAllRefs(notesDir)
 	if err != nil {
 		return err
@@ -222,6 +222,30 @@ func listBinder(notesDir, binder string, pathsOnly, jsonOnly, print0 bool) error
 	if len(records) == 0 {
 		fmt.Fprintf(os.Stderr, "No refs found for binder '%s'\n", binder)
 		return nil // warn, but exit 0
+	}
+
+	// --inbox / --curated: the same split the binder overview makes, here for
+	// the members of one binder. The flags used to be accepted and ignored.
+	if filter != "" {
+		annotated, aerr := annotatedIDs(notesDir)
+		if aerr != nil {
+			return aerr
+		}
+		kept := records[:0]
+		for _, r := range records {
+			if annotated[index.AsString(r["id"])] == (filter == "curated") {
+				kept = append(kept, r)
+			}
+		}
+		records = kept
+		if len(records) == 0 {
+			what := "without"
+			if filter == "curated" {
+				what = "with"
+			}
+			fmt.Fprintf(os.Stderr, "Binder '%s' has no records %s a note block\n", binder, what)
+			return nil
+		}
 	}
 
 	// Resolve bookmark paths for the file (non-url) refs in one batch.

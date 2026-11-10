@@ -96,6 +96,11 @@ func cmdReindex(args []string) int {
 		if id == "" || indexed[id] {
 			continue
 		}
+		// A handle in the id slot names a record the index has; a record of
+		// its own made from it would be a second one for the same file.
+		if _, isHandle := akaToID[id]; isHandle {
+			continue
+		}
 		binders := index.NormalizeBinders(r["binder"])
 		if len(binders) == 0 {
 			binders = []any{""}

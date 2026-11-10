@@ -189,7 +189,7 @@ func TestUnmarshalNoteWaitsForItsRecords(t *testing.T) {
 	note := filepath.Join(dest, "collections", "binder_Docs.md")
 
 	out, _, code := runGoUnmarshal(t, env, container)
-	if code != 0 || !strings.Contains(out, "Imported 0 record(s)") {
+	if code != 1 || !strings.Contains(out, "Imported 0 record(s)") {
 		t.Fatalf("first run: exit %d\n%s", code, out)
 	}
 	if index.FileExists(note) {

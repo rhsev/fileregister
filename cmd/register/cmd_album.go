@@ -64,8 +64,7 @@ func cmdAlbum(args []string) int {
 	if err != nil {
 		return 1
 	}
-	// Naming the album is the one write album does, and it happens before the
-	// read, so the lines already carry the new name. Messages go to stderr:
+	// Naming the album is the one write album does. Messages go to stderr:
 	// stdout is the data.
 	title, titleSet := vals["--title"]
 	clearTitle := titleSet && strings.TrimSpace(title) == ""
@@ -79,6 +78,15 @@ func cmdAlbum(args []string) int {
 			return 1
 		}
 	}
+	// Members and their order exactly as `order show` has them: one source of
+	// order, so the album cannot disagree with the ordering it is made of.
+	ctx, ok := buildOrderContext(binder, "")
+	if !ok {
+		return 1
+	}
+	// Written only now that the binder is known to exist: a mistyped name
+	// used to leave a note for a binder that is none. It is still before the
+	// read of the notes below, so the lines carry the new name.
 	cleared := ""
 	if clearTitle {
 		var werr error
@@ -95,12 +103,6 @@ func cmdAlbum(args []string) int {
 		fmt.Fprintf(os.Stderr, "Album field %s: %q — every member of '%s' inherits it\n", what, title, binder)
 	}
 
-	// Members and their order exactly as `order show` has them: one source of
-	// order, so the album cannot disagree with the ordering it is made of.
-	ctx, ok := buildOrderContext(binder, "")
-	if !ok {
-		return 1
-	}
 	byID := recordsByID(ctx.records)
 
 	// The Markdown layer is grubber's, not ours.

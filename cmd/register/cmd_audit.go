@@ -12,6 +12,29 @@ import (
 	"strings"
 )
 
+// auditRecordIndex is what the index says of the files it knows: one key per
+// file and name it stands under, a binder or a kept tag. Keyed by the
+// canonical name, as ghostReport looks it up: a binder typed composed and
+// stored decomposed (or the reverse) is one binder, and its members are no
+// ghosts.
+func auditRecordIndex(records []map[string]any, resolved map[string]string) map[string]bool {
+	recordIndex := map[string]bool{}
+	for _, rec := range records {
+		rp := resolved[index.AsString(rec["id"])]
+		if rp == "" {
+			continue
+		}
+		for _, b := range index.AsStrings(rec["binder"]) {
+			recordIndex[index.PathKey(rp)+"|"+index.CanonLabel(b)] = true
+		}
+		// A kept tag is the user's own, not a leftover of a membership.
+		for _, t := range index.KeptTags(rec) {
+			recordIndex[index.PathKey(rp)+"|"+index.CanonLabel(t)] = true
+		}
+	}
+	return recordIndex
+}
+
 // ghostReport prints a ghost entry (a file tagged with a binder that the index
 // doesn't record) and returns "ghost", or "" if it's a known record. A copy of a
 // registered file (cp, Finder's Duplicate, a copied folder) carries the
@@ -22,7 +45,7 @@ func ghostReport(fpath, binderName, layer string, recordIndex map[string]bool, d
 	if fpath == "" {
 		return ""
 	}
-	key := index.PathKey(fpath) + "|" + binderName
+	key := index.PathKey(fpath) + "|" + index.CanonLabel(binderName)
 	if recordIndex[key] {
 		return ""
 	}
@@ -405,20 +428,7 @@ func cmdAudit(args []string) int {
 	fmt.Printf("=== Direction 2: File → Record (%d binder(s) via %s) ===\n", len(binderNames), direction2Source)
 	fmt.Println("")
 
-	recordIndex := map[string]bool{}
-	for _, rec := range active {
-		rp := resolved[index.AsString(rec["id"])]
-		if rp == "" {
-			continue
-		}
-		for _, b := range index.AsStrings(rec["binder"]) {
-			recordIndex[index.PathKey(rp)+"|"+b] = true
-		}
-		// A kept tag is the user's own, not a leftover of a membership.
-		for _, t := range index.KeptTags(rec) {
-			recordIndex[index.PathKey(rp)+"|"+t] = true
-		}
-	}
+	recordIndex := auditRecordIndex(active, resolved)
 
 	found := map[string]int{}
 	for _, binderName := range binderNames {

@@ -490,7 +490,7 @@ func TestUnmarshalPlacesBasesAndTakesOver(t *testing.T) {
 	notes := filepath.Join(home, "Notes")
 	os.MkdirAll(notes, 0755)
 	so, _, code := runIn(t, snapEnv(home, notes, anchor), cmdUnmarshal, container)
-	if code != 0 || !strings.Contains(so, "vertrag.pdf — outside the notes folder; use --into") {
+	if code != 1 || !strings.Contains(so, "vertrag.pdf — outside the notes folder; use --into") {
 		t.Errorf("unmarshal without --into: exit %d\n%s", code, so)
 	}
 	if _, err := os.Stat(filepath.Join(notes, "a.txt")); err != nil {

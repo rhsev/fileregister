@@ -187,15 +187,19 @@ func cmdSnapshot(args []string) int {
 		return 1
 	}
 
-	os.Remove(out)
-	tw, err := newTarWriter(out, top)
+	// Written next to its place and moved there at the end: a snapshot that
+	// is already at out stays until the new one is complete, and a run that
+	// fails leaves it as it was.
+	partial := out + ".partial"
+	os.Remove(partial)
+	tw, err := newTarWriter(partial, top)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "register:", err)
 		return 1
 	}
 	fail := func(err error) int {
 		tw.close()
-		os.Remove(out)
+		os.Remove(partial)
 		fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", out, err)
 		return 1
 	}
@@ -314,7 +318,12 @@ func cmdSnapshot(args []string) int {
 		return fail(err)
 	}
 	if err := tw.close(); err != nil {
-		os.Remove(out)
+		os.Remove(partial)
+		fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", out, err)
+		return 1
+	}
+	if err := os.Rename(partial, out); err != nil {
+		os.Remove(partial)
 		fmt.Fprintf(os.Stderr, "Error: writing %s failed: %v\n", out, err)
 		return 1
 	}

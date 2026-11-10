@@ -16,10 +16,43 @@ import (
 	"strings"
 )
 
-// mdYamlBlockRe matches fenced YAML blocks: ```yaml\n…\n``` (multiline, dotall,
-// non-greedy). The writers use it to find the block they edit; reading the
-// layer is grubber's.
-var mdYamlBlockRe = regexp.MustCompile("(?ms)^```yaml\n(.*?)\n^```")
+// mdYamlBlockRe matches fenced YAML blocks. The writers use it to find the
+// block they edit; reading the layer is grubber's, and the two must agree on
+// what a block is, or a writer misses a block the reader shows and appends a
+// second one. So the rule is grubber's: the fences are lines of their own, may
+// be indented and may carry trailing blanks; the body ends at the start of the
+// closing fence's line and may be empty. An empty block used to reach for the
+// next fence below it and hide the block in between. Group 1 is the body,
+// with its trailing newline.
+var mdYamlBlockRe = regexp.MustCompile("(?ms)^[ \t]*```yaml[ \t]*\n(.*?)^[ \t]*```[ \t]*$")
+
+// The same fences for the writers that walk a note line by line.
+var (
+	mdFenceOpenRe  = regexp.MustCompile("^[ \t]*```yaml[ \t]*$")
+	mdFenceCloseRe = regexp.MustCompile("^[ \t]*```[ \t]*$")
+)
+
+// splitFence splits a mdYamlBlockRe match into its opening fence line (with
+// its newline), the body without a trailing newline, and the closing fence
+// line.
+func splitFence(match string) (open, body, closing string) {
+	i := strings.IndexByte(match, '\n')
+	j := strings.LastIndexByte(match, '\n')
+	open, closing = match[:i+1], match[j+1:]
+	if j > i {
+		body = match[i+1 : j]
+	}
+	return
+}
+
+// canonBlock is a block as register writes it. The editors build their
+// replacement in this form; refence puts it back between the fence lines the
+// note had, so an indented fence stays indented.
+func canonBlock(body string) string { return "```yaml\n" + body + "\n```" }
+
+func refence(repl, open, closing string) string {
+	return open + strings.TrimSuffix(strings.TrimPrefix(repl, "```yaml\n"), "```") + closing
+}
 
 // importDir: where unmarshal parks what it did not place — a container's notes
 // wait there for the user, and are not part of the notes.
