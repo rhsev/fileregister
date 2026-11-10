@@ -9,32 +9,6 @@ import (
 	"testing"
 )
 
-// stubDyingOn wraps the real engine and ends the moment it is asked op, as an
-// engine that crashes in the middle of a run does.
-func stubDyingOn(t *testing.T, real, op string) string {
-	t.Helper()
-	script := filepath.Join(t.TempDir(), "fileanchor-stub")
-	body := `#!/usr/bin/env python3
-import json, subprocess, sys
-engine = subprocess.Popen([` + quotePy(real) + `] + sys.argv[1:], stdin=subprocess.PIPE,
-                          stdout=subprocess.PIPE, text=True, bufsize=1)
-for line in sys.stdin:
-    try:
-        op = json.loads(line).get("op")
-    except Exception:
-        op = None
-    if op == ` + quotePy(op) + `:
-        sys.exit(1)
-    engine.stdin.write(line)
-    engine.stdin.flush()
-    print(engine.stdout.readline().rstrip("\n"), flush=True)
-`
-	if err := os.WriteFile(script, []byte(body), 0755); err != nil {
-		t.Fatal(err)
-	}
-	return script
-}
-
 // withEngine is env with another engine: same HOME, same notes.
 func withEngine(env []string, anchor string) []string {
 	return append(filterEnv(env, "FILEANCHOR"), "FILEANCHOR="+anchor)

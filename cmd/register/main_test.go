@@ -18,6 +18,10 @@ import (
 //
 // A test that wants the real environment has to say so by setting HOME itself.
 func TestMain(m *testing.M) {
+	// Started as an engine stub (engine_stub_test.go), not as the tests.
+	if conf := os.Getenv(stubEnv); conf != "" {
+		runEngineStub(conf)
+	}
 	tmp, err := os.MkdirTemp("", "register-test-home-")
 	if err != nil {
 		panic(err)

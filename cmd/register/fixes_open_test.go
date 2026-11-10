@@ -10,53 +10,6 @@ import (
 	"time"
 )
 
-// stubResolve wraps the real engine. searchable is answered with yes, so a
-// miss counts where the test's folders are not indexed. A resolve of a blob in
-// noPath is answered without last_path, one of a blob in gonePath as resolving
-// to that path.
-func stubResolve(t *testing.T, real string, noPath []string, gonePath map[string]string) string {
-	t.Helper()
-	script := filepath.Join(t.TempDir(), "fileanchor-stub")
-	var np, gp []string
-	for _, b := range noPath {
-		np = append(np, quotePy(b))
-	}
-	for b, p := range gonePath {
-		gp = append(gp, quotePy(b)+": "+quotePy(p))
-	}
-	body := `#!/usr/bin/env python3
-import json, subprocess, sys
-engine = subprocess.Popen([` + quotePy(real) + `] + sys.argv[1:], stdin=subprocess.PIPE,
-                          stdout=subprocess.PIPE, text=True, bufsize=1)
-no_path = {` + strings.Join(np, ", ") + `}
-gone = {` + strings.Join(gp, ", ") + `}
-for line in sys.stdin:
-    try:
-        req = json.loads(line)
-    except Exception:
-        req = {}
-    op = req.get("op")
-    if op == "searchable":
-        print('{"ok":true,"searchable":true}', flush=True)
-        continue
-    if op == "resolve" and req.get("blob") in gone:
-        print(json.dumps({"ok": True, "path": gone[req.get("blob")]}), flush=True)
-        continue
-    engine.stdin.write(line)
-    engine.stdin.flush()
-    reply = engine.stdout.readline().rstrip("\n")
-    if op == "resolve" and req.get("blob") in no_path:
-        r = json.loads(reply)
-        r.pop("last_path", None)
-        reply = json.dumps(r)
-    print(reply, flush=True)
-`
-	if err := os.WriteFile(script, []byte(body), 0755); err != nil {
-		t.Fatal(err)
-	}
-	return script
-}
-
 // bookmarkBlobs reads the identity store of env's HOME.
 func bookmarkBlobs(t *testing.T, env []string) map[string]string {
 	t.Helper()
