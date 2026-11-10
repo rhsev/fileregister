@@ -37,6 +37,14 @@ func cmdList(args []string) int {
 		}
 	}
 
+	if containsArg(args, "--inbox") && containsArg(args, "--curated") {
+		fmt.Fprintln(os.Stderr, "register list: --inbox or --curated, not both")
+		return 1
+	}
+	if containsArg(args, "--json") && containsArg(args, "--paths") {
+		fmt.Fprintln(os.Stderr, "register list: --json or --paths, not both")
+		return 1
+	}
 	filter := ""
 	if containsArg(args, "--inbox") {
 		filter = "inbox"
@@ -175,7 +183,11 @@ func listAllFiltered(notesDir, filter string, jsonOnly bool) error {
 		sorted = append(sorted, binderEntry{name, count})
 	}
 	sort.Slice(sorted, func(i, j int) bool {
-		return strings.ToLower(sorted[i].name) < strings.ToLower(sorted[j].name)
+		a, b := strings.ToLower(sorted[i].name), strings.ToLower(sorted[j].name)
+		if a != b {
+			return a < b
+		}
+		return sorted[i].name < sorted[j].name // same in every run
 	})
 
 	if jsonOnly {

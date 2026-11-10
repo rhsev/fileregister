@@ -356,14 +356,18 @@ func bindFile(db map[string]string, target, id string, rec map[string]any, tags 
 	binders := index.NormalizeBinders(rec["binder"])
 	backend := index.XattrBackend(rec)
 	for _, b := range binders {
-		index.XattrBackendAdd(target, index.AsString(b), backend)
+		if index.XattrBackendAdd(target, index.AsString(b), backend) == "failed" {
+			remarks = append(remarks, fmt.Sprintf("binder '%s' not written to the file (%s); run register refresh", index.AsString(b), index.LastEngineError()))
+		}
 	}
-	index.StatusMark(target, len(binders) > 0)
+	if index.StatusMark(target, len(binders) > 0) == "failed" {
+		remarks = append(remarks, fmt.Sprintf("star not set (%s); run register refresh", index.LastEngineError()))
+	}
 	if !finder {
 		return ok, remarks
 	}
-	_, remarks = writeFinder(target, tags, comment)
-	return ok, remarks
+	_, finderRemarks := writeFinder(target, tags, comment)
+	return ok, append(remarks, finderRemarks...)
 }
 
 // writeFinder adds the free Finder tags the file lacks and sets the comment
@@ -497,7 +501,17 @@ func newContentFinder(roots []string, sizes map[int64]bool, skip []string) *cont
 		if root == "" || root == "/" {
 			continue
 		}
-		filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		// WalkDir does not go into a root that is a symlink, so the walk
+		// starts at what the link names. Hits are reported below root, the
+		// spelling the caller's targets have.
+		walked := root
+		if real, err := filepath.EvalSymlinks(root); err == nil {
+			walked = real
+		}
+		filepath.WalkDir(walked, func(p string, d fs.DirEntry, err error) error {
+			if err == nil && walked != root {
+				p = root + strings.TrimPrefix(p, walked)
+			}
 			if err != nil {
 				if d != nil && d.IsDir() {
 					return fs.SkipDir

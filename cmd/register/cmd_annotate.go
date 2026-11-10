@@ -238,7 +238,9 @@ func annotateValue(v string) string {
 	if v == "true" || v == "false" || annotateDateRe.MatchString(v) {
 		return v
 	}
-	if _, err := strconv.ParseFloat(v, 64); err == nil {
+	// ParseFloat takes 1_000 for a number, and so does YAML: written plain,
+	// 2024_05 would read back as 202405.
+	if _, err := strconv.ParseFloat(v, 64); err == nil && !strings.Contains(v, "_") {
 		if !(len(v) > 1 && v[0] == '0' && v[1] != '.') &&
 			!(len(v) > 2 && (v[0] == '-' || v[0] == '+') && v[1] == '0' && v[2] != '.') {
 			return v

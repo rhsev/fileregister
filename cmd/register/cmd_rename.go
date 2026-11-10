@@ -67,6 +67,11 @@ func cmdRename(args []string) int {
 		fmt.Fprintln(os.Stderr, "Usage: register rename <old-name> <new-name>")
 		return 1
 	}
+	// A name with a blank that was not quoted arrives as two.
+	if len(pos) > 2 {
+		fmt.Fprintf(os.Stderr, "Error: rename takes two names, got %d — quote a name that holds a blank\n", len(pos))
+		return 1
+	}
 	// The new name is being introduced, so it is stored canonical. The old one
 	// is only looked up, and SameBinder finds it in either form.
 	oldName, newName := pos[0], index.CanonLabel(pos[1])
@@ -156,7 +161,7 @@ func cmdRename(args []string) int {
 	// left behind, `order` would silently fall back to rule order.
 	oldNote := defaultPromoteTarget(nd, oldName)
 	newNote := defaultPromoteTarget(nd, newName)
-	if index.FileExists(oldNote) {
+	if index.FileExists(oldNote) && oldNote != newNote {
 		if n, oerr := mdRenameOrderingBinder(oldNote, oldName, newName); oerr != nil {
 			fmt.Fprintf(os.Stderr, "  Error: updating ordering config in %s failed: %v\n", filepath.Base(oldNote), oerr)
 			writeFailed = true
@@ -174,7 +179,7 @@ func cmdRename(args []string) int {
 			// and ordering along.
 			fmt.Fprintf(os.Stderr, "  Note: %s also holds binder '%s' — it stays; move the '%s' blocks by hand if you like\n",
 				filepath.Base(oldNote), other, newName)
-		} else if index.FileExists(newNote) {
+		} else if index.FileExists(newNote) && !sameFileOnDisk(oldNote, newNote) {
 			fmt.Fprintf(os.Stderr, "  Note: %s already exists — blocks stay in %s; review by hand\n",
 				filepath.Base(newNote), filepath.Base(oldNote))
 		} else if mvErr := os.Rename(oldNote, newNote); mvErr != nil {
@@ -316,4 +321,16 @@ func noteHoldsOtherBinder(note, oldName, newName string) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+// sameFileOnDisk reports whether two paths name one file, as binder_foo.md
+// and binder_Foo.md do on a volume that ignores case. Renaming one to the
+// other is then a change of spelling, not a clash.
+func sameFileOnDisk(a, b string) bool {
+	fa, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	fb, err := os.Stat(b)
+	return err == nil && os.SameFile(fa, fb)
 }

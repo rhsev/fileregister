@@ -208,18 +208,23 @@ func JSONLSetKeptTags(path string, changes map[string]map[string]bool) (int, err
 		if !ok {
 			return rec, false
 		}
+		// Tags are labels: one named decomposed is the one stored composed.
+		canon := map[string]bool{}
+		for t, keep := range ch {
+			canon[CanonLabel(t)] = keep
+		}
 		kept := KeptTags(rec)
 		var next []any
 		seen := map[string]bool{}
 		for _, t := range kept {
-			if keep, touched := ch[t]; touched && !keep {
+			if keep, touched := canon[CanonLabel(t)]; touched && !keep {
 				continue
 			}
-			seen[t] = true
+			seen[CanonLabel(t)] = true
 			next = append(next, t)
 		}
-		added := make([]string, 0, len(ch))
-		for t, keep := range ch {
+		added := make([]string, 0, len(canon))
+		for t, keep := range canon {
 			if keep && !seen[t] {
 				added = append(added, t)
 			}

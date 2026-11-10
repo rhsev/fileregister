@@ -37,9 +37,11 @@ func cmdOf(args []string) int {
 			if strings.HasPrefix(a, "-") {
 				return unknownOption("of", a)
 			}
-			if arg == "" {
-				arg = a
+			if arg != "" {
+				fmt.Fprintf(os.Stderr, "register of: one file at a time (got %s and %s)\n", arg, a)
+				return 1
 			}
+			arg = a
 		}
 	}
 	if arg == "" {

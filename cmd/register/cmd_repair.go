@@ -320,6 +320,14 @@ func cmdRepair(args []string) int {
 
 		if newPath == "" && interactive {
 			newPath = promptForPath(rec, stdin)
+			// A typed path gets the check a found candidate gets: no file
+			// in the Trash, none that is another record's.
+			if newPath != "" {
+				if why := candidateProblem(newPath, id, db, indexIDs); why != "" {
+					fmt.Fprintf(os.Stderr, "  Not bound: %s is %s\n", newPath, why)
+					newPath = ""
+				}
+			}
 		}
 
 		if newPath == "" {
@@ -395,8 +403,12 @@ func promptForPath(rec map[string]any, stdin *bufio.Reader) string {
 	fmt.Fprintf(os.Stderr, "Cannot locate file for: [%s] %s (id: %s)\n", strings.Join(index.AsStrings(rec["binder"]), ", "), label, index.AsString(rec["id"]))
 	fmt.Fprint(os.Stderr, "  Enter path (or blank to skip): ")
 	path, _ := stdin.ReadString('\n')
-	path = strings.TrimSpace(path)
-	if path == "" || !index.FileExists(path) {
+	path = expandHome(strings.TrimSpace(path))
+	if path == "" {
+		return ""
+	}
+	if !index.FileExists(path) {
+		fmt.Fprintf(os.Stderr, "  No file at %s\n", path)
 		return ""
 	}
 	return path

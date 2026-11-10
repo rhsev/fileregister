@@ -42,10 +42,13 @@ func cmdAka(args []string) int {
 	}
 	// A handle being introduced is stored canonical; one being removed or
 	// looked up is matched in either form through akaStored.
-	adds, removes := uniqStrings(vals["--add"], false), uniqStrings(vals["--remove"], false)
+	// Made canonical first, so one handle typed composed and decomposed is
+	// one handle.
+	adds, removes := append([]string{}, vals["--add"]...), uniqStrings(vals["--remove"], false)
 	for i, h := range adds {
 		adds[i] = index.CanonLabel(h)
 	}
+	adds = uniqStrings(adds, false)
 	if len(pos) != 1 || (len(adds) == 0 && len(removes) == 0) {
 		fmt.Fprintln(os.Stderr, akaUsage)
 		return 1
@@ -207,16 +210,16 @@ func cmdAka(args []string) int {
 // record through a handle. current is the handle list BEFORE the change.
 func akaBlockOwned(b map[string]any, id string, current []string) bool {
 	bid := index.AsString(b["id"])
-	if bid == id || (bid != "" && containsStr(current, bid)) {
+	if bid == id || (bid != "" && hasLabel(current, bid)) {
 		return true
 	}
-	return bid == "" && anyIn(index.AsStrings(b["aka"]), current)
+	return bid == "" && anyLabelIn(index.AsStrings(b["aka"]), current)
 }
 
 // akaBlockTouched reports whether a block carries one of the handles, in its
 // id: slot or its aka: list.
 func akaBlockTouched(b map[string]any, handles []string) bool {
-	return containsStr(handles, index.AsString(b["id"])) || anyIn(index.AsStrings(b["aka"]), handles)
+	return hasLabel(handles, index.AsString(b["id"])) || anyLabelIn(index.AsStrings(b["aka"]), handles)
 }
 
 // akaBlockConflicts lists the blocks that carry one of the changing handles
@@ -249,12 +252,12 @@ func mdStripAka(path, id string, current, handles []string) (int, error) {
 		}
 		keep := []any{}
 		for _, a := range index.AsStrings(parsed["aka"]) {
-			if !containsStr(handles, a) {
+			if !hasLabel(handles, a) {
 				keep = append(keep, a)
 			}
 		}
 		wantID := index.AsString(parsed["id"])
-		setID := wantID == "" || containsStr(handles, wantID)
+		setID := wantID == "" || hasLabel(handles, wantID)
 		if setID {
 			wantID = id
 		}
@@ -322,6 +325,26 @@ func mdStripAka(path, id string, current, handles []string) (int, error) {
 func anyIn(xs, set []string) bool {
 	for _, x := range xs {
 		if containsStr(set, x) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasLabel and anyLabelIn compare handles as the index does: a handle a note
+// holds decomposed (NFD) is the handle the index holds composed.
+func hasLabel(set []string, s string) bool {
+	for _, x := range set {
+		if index.SameLabel(x, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func anyLabelIn(xs, set []string) bool {
+	for _, x := range xs {
+		if hasLabel(set, x) {
 			return true
 		}
 	}

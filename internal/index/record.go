@@ -13,6 +13,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -167,7 +168,12 @@ func ParseJSONObject(line string) map[string]any {
 	dec := json.NewDecoder(strings.NewReader(line))
 	dec.UseNumber()
 	var m map[string]any
-	if dec.Decode(&m) != nil || dec.More() {
+	if dec.Decode(&m) != nil {
+		return nil
+	}
+	// Nothing may follow the object: More() is false before a stray closing
+	// bracket, so the next token is asked for.
+	if _, err := dec.Token(); err != io.EOF {
 		return nil
 	}
 	return m

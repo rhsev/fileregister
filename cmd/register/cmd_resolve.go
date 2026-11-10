@@ -39,9 +39,11 @@ func cmdResolve(args []string) int {
 			if strings.HasPrefix(a, "-") {
 				return unknownOption("resolve", a)
 			}
-			if key == "" {
-				key = a
+			if key != "" {
+				fmt.Fprintf(os.Stderr, "register resolve: one key at a time (got %s and %s)\n", key, a)
+				return 1
 			}
+			key = a
 		}
 	}
 

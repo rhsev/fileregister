@@ -155,7 +155,9 @@ func JSONLWriteMany(records []RefRecord, targetPath string) ([]string, error) {
 		for _, line := range raw {
 			l := idxLine{raw: line}
 			if strings.TrimSpace(line) != "" {
-				if rec := ParseJSONObject(line); rec != nil && rec["id"] != nil {
+				// Only a ref line is a record. A foreign line that happens to
+				// carry the same id passes through untouched.
+				if rec := ParseJSONObject(line); rec != nil && rec["id"] != nil && AsString(rec["type"]) == "ref" {
 					l.rec = rec
 					byID[AsString(rec["id"])] = len(lines)
 				}

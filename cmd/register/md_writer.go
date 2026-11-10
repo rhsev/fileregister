@@ -421,6 +421,11 @@ func mdReattachBlock(path, binder, filename, id string) (bool, error) {
 		return false, err
 	}
 	want := unorm.NFC.String(strings.TrimSpace(headingText(filename)))
+	if want == "" {
+		// A record without a name has no heading to be found by. An empty
+		// one would match every block that stands before the first heading.
+		return false, nil
+	}
 	lines := strings.Split(content, "\n")
 	type span struct{ start, end int }
 	var hits []span
