@@ -21,8 +21,8 @@ cd "$(dirname "$0")/.."
 
 [ $# -eq 1 ] || { echo "Usage: scripts/test-linux.sh <ssh-host>" >&2; exit 2; }
 HOST="$1"
-FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.5.0}"
-GRUBBER_VERSION="${GRUBBER_VERSION:-v0.20.0}"
+FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.5.1}"
+GRUBBER_VERSION="${GRUBBER_VERSION:-v0.20.1}"
 
 # The login shell there may be fish or anything else: every remote command
 # is handed to sh.

@@ -209,3 +209,24 @@ func TestPruneKeepsTheDeadEntryOfAMember(t *testing.T) {
 		t.Error("--prune dropped the bookmark entry of a record that is still in a binder")
 	}
 }
+
+// The readers see what the writers see. An empty yaml block used to hide the
+// block after it from grubber, up to v0.20.0: promote and rename then worked
+// on a block that list --curated, annotate and cleanup did not find.
+func TestReadersSeeTheBlockAfterAnEmptyOne(t *testing.T) {
+	needGrubber(t)
+	notes := t.TempDir()
+	col := filepath.Join(notes, "collections")
+	os.MkdirAll(col, 0755)
+	writeFile(t, filepath.Join(col, "binder_Docs.md"),
+		"### empty\n```yaml\n```\n\n### doc\n```yaml\n"+refBlock+"```\n")
+	restore := setEnv(t, annotateEnv(t, notes))
+	defer restore()
+	blocks, err := readAnnotations(notes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocks) != 1 || index.AsString(blocks[0]["id"]) != "1" {
+		t.Errorf("grubber read %d ref block(s), want the one after the empty block: %v", len(blocks), blocks)
+	}
+}

@@ -9,11 +9,11 @@ WORKFLOWS     = add-to-binder binder-of
 # The metadata engine is a separate project. Pin the tag the checks run against;
 # bump it deliberately rather than drifting to whatever main happens to be.
 FILEANCHOR_REPO    ?= https://github.com/rhsev/fileanchor.git
-FILEANCHOR_VERSION ?= 1.5.0
+FILEANCHOR_VERSION ?= 1.5.1
 
 # The Markdown layer is read through grubber, so the album checks need it the
 # same way half the suite needs the engine. Same rule: pin a tag.
-GRUBBER_VERSION ?= v0.20.0
+GRUBBER_VERSION ?= v0.20.1
 
 # Stamp the version from the tag rather than trusting a literal in main.go,
 # which shipped 1.4.0 as 1.3.0. A dirty or untagged tree says so in --version.
