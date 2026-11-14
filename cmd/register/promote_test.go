@@ -115,3 +115,42 @@ func TestAddMdBehavior(t *testing.T) {
 		t.Errorf("file not id-stamped: %s", got)
 	}
 }
+
+// add --md that cannot write the note keeps the index record and ends with
+// exit 1, for a file and for a URL.
+func TestAddExitsOneWhenTheAnnotationFails(t *testing.T) {
+	anchor := engineBin(t)
+	notes := t.TempDir()
+	md := filepath.Join(notes, "collections", "binder_Akten.md")
+	unwritable(t, md, "# Akten\n")
+	f := filepath.Join(t.TempDir(), "report.pdf")
+	writeFile(t, f, "x")
+	real, _ := filepath.EvalSymlinks(f)
+	env := addEnv(t, notes, anchor)
+	inbox := filepath.Join(notes, "collections", "inbox.jsonl")
+
+	out, e, code := runGoAdd(t, env, real, "--binder", "Akten", "--md")
+	if code != 1 {
+		t.Errorf("file: exit %d, want 1\n%s%s", code, out, e)
+	}
+	if !strings.Contains(out, "annotated: 0 → binder_Akten.md") || !strings.Contains(out, "not annotated: 1") {
+		t.Errorf("file: report does not name the failed annotation:\n%s", out)
+	}
+	if idx := mustRead(t, inbox); !strings.Contains(idx, `"filename":"report.pdf"`) {
+		t.Errorf("file: record not in the index:\n%s", idx)
+	}
+
+	out, e, code = runGoAdd(t, env, "--url", "https://example.com/a", "--binder", "Akten", "--md")
+	if code != 1 {
+		t.Errorf("url: exit %d, want 1\n%s%s", code, out, e)
+	}
+	if !strings.Contains(out, "not annotated: 1") {
+		t.Errorf("url: report does not name the failed annotation:\n%s", out)
+	}
+	if idx := mustRead(t, inbox); !strings.Contains(idx, `"url":"https://example.com/a"`) {
+		t.Errorf("url: record not in the index:\n%s", idx)
+	}
+	if got := mustRead(t, md); got != "# Akten\n" {
+		t.Errorf("note changed:\n%s", got)
+	}
+}

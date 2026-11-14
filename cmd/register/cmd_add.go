@@ -461,13 +461,13 @@ func cmdAdd(args []string) int {
 	}
 
 	// 4b. Optional Markdown annotation destination (idempotent, index stays truth).
-	annotated := 0
+	annotated, notAnnotated := 0, 0
 	if annotateTarget != "" && len(records) > 0 {
 		recMaps := make([]map[string]any, len(records))
 		for i, r := range records {
 			recMaps[i] = r.ToH()
 		}
-		annotated, _, _ = promoteRecords(recMaps, annotateTarget, opts.binder)
+		annotated, _, notAnnotated = promoteRecords(recMaps, annotateTarget, opts.binder)
 	}
 
 	if opts.aka != "" && len(records) == 1 {
@@ -502,13 +502,18 @@ func cmdAdd(args []string) int {
 	if annotateTarget != "" {
 		fmt.Printf("  annotated: %d → %s\n", annotated, filepath.Base(annotateTarget))
 	}
+	if notAnnotated > 0 {
+		fmt.Printf("  not annotated: %d\n", notAnnotated)
+	}
 	if len(missing)+needRepair > 0 {
 		fmt.Printf("  skipped  : %d\n", len(missing)+needRepair)
 	}
 	if failed > 0 {
 		fmt.Printf("  failed   : %d\n", failed)
 	}
-	if appended == 0 && noop == 0 {
+	// The records are in the index, but an annotation that was asked for and
+	// not written needs the user, as in promote.
+	if appended == 0 && noop == 0 || notAnnotated > 0 {
 		return 1
 	}
 	return 0
@@ -657,9 +662,9 @@ func addURLRecord(opts addOptions, binderSet bool) int {
 	}
 	ensureSchema(nd)
 
-	annotated := 0
+	annotated, notAnnotated := 0, 0
 	if annotateTarget != "" {
-		annotated, _, _ = promoteRecords([]map[string]any{ref.ToH()}, annotateTarget, opts.binder)
+		annotated, _, notAnnotated = promoteRecords([]map[string]any{ref.ToH()}, annotateTarget, opts.binder)
 	}
 
 	action := "appended"
@@ -678,6 +683,10 @@ func addURLRecord(opts addOptions, binderSet bool) int {
 	}
 	if annotateTarget != "" {
 		fmt.Printf("  annotated: %d → %s\n", annotated, filepath.Base(annotateTarget))
+	}
+	if notAnnotated > 0 {
+		fmt.Printf("  not annotated: %d\n", notAnnotated)
+		return 1
 	}
 	return 0
 }
