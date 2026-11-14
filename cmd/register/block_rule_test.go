@@ -28,6 +28,8 @@ func TestReaderAndWritersSeeTheSameBlocks(t *testing.T) {
 		"plain":                "### a\n" + block("a") + "\n### b\n" + block("b"),
 		"no heading":           block("a") + "\n" + block("b"),
 		"frontmatter":          "---\ntitle: T\n---\n\n### a\n" + block("a"),
+		"fence in frontmatter": "---\ntitle: T\nnote: |\n  ```yaml\n  type: ref\n  id: x\n  binder: Docs\n  ```\n---\n\n" + block("a"),
+		"open fence in header": "---\ntitle: T\nnote: |\n  ````\n---\n\n" + block("a") + "\n````\n",
 		"empty block first":    "### empty\n```yaml\n```\n\n### a\n" + block("a"),
 		"indented fences":      "- item\n\n  ```yaml\n  type: ref\n  id: a\n  binder: Docs\n  ```\n\n" + block("b"),
 		"blanks after fences":  "```yaml \ntype: ref\nid: a\nbinder: Docs\n``` \n\n" + block("b"),
@@ -163,5 +165,21 @@ func TestReattachLeavesAnExampleAlone(t *testing.T) {
 		strings.Replace(real, "type: ref\n", "type: ref\nid: '1'\n", 1)
 	if got := mustRead(t, note); got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// rename says why it left a block as it was.
+func TestRenameNamesABlockThatIsNotValidYAML(t *testing.T) {
+	note := filepath.Join(t.TempDir(), "binder_Docs.md")
+	broken := "### a.pdf\n```yaml\ntype: ref\nid: '1'\nbinder: Docs\ncomment: see: there\n```\n"
+	writeFile(t, note, broken)
+	var n int
+	var err error
+	stderr := captureStderr(func() { n, err = mdRenameBinder(note, "Docs", "Papers") })
+	if err != nil || n != 0 || mustRead(t, note) != broken {
+		t.Errorf("rename changed %d block(s), err %v", n, err)
+	}
+	if !strings.Contains(stderr, "left unrenamed (the block is not valid YAML)") {
+		t.Errorf("warning: %q", stderr)
 	}
 }

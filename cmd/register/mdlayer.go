@@ -31,13 +31,16 @@ type mdBlock struct {
 // one. So the rule is not register's: entry.DataBlocks is the function grubber
 // reads its records with.
 func mdBlocks(content string) []mdBlock {
-	lines := strings.Split(content, "\n")
+	// Below the frontmatter, as grubber looks: a fence line in a header
+	// value that runs over several lines opens no block.
+	fm := frontmatterLen(content)
+	lines := strings.Split(content[fm:], "\n")
 	spans := entry.DataBlocks(lines)
 	if len(spans) == 0 {
 		return nil
 	}
 	starts := make([]int, len(lines))
-	off := 0
+	off := fm
 	for i, l := range lines {
 		starts[i] = off
 		off += len(l) + 1

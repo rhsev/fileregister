@@ -481,9 +481,13 @@ func mdRenameBinder(path, oldName, newName string) (int, error) {
 		// Verify the surgery still parses to the renamed record before
 		// accepting it (a binder: key with a multi-line value, say).
 		var check map[string]any
-		if yaml.Unmarshal([]byte(body), &check) != nil || !index.SameBinder(index.AsString(check["binder"]), newName) {
-			fmt.Fprintf(os.Stderr, "  Warning: block for id %s in %s left unrenamed (nested binder: key) — edit by hand\n",
-				index.AsString(parsed["id"]), filepath.Base(path))
+		if err := yaml.Unmarshal([]byte(body), &check); err != nil || !index.SameBinder(index.AsString(check["binder"]), newName) {
+			why := "nested binder: key"
+			if err != nil {
+				why = "the block is not valid YAML"
+			}
+			fmt.Fprintf(os.Stderr, "  Warning: block for id %s in %s left unrenamed (%s) — edit by hand\n",
+				index.AsString(parsed["id"]), filepath.Base(path), why)
 			return "", false
 		}
 		return "```yaml\n" + body + "\n```", true
