@@ -299,24 +299,27 @@ func cmdUnmarshal(args []string) int {
 		}
 	}
 
-	// flush saves what the run has done so far: the bookmarks made and the
-	// records taken in. A run that stops halfway calls it too, so a file that
-	// is placed and stamped has its bookmark and its index line.
+	// flush saves what the run has done so far: the records taken in, then the
+	// bookmarks made. A run that stops halfway calls it too. The index goes
+	// first, and the bookmarks are saved only once it is written: a bookmark
+	// without a record would park its file as "already present" on the next
+	// run, and the record would never arrive. A record without a bookmark is
+	// what repair is for, and the next run takes a format-2 file over again.
 	flush := func() bool {
-		ok := true
+		if len(indexRefs) > 0 {
+			if _, err := index.JSONLWriteMany(indexRefs, inbox); err != nil {
+				fmt.Fprintln(os.Stderr, "register:", err)
+				return false
+			}
+		}
 		if dbDirty {
 			if err := index.SaveDB(db); err != nil {
 				fmt.Fprintln(os.Stderr, "register:", err)
-				ok = false
+				fmt.Fprintln(os.Stderr, "The records are in the index, their bookmarks were not saved — run: register repair")
+				return false
 			}
 		}
-		if ok && len(indexRefs) > 0 {
-			if _, err := index.JSONLWriteMany(indexRefs, inbox); err != nil {
-				fmt.Fprintln(os.Stderr, "register:", err)
-				ok = false
-			}
-		}
-		return ok
+		return true
 	}
 
 	for _, entry := range refLines {
