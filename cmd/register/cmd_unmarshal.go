@@ -315,7 +315,7 @@ func cmdUnmarshal(args []string) int {
 		if dbDirty {
 			if err := index.SaveDB(db); err != nil {
 				fmt.Fprintln(os.Stderr, "register:", err)
-				fmt.Fprintln(os.Stderr, "The records are in the index, their bookmarks were not saved — run: register repair")
+				fmt.Fprintln(os.Stderr, "The records are in the index, their bookmarks were not saved. Run: register repair")
 				return false
 			}
 		}
