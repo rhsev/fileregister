@@ -48,9 +48,9 @@ func TestWritersSeeTheBlocksGrubberReads(t *testing.T) {
 	}
 
 	// A fence of another language is no closing fence.
-	writeFile(t, note, "```yaml\n"+refBlock+"\n```sh\necho\n```\n")
-	if refs := mdAllRefs(note); len(refs) != 0 {
-		t.Errorf("```sh must not close a yaml block, got %v", refs)
+	text := "```yaml\n" + refBlock + "\n```sh\necho\n```\n"
+	if blocks := mdBlocks(text); len(blocks) != 1 || !strings.HasSuffix(blocks[0].body, "echo") {
+		t.Errorf("```sh must not close a yaml block, got %v", blocks)
 	}
 }
 

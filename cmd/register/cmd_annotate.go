@@ -254,10 +254,10 @@ func annotateValue(v string) string {
 // content and the count of changed blocks.
 func annotateEditBlocks(content string, keys map[string]bool, binder string, sets []annotateSet, unsets []string) (string, int) {
 	changed := 0
-	edited := mdYamlBlockRe.ReplaceAllStringFunc(content, func(match string) string {
+	edited := mdReplaceBlocks(content, func(match string) string {
 		open, body, closing := splitFence(match)
-		var parsed map[string]any
-		if yaml.Unmarshal([]byte(body), &parsed) != nil || parsed == nil {
+		parsed := blockFields(body)
+		if parsed == nil {
 			return match
 		}
 		if t, _ := parsed["type"].(string); t != "ref" {

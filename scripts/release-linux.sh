@@ -19,7 +19,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.5.1}"
-GRUBBER_VERSION="${GRUBBER_VERSION:-v0.20.1}"
+GRUBBER_VERSION="${GRUBBER_VERSION:-v0.21.0}"
 OUT="$(pwd)/.build/dist"
 VERSION="$(git describe --tags --dirty --always | sed 's/^v//')"
 [ -n "$VERSION" ] || { echo "release-linux.sh: no version from git describe — run it in a checkout" >&2; exit 1; }

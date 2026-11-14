@@ -12,27 +12,73 @@ import (
 
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"strings"
+
+	"github.com/rhsev/grubber/entry"
 )
 
-// mdYamlBlockRe matches fenced YAML blocks. The writers use it to find the
-// block they edit; reading the layer is grubber's, and the two must agree on
-// what a block is, or a writer misses a block the reader shows and appends a
-// second one. So the rule is grubber's: the fences are lines of their own, may
-// be indented and may carry trailing blanks; the body ends at the start of the
-// closing fence's line and may be empty. An empty block used to reach for the
-// next fence below it and hide the block in between. Group 1 is the body,
-// with its trailing newline.
-var mdYamlBlockRe = regexp.MustCompile("(?ms)^[ \t]*```yaml[ \t]*\n(.*?)^[ \t]*```[ \t]*$")
+// mdBlock is one data block in a note's text: the bytes from the opening
+// fence line's first to the closing fence line's last, and the lines between
+// the fences without a trailing newline.
+type mdBlock struct {
+	start, end int
+	body       string
+}
 
-// The same fences for the writers that walk a note line by line.
-var (
-	mdFenceOpenRe  = regexp.MustCompile("^[ \t]*```yaml[ \t]*$")
-	mdFenceCloseRe = regexp.MustCompile("^[ \t]*```[ \t]*$")
-)
+// mdBlocks returns the data blocks of a note. The writers find the block they
+// edit with it; reading the layer is grubber's, and the two must agree on what
+// a block is, or a writer misses a block the reader shows and appends a second
+// one. So the rule is not register's: entry.DataBlocks is the function grubber
+// reads its records with.
+func mdBlocks(content string) []mdBlock {
+	lines := strings.Split(content, "\n")
+	spans := entry.DataBlocks(lines)
+	if len(spans) == 0 {
+		return nil
+	}
+	starts := make([]int, len(lines))
+	off := 0
+	for i, l := range lines {
+		starts[i] = off
+		off += len(l) + 1
+	}
+	blocks := make([]mdBlock, len(spans))
+	for i, s := range spans {
+		blocks[i] = mdBlock{
+			start: starts[s.Open],
+			end:   starts[s.Close] + len(lines[s.Close]),
+			body:  strings.Join(lines[s.Open+1:s.Close], "\n"),
+		}
+	}
+	return blocks
+}
 
-// splitFence splits a mdYamlBlockRe match into its opening fence line (with
+// blockFields reads the text between a block's fences as grubber reads it:
+// a key that stands twice counts once, and a block that is not valid YAML is
+// read line by line. A writer that took such a block for none would not find
+// the record grubber shows, and promote would append a second block for it.
+// nil when the block holds no record.
+func blockFields(body string) map[string]any {
+	fields, _ := entry.Fields([]byte(body))
+	return fields
+}
+
+// mdReplaceBlocks returns content with every data block replaced by what fn
+// makes of it. fn gets the block from fence to fence and returns it unchanged
+// to keep it.
+func mdReplaceBlocks(content string, fn func(block string) string) string {
+	var b strings.Builder
+	last := 0
+	for _, blk := range mdBlocks(content) {
+		b.WriteString(content[last:blk.start])
+		b.WriteString(fn(content[blk.start:blk.end]))
+		last = blk.end
+	}
+	b.WriteString(content[last:])
+	return b.String()
+}
+
+// splitFence splits a block from fence to fence into its opening fence line (with
 // its newline), the body without a trailing newline, and the closing fence
 // line.
 func splitFence(match string) (open, body, closing string) {

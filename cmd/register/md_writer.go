@@ -16,6 +16,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/rhsev/grubber/entry"
 	"gopkg.in/yaml.v3"
 
 	unorm "golang.org/x/text/unicode/norm"
@@ -176,9 +177,9 @@ func mdParseBlocks(path string) []map[string]any {
 		return nil
 	}
 	var out []map[string]any
-	for _, m := range mdYamlBlockRe.FindAllStringSubmatch(content, -1) {
-		var rec map[string]any
-		if yaml.Unmarshal([]byte(m[1]), &rec) != nil || rec == nil {
+	for _, blk := range mdBlocks(content) {
+		rec := blockFields(blk.body)
+		if rec == nil {
 			continue
 		}
 		out = append(out, rec)
@@ -353,10 +354,10 @@ func mdTransformFile(path string, fn func(lines []string, parsed map[string]any)
 		return 0, err
 	}
 	changes := 0
-	modified := mdYamlBlockRe.ReplaceAllStringFunc(content, func(match string) string {
+	modified := mdReplaceBlocks(content, func(match string) string {
 		open, body, closing := splitFence(match)
-		var parsed map[string]any
-		if yaml.Unmarshal([]byte(body), &parsed) != nil || parsed == nil {
+		parsed := blockFields(body)
+		if parsed == nil {
 			return match
 		}
 		if t, _ := parsed["type"].(string); t != "ref" {
@@ -427,38 +428,18 @@ func mdReattachBlock(path, binder, filename, id string) (bool, error) {
 		return false, nil
 	}
 	lines := strings.Split(content, "\n")
+	// Blocks and headings as grubber's package entry finds them: a block or a
+	// # line inside another code fence is that fence's text.
 	type span struct{ start, end int }
 	var hits []span
-	heading, fence := "", false
-	for i := 0; i < len(lines); i++ {
-		l := lines[i]
-		if mdFenceOpenRe.MatchString(l) && !fence {
-			end := i + 1
-			for end < len(lines) && !mdFenceCloseRe.MatchString(lines[end]) {
-				end++
-			}
-			if end >= len(lines) {
-				break
-			}
-			var parsed map[string]any
-			if yaml.Unmarshal([]byte(strings.Join(lines[i+1:end], "\n")), &parsed) == nil && parsed != nil {
-				t, _ := parsed["type"].(string)
-				if t == "ref" && index.AsString(parsed["id"]) == "" &&
-					index.SameBinder(index.AsString(parsed["binder"]), binder) && heading == want {
-					hits = append(hits, span{i + 1, end})
-				}
-			}
-			i = end
+	for _, blk := range entry.ParseBlocks(lines) {
+		if blk.Fields == nil || blk.HeadingAt < 0 {
 			continue
 		}
-		if strings.HasPrefix(strings.TrimLeft(l, " \t"), "```") {
-			fence = !fence
-			continue
-		}
-		if !fence && strings.HasPrefix(l, "#") {
-			if text := strings.TrimLeft(l, "#"); text != l && (text == "" || text[0] == ' ' || text[0] == '\t') {
-				heading = unorm.NFC.String(strings.TrimSpace(text))
-			}
+		heading := unorm.NFC.String(strings.TrimSpace(strings.TrimLeft(lines[blk.HeadingAt], "#")))
+		if t, _ := blk.Fields["type"].(string); t == "ref" && index.AsString(blk.Fields["id"]) == "" &&
+			index.SameBinder(index.AsString(blk.Fields["binder"]), binder) && heading == want {
+			hits = append(hits, span{blk.Open + 1, blk.Close})
 		}
 	}
 	if len(hits) != 1 {
@@ -519,10 +500,10 @@ func mdRenameOrderingBinder(path, oldName, newName string) (int, error) {
 		return 0, err
 	}
 	changes := 0
-	modified := mdYamlBlockRe.ReplaceAllStringFunc(content, func(match string) string {
+	modified := mdReplaceBlocks(content, func(match string) string {
 		open, body, closing := splitFence(match)
-		var parsed map[string]any
-		if yaml.Unmarshal([]byte(body), &parsed) != nil || parsed == nil {
+		parsed := blockFields(body)
+		if parsed == nil {
 			return match
 		}
 		if t, _ := parsed["type"].(string); t != blockType {
@@ -628,11 +609,8 @@ func mdAlreadyPresent(rec index.RefRecord, content string) bool {
 			recIdents[a] = true
 		}
 	}
-	for _, m := range mdYamlBlockRe.FindAllStringSubmatch(content, -1) {
-		var parsed map[string]any
-		if yaml.Unmarshal([]byte(m[1]), &parsed) != nil {
-			continue
-		}
+	for _, blk := range mdBlocks(content) {
+		parsed := blockFields(blk.body)
 		if t, _ := parsed["type"].(string); t != "ref" {
 			continue
 		}
@@ -695,13 +673,15 @@ func mdFileWriteMany(recs []index.RefRecord, targetPath string) []string {
 	return actions
 }
 
-// mdDeleteBlockRe matches an optional heading + blank lines, a ```yaml block, and
-// the trailing blank lines — so deleting a block leaves no gap (MdEditor.delete_block).
-// Exactly ONE heading line, and only an entry heading (H3/H4): H1/H2 are
-// document structure (SPEC), so a section title directly above a block that
-// has no heading of its own stays.
-// The fences follow mdYamlBlockRe.
-var mdDeleteBlockRe = regexp.MustCompile("(?ms)((?:^#{3,4}[ \t][^\n]*\n)\n*)?^[ \t]*```yaml[ \t]*\n(.*?)^[ \t]*```[ \t]*$(?:\n(?:[ \t]*\n)*)?")
+// What mdDeleteBlock takes away with a block, so that no gap stays
+// (MdEditor.delete_block): the heading above it with the empty lines between,
+// and the blank lines below it. Exactly ONE heading line, and only an entry
+// heading (H3/H4): H1/H2 are document structure (SPEC), so a section title
+// directly above a block that has no heading of its own stays.
+var (
+	mdHeadingAboveRe = regexp.MustCompile(`(?m)^#{3,4}[ \t][^\n]*\n\n*\z`)
+	mdBlanksBelowRe  = regexp.MustCompile(`^\n(?:[ \t]*\n)*`)
+)
 
 // mdDeleteBlock removes the block(s) matching (id, binder) — and their preceding
 // heading + trailing blanks — keeping the rest of the document byte-for-byte.
@@ -712,22 +692,23 @@ func mdDeleteBlock(path, id, binder string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	locs := mdDeleteBlockRe.FindAllStringSubmatchIndex(content, -1)
-	if len(locs) == 0 {
+	blocks := mdBlocks(content)
+	if len(blocks) == 0 {
 		return 0, nil
 	}
 	var b strings.Builder
 	last := 0
 	changes := 0
-	for _, m := range locs {
-		start, end := m[0], m[1]
-		body := ""
-		if m[4] >= 0 {
-			body = content[m[4]:m[5]] // capture group 2 = yaml body
+	for _, blk := range blocks {
+		start, end := blk.start, blk.end
+		heading := ""
+		if h := mdHeadingAboveRe.FindStringIndex(content[last:start]); h != nil {
+			start = last + h[0]
+			heading = content[start:blk.start]
 		}
-		var parsed map[string]any
+		end += len(mdBlanksBelowRe.FindString(content[end:]))
 		del := false
-		if yaml.Unmarshal([]byte(body), &parsed) == nil && parsed != nil {
+		if parsed := blockFields(blk.body); parsed != nil {
 			if t, _ := parsed["type"].(string); t == "ref" &&
 				index.AsString(parsed["id"]) == id &&
 				index.SameBinder(index.AsString(parsed["binder"]), binder) {
@@ -741,8 +722,8 @@ func mdDeleteBlock(path, id, binder string) (int, error) {
 			changes++
 			// A heading with a second block right below this one is that
 			// block's heading too, and stays.
-			if m[2] >= 0 && mdFenceOpenRe.MatchString(firstLine(content[end:])) {
-				b.WriteString(content[m[2]:m[3]])
+			if heading != "" && entry.IsDataOpen(firstLine(content[end:])) {
+				b.WriteString(heading)
 			}
 		}
 		last = end

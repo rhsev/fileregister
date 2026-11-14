@@ -16,8 +16,11 @@ const scalarBlock = "### a.pdf\n```yaml\ntype: ref\nid: '1'\nbinder: proj\n" +
 
 func parseOnlyBlock(t *testing.T, content string) map[string]any {
 	t.Helper()
-	m := mdYamlBlockRe.FindString(content)
-	body := strings.TrimSuffix(strings.TrimPrefix(m, "```yaml\n"), "\n```")
+	blocks := mdBlocks(content)
+	if len(blocks) == 0 {
+		t.Fatalf("no block in:\n%s", content)
+	}
+	body := blocks[0].body
 	var parsed map[string]any
 	if err := yaml.Unmarshal([]byte(body), &parsed); err != nil {
 		t.Fatalf("block no longer parses: %v\n%s", err, content)

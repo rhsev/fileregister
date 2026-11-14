@@ -13,7 +13,7 @@ FILEANCHOR_VERSION ?= 1.5.1
 
 # The Markdown layer is read through grubber, so the album checks need it the
 # same way half the suite needs the engine. Same rule: pin a tag.
-GRUBBER_VERSION ?= v0.20.1
+GRUBBER_VERSION ?= v0.21.0
 
 # Stamp the version from the tag rather than trusting a literal in main.go,
 # which shipped 1.4.0 as 1.3.0. A dirty or untagged tree says so in --version.
