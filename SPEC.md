@@ -315,13 +315,13 @@ The user-facing entry point for registering one or more files. With `--binder` t
    - `tags`: the binder name as a Finder tag (`kMDItemUserTags`)
    - `none`: no xattr write
 
-The `--xattr` flag selects the backend; the default is `itemprojects`. The index record is written first; annotation and xattr failures don't block it.
+The `--xattr` flag selects the backend; the default is `itemprojects`. The index record is written first. A failed annotation or xattr write does not undo it. `add` exits 1 when `--md` or `--target *.md` was given and a block was not written.
 
 The `kind` field is auto-detected from the file's extension (e.g. `.jpg` → `image`, `.pdf` → `pdf`, `.eml` → `mail`). Use `--kind` to override when a finer classification matters (e.g. `--kind invoice` for a PDF that's an invoice). Pass `--kind ""` to suppress the field entirely.
 
 Idempotent. Re-adding the same file to the same binder is a set-insert of a value already present, so there is no duplicate record and no duplicate xattr entry. If the file was previously **removed** from that binder, re-adding re-inserts it into the existing record's set; if the record was [in no binder](#records-in-no-binder) (empty set), it gains its first binder. Either way there is one record, edited in place, and nothing to reclaim.
 
-**Batch adds.** Multiple file arguments (`register add *.pdf --binder x`) are processed in one pass. Batch-wide options (`--binder`, `--kind`, `--target`/`--md`, `--xattr`) apply to every file. The per-file option `--aka` only makes sense for a single file and is rejected when more than one file is given (`kind` defaults to the extension-derived value). Files that don't exist are reported and skipped; a per-file bookmark save failure is reported and skipped; the rest still go through. The command exits non-zero only when nothing at all was written. The batch I/O is linear, not quadratic: one bookmark-DB load/save and one target read/write for the whole batch (see steps 1 and 2 above).
+**Batch adds.** Multiple file arguments (`register add *.pdf --binder x`) are processed in one pass. Batch-wide options (`--binder`, `--kind`, `--target`/`--md`, `--xattr`) apply to every file. The per-file option `--aka` only makes sense for a single file and is rejected when more than one file is given (`kind` defaults to the extension-derived value). Files that don't exist are reported and skipped; a per-file bookmark save failure is reported and skipped; the rest still go through. The command exits 1 when nothing at all was written, or when an annotation was asked for and a block was not written. The batch I/O is linear, not quadratic: one bookmark-DB load/save and one target read/write for the whole batch (see steps 1 and 2 above).
 
 ### `register promote --binder <name> [--target F] [--id ID] [--edit]`
 
@@ -612,6 +612,11 @@ already at the target with the same sha256 is taken over instead of copied; a
 different file there is parked (`--force` overwrites it). A file that is
 already registered here under another id is parked, because taking it over
 would give it two identities. Exit 0 only when nothing is parked.
+
+The index is written before the bookmarks are saved, and the bookmarks are not
+saved when the index write fails. A run that stops between the two leaves
+records without a bookmark. `repair` binds them again, and a second run takes
+over a file that is already in place with the same sha256.
 
 #### `register snapshot [--out <file>.tar.gz] [--no-files [--since <snapshot>]] [--no-finder]`
 
