@@ -220,6 +220,18 @@ over an existing file. Helix has the setting `atomic-save` since 25.07.
 | Helix 25.01.1 and 25.07.1 with default settings | new | lost |
 | `sed -i`, `perl -i`, OpenCloud (edit on another Mac) | new | lost |
 
+**A bookmark resolves by path first.** Verified 2026-11-17 on macOS 27.2:
+when a registered file is moved or renamed and another file is then created
+under its old path, `URL(resolvingBookmarkData:)` returns the new file and
+marks the bookmark `stale`. Once the new file is removed, the same bookmark
+resolves to the moved file again, so the inode was in the bookmark all along.
+Finder aliases behave the same way. To a consumer this looks exactly like a
+save that replaced the file. The inode tells the two apart: after a replacing
+save the old inode is gone, after a move it still leads to the file
+(`fsgetpath(2)`, or `/.vol/<volume>/<inode>`). fileanchor 1.6.0 checks that
+and answers with the moved file; `register refresh` writes nothing until
+`register repair` has settled which file the record means.
+
 **Writes into the existing file.** Inode and xattrs stay, and the bookmark
 resolves as before. A rename in Finder or with `mv` also keeps the inode. The
 bookmark then follows the file and is marked `stale`, which `register

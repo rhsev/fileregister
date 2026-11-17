@@ -150,9 +150,9 @@ register <subcommand> [args...]
 | `annotate` | Edit an existing block's fields or note from the command line (`--set`, `--unset`, `--prose`) |
 | `remove` | Take files out of a binder; a record whose binder set runs empty stays, in no binder |
 | `forget` | Delete a record in no binder, or one whose file is gone, for good: index line, bookmark entry, its id in the notes and on the file; the notes' blocks stay, and `promote` reattaches one if the file returns |
-| `refresh` | Rebuild the attributes on each file from the index, renew stale bookmarks, and write a renamed file's new name into the index; with `--snapshot`, bring back the Finder tags and comment of a file that lost its id |
+| `refresh` | Rebuild the attributes on each file from the index, renew stale bookmarks, and write a renamed file's new name into the index; with `--snapshot`, bring back the Finder tags and comment of a file that lost its id. A file that was moved while another file took its old place is left alone and listed |
 | `audit` | Read-only consistency report in three directions: record → file, file → record, and bookmark → record; exits 1 while something needs you |
-| `repair` | Re-bind a moved file's broken bookmark under its unchanged id, located via Spotlight |
+| `repair` | Re-bind a moved file's broken bookmark under its unchanged id, located via Spotlight; settle which file a record means when another file took the old place of a moved one |
 | `rename` | Rename a binder across all records and xattrs; onto an existing name needs `--merge` |
 | `cleanup` | Review drift between the layers (stale blocks, unindexed annotations, records in no binder, bookmark entries no record needs) and decide per item; `--prune` drops those entries without asking, and refuses while an entry cannot be judged (its volume is away) |
 | `write` | Read JSONL from stdin, write ref records to Markdown or JSONL |
@@ -231,7 +231,7 @@ every subcommand is native.
 
 ### Companion releases
 
-`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads the Markdown layer. Without it, register manages only the index. The core commands (`add`, `list`, `resolve`, `audit`, `repair`, `refresh`, `remove`) run without it. The commands that read notes need it: `album`, `order`, `annotate`, `aka`, `rename`, `forget`, `marshal`, `reindex`, `cleanup` and `list --inbox`/`--curated`, because register has no Markdown reader of its own. This release is tested against **fileanchor 1.5.1** and **grubber v0.21.0**. `make fileanchor` builds the engine at its tag, `make grubber` downloads the grubber release binary into `.build/`, and `make install` puts both next to register.
+`register` spawns the **fileanchor** engine ([rhsev/fileanchor](https://github.com/rhsev/fileanchor)) for every metadata operation, so a working fileanchor is required at runtime. The **grubber** query tool ([rhsev/grubber](https://github.com/rhsev/grubber)) reads the Markdown layer. Without it, register manages only the index. The core commands (`add`, `list`, `resolve`, `audit`, `repair`, `refresh`, `remove`) run without it. The commands that read notes need it: `album`, `order`, `annotate`, `aka`, `rename`, `forget`, `marshal`, `reindex`, `cleanup` and `list --inbox`/`--curated`, because register has no Markdown reader of its own. This release is tested against **fileanchor 1.6.0** and **grubber v0.21.0**. `make fileanchor` builds the engine at its tag, `make grubber` downloads the grubber release binary into `.build/`, and `make install` puts both next to register.
 
 ### Configuration
 

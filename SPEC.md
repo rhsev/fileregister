@@ -360,6 +360,7 @@ Edits a record's `aka` handles after add time. `annotate` refuses `aka` as an id
 Pushes index state to macOS metadata. Reads every `type: ref` record from the index via `index.ReadAllRefs`, resolves the bookmarks in one batch, and for each file record whose file resolves:
 
 - renews the bookmark under the same id when macOS reports it as stale
+- writes nothing for a **displaced** record (below)
 - writes the file's current name into the record's `filename` when the file was renamed (the two Unicode forms of a name count as one)
 - writes the id: `com.fileregister.id#S` always, and `kMDItemInformation` where the id is missing there (added, never set)
 - sets ★ when the record is in at least one binder, ☆ when it is in none, and takes the other star off
@@ -387,6 +388,8 @@ Reports:
 - Count of ids restored to `kMDItemInformation`, when any (`--dry-run` lists them)
 - Each file name written into the index, old and new, and their count
 
+**Displaced records.** fileanchor resolves a bookmark to the file it was saved from, wherever that is now, and names another file that lies in its old place (`at_old_path`, fileanchor 1.6.0). The file was moved and a new file got its name, or a program saved a new file there and kept the old one under another name. Renewing the bookmark would settle which of the two the record means, so refresh leaves such a record as it is, lists both paths and exits 1. `audit` reports it as **displaced**, and `register repair` settles it. Commands that only read (`resolve`, `list`, `album`) use the file the bookmark was saved from. With an older fileanchor the file in the old place is taken for the record's file, as before.
+
 Idempotent. Safe to run repeatedly.
 
 ### `register repair [--interactive]`
@@ -402,6 +405,8 @@ For records with broken bookmarks (typical after cross-volume move or transfer t
 2. If found: re-bind the bookmark **under the file's existing id** via `index.Rebind` (a fresh blob stored under the same id), then refresh the id xattrs, the binder xattr layer and the star. The id is the file's **permanent identity**. Only the broken blob is renewed, so the id goes nowhere new. If the file was renamed, the index line's `filename` takes the new name, since it is the label `list` and `album` show; note headings stay as they are. This happens **without asking only** for a single candidate from stage 1 (the id) on the volume the file was on. A hit by name, or on another volume, is some file that may or may not be this one.
 3. Otherwise: list the candidates with the reason they need confirmation (found by name, several files with the id, or the file with the id on another volume); with `--interactive`, prompt to choose (also for a single one). `refresh` therefore points to `register repair --interactive` for broken bookmarks.
 4. If not found: report; in `--interactive` mode prompt for an explicit path
+
+A **displaced** record (see `refresh`) is settled here too. The file found elsewhere is bound without asking when it carries the id and the file in its old place does not: inode and id agree. When both carry the id, when the file found elsewhere carries none, or when it lies in the Trash or a backup, `--interactive` asks which of the two is the record's file. Binding renews the bookmark, which then records the chosen file's place, and writes the file name into the index.
 
 Exit status is 1 while a record stays unresolved or a repaired file is missing metadata, so a monitor can tell. Records on a volume that is not mounted do not count, since they need only the volume.
 
@@ -446,7 +451,7 @@ A record for which this system's bookmark store has no entry at all is reported 
 
 Two more findings on the record side: a file whose bookmark followed it into the **Trash or a backup** (a bookmark tracks its file wherever it moves), and a **shared file** that several records resolve to (two identities on one file, the trace a bad re-bind leaves). `refresh` marks neither kind (it would re-mark a discarded file, or write the records' ids onto the file in turn).
 
-The record side also checks the identity layer `refresh` writes: the record id in `kMDItemInformation` (where `repair` looks first), the same id in `com.fileregister.id#S`, and the star for the record's state (★ in a binder, ☆ in none, never both). A file that lacks any of them or carries the wrong star is reported as **missing id**, with `register refresh` as the remedy. A file whose name differs from the record's `filename` is reported as **renamed**, also with `register refresh` as the remedy; it does not change the exit status, since the bookmark still finds the file.
+The record side also checks the identity layer `refresh` writes: the record id in `kMDItemInformation` (where `repair` looks first), the same id in `com.fileregister.id#S`, and the star for the record's state (★ in a binder, ☆ in none, never both). A file that lacks any of them or carries the wrong star is reported as **missing id**, with `register refresh` as the remedy. A file whose name differs from the record's `filename` is reported as **renamed**, also with `register refresh` as the remedy; it does not change the exit status, since the bookmark still finds the file. A record whose file was found elsewhere while another file lies in its old place is reported as **displaced**, with both paths and `register repair` as the remedy; nothing else is checked on it until that is settled.
 
 Output is plain text. Decisions stay with the user. Exit status is 1 while something needs the user: a broken bookmark, a missing file, a missing binder xattr or id, a file in the Trash or a backup, a shared file, a ghost entry, or an orphan, broken, dead or malformed bookmark entry. Copies, entries on an absent volume and records not bound on this system are reported but do not count, so a monitor can rely on the exit status.
 
