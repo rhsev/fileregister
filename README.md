@@ -40,8 +40,9 @@ which files the register knows.
 
 Most of the OS-specific work lives behind the
 [fileanchor](https://github.com/rhsev/fileanchor) engine. It is released for
-macOS, and a Linux version is in preparation. register itself builds for Linux
-and passes its tests there, but it needs that engine to do anything useful.
+macOS and for Linux, and register runs on both. The Linux engine keeps the
+values in `user.*` extended attributes and finds a file again by its inode
+(see [Installation](#installation) for what it needs).
 
 ## A first session
 
