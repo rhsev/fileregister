@@ -12,13 +12,13 @@
 # asking it; the Makefile and the fileanchor and grubber releases stamp the
 # version there.
 #
-# Env: FILEANCHOR_VERSION (tag, default 1.5.1); FILEANCHOR_LOCAL (a fileanchor
+# Env: FILEANCHOR_VERSION (tag, default 1.6.0); FILEANCHOR_LOCAL (a fileanchor
 # checkout after `make linux`, used instead of the release assets, for a trial
 # run before the tag exists; then FILEANCHOR_VERSION is what that build says).
 set -eu
 cd "$(dirname "$0")/.."
 
-FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.5.1}"
+FILEANCHOR_VERSION="${FILEANCHOR_VERSION:-1.6.0}"
 GRUBBER_VERSION="${GRUBBER_VERSION:-v0.21.0}"
 OUT="$(pwd)/.build/dist"
 VERSION="$(git describe --tags --dirty --always | sed 's/^v//')"
