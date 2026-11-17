@@ -4,6 +4,8 @@ package main
 
 import (
 	"github.com/rhsev/fileregister/v2/internal/index"
+
+	"fmt"
 )
 
 // resolveRecordPaths resolves every non-URL record's bookmark in one engine
@@ -36,4 +38,22 @@ func recordFileIDs(records []map[string]any) []string {
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+// displacedEntry is a record whose file was found elsewhere while another
+// file lies where it was bookmarked (index.Resolution.AtOldPath).
+type displacedEntry struct {
+	binders            []string
+	label, path, other string
+}
+
+func printDisplaced(d displacedEntry) {
+	fmt.Printf("  [%s] %s\n", binderTag(d.binders), d.label)
+	fmt.Printf("    file:      %s\n", d.path)
+	fmt.Printf("    old place: %s\n", d.other)
+}
+
+// carriesID reports whether the file has id in either of its carriers.
+func carriesID(path, id string) bool {
+	return index.HasDescriptionID(path, id) || index.SyncID(path) == id
 }

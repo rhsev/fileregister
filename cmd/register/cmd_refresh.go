@@ -113,6 +113,7 @@ func cmdRefresh(args []string) int {
 	var absent []string // on a volume that is not mounted: not judged
 	var missing []missingEntry
 	var skippedTrash, skippedShared []string
+	var displaced []displacedEntry
 	shared := sharedPaths(allRefs, resolved)
 	refreshed, noop, failed, skippedNone, skippedURL, restoredIDs := 0, 0, 0, 0, 0, 0
 	starsSet, finderBack := 0, 0
@@ -145,6 +146,13 @@ func cmdRefresh(args []string) int {
 		}
 		if !index.FileExists(refPath) {
 			missing = append(missing, missingEntry{binders, refPath, refLabel(rec)})
+			continue
+		}
+		// Another file lies where this one was bookmarked. Renewing the
+		// bookmark now would settle which of the two the record means, and
+		// that is repair's question to ask.
+		if old := resolutions[id].AtOldPath; old != "" {
+			displaced = append(displaced, displacedEntry{binders, refLabel(rec), refPath, old})
 			continue
 		}
 		// A file in the Trash is not re-marked as a member, and a file two
@@ -323,6 +331,14 @@ func cmdRefresh(args []string) int {
 		}
 	}
 
+	if len(displaced) > 0 {
+		fmt.Println("")
+		fmt.Printf("Displaced (%d) — another file has the old place; left as they are, run 'register repair' to settle:\n", len(displaced))
+		for _, d := range displaced {
+			printDisplaced(d)
+		}
+	}
+
 	if len(absent) > 0 {
 		fmt.Println("")
 		fmt.Printf("On an absent volume (%d) — not mounted, so not judged:\n", len(absent))
@@ -348,7 +364,7 @@ func cmdRefresh(args []string) int {
 
 	// Non-zero while something needs the user, so a monitor can tell. Records
 	// not bound on this system are information, not a fault.
-	if failed > 0 || len(broken) > 0 || len(missing) > 0 {
+	if failed > 0 || len(broken) > 0 || len(missing) > 0 || len(displaced) > 0 {
 		return 1
 	}
 	return 0

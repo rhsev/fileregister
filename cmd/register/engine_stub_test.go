@@ -25,6 +25,9 @@ type engineStub struct {
 	DieOn      string            `json:"die_on,omitempty"`     // end when this op is asked
 	NoPath     []string          `json:"no_path,omitempty"`    // blobs resolved without last_path
 	Gone       map[string]string `json:"gone,omitempty"`       // blob → path it is said to resolve to
+	// blob → the file found elsewhere and the file in its old place, as an
+	// engine answers that tells the two apart (at_old_path).
+	Displaced map[string][2]string `json:"displaced,omitempty"`
 }
 
 const stubEnv = "REGISTER_TEST_ENGINE_STUB"
@@ -109,12 +112,16 @@ func runEngineStub(confPath string) {
 			}
 			json.Unmarshal([]byte(line), &req) // not JSON: passed through as it is
 			gone, isGone := s.Gone[req.Blob]
+			moved, isDisplaced := s.Displaced[req.Blob]
 			switch {
 			case s.DieOn != "" && req.Op == s.DieOn:
 				engine.Process.Kill()
 				os.Exit(1)
 			case s.Searchable != "" && req.Op == "searchable":
 				fmt.Fprintln(out, s.Searchable)
+			case req.Op == "resolve" && isDisplaced:
+				reply, _ := json.Marshal(map[string]any{"ok": true, "path": moved[0], "stale": true, "at_old_path": moved[1]})
+				fmt.Fprintln(out, string(reply))
 			case req.Op == "resolve" && isGone:
 				reply, _ := json.Marshal(map[string]any{"ok": true, "path": gone})
 				fmt.Fprintln(out, string(reply))

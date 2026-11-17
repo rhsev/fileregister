@@ -148,6 +148,11 @@ func BookmarkGet(id string) (string, error) {
 type Resolution struct {
 	Path, LastPath string
 	Stale          bool
+	// AtOldPath: another file that lies where the bookmark was saved, while
+	// the bookmarked file was found elsewhere, at Path. The file was moved
+	// and its name taken, or a program saved a new file there and kept the
+	// old one under another name. The engine cannot tell which.
+	AtOldPath string
 	// Unbound: this system's bookmark store has no entry for the id. Another
 	// machine bound the file, or it was never placed here; that is not a
 	// broken bookmark, and repair has nothing to repair.
@@ -200,6 +205,7 @@ func BatchResolve(ids []string) (map[string]Resolution, error) {
 			if ok, _ := resps[i]["ok"].(bool); ok {
 				r.Path, _ = resps[i]["path"].(string)
 				r.Stale, _ = resps[i]["stale"].(bool)
+				r.AtOldPath, _ = resps[i]["at_old_path"].(string)
 			} else {
 				r.LastPath, _ = resps[i]["last_path"].(string)
 			}

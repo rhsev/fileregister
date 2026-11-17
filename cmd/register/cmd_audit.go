@@ -205,6 +205,9 @@ func cmdAudit(args []string) int {
 		label, vol, where string
 	}
 	var absent []absentT
+	// The file was found elsewhere and another file lies where it was
+	// bookmarked. Which of the two the record means is repair's question.
+	var displaced []displacedEntry
 	okCount := 0
 
 	fmt.Printf("=== Direction 1: Record → File (%d record(s)) ===\n", len(checked))
@@ -245,6 +248,10 @@ func cmdAudit(args []string) int {
 		}
 		if !index.FileExists(refPath) {
 			missingFile = append(missingFile, missingFileT{binders, noteFile, refPath, label})
+			continue
+		}
+		if old := res[id].AtOldPath; old != "" {
+			displaced = append(displaced, displacedEntry{binders, label, refPath, old})
 			continue
 		}
 		if trashOrBackup(refPath) != "" {
@@ -291,7 +298,7 @@ func cmdAudit(args []string) int {
 		}
 	}
 
-	needsYou := len(brokenBookmark)+len(missingFile)+len(missingXattr)+len(missingIdentity)+len(inTrash)+len(shared)+len(notCanonical) > 0
+	needsYou := len(brokenBookmark)+len(missingFile)+len(missingXattr)+len(missingIdentity)+len(inTrash)+len(shared)+len(notCanonical)+len(displaced) > 0
 	if !needsYou && len(absent) == 0 && len(unbound) == 0 {
 		fmt.Printf("All %d record(s) are consistent.\n", okCount)
 	} else {
@@ -322,6 +329,14 @@ func cmdAudit(args []string) int {
 				fmt.Printf("  [%s] %s\n", binderTag(m.binders), m.label)
 				fmt.Printf("    file: %s\n", m.refPath)
 				fmt.Println("    → put it back, or remove the record")
+			}
+		}
+		if len(displaced) > 0 {
+			fmt.Println("")
+			fmt.Printf("DISPLACED (%d) — the file is elsewhere, and another file has its old place:\n", len(displaced))
+			for _, d := range displaced {
+				printDisplaced(d)
+				fmt.Println("    → run: register repair")
 			}
 		}
 		if len(shared) > 0 {

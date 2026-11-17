@@ -241,12 +241,26 @@ func cmdRepair(args []string) int {
 		}
 		broken = append(broken, r)
 	}
-	if len(broken) == 0 {
+	// A record whose file was found elsewhere while another file lies where it
+	// was bookmarked. The bookmark resolves, but refresh will not renew it
+	// until it is settled which of the two files the record means.
+	var displaced []map[string]any
+	for _, r := range active {
+		if !index.URLRef(r) && resolved[index.AsString(r["id"])].AtOldPath != "" {
+			displaced = append(displaced, r)
+		}
+	}
+	if len(broken) == 0 && len(displaced) == 0 {
 		fmt.Println("All bookmarks resolve correctly. Nothing to repair.")
 		return 0
 	}
 
-	fmt.Printf("Found %d broken bookmark(s).\n", len(broken))
+	if len(broken) > 0 {
+		fmt.Printf("Found %d broken bookmark(s).\n", len(broken))
+	}
+	if len(displaced) > 0 {
+		fmt.Printf("Found %d displaced file(s).\n", len(displaced))
+	}
 	fmt.Println("")
 
 	stdin := bufio.NewReader(os.Stdin)
@@ -255,6 +269,35 @@ func cmdRepair(args []string) int {
 	var notFound []unresolvedT
 	offline := map[string]int{}
 	partial := 0
+
+	// bind re-binds rec to newPath under its unchanged id and reports it.
+	bind := func(rec map[string]any, newPath, binderLabel, label string) {
+		id := index.AsString(rec["id"])
+		if rid, failed := repairRecord(rec, newPath); rid != "" {
+			fmt.Printf("  Repaired: re-bound id %s (unchanged)\n", id)
+			// SameName, not !=: a file the Finder or Apple Mail created carries
+			// its name decomposed, the index holds it precomposed, and a raw
+			// comparison calls that a rename. It would rewrite the index to the
+			// decomposed form and report two names that read identically.
+			if old, nw := index.AsString(rec["filename"]), filepath.Base(newPath); old != "" && !index.SameName(old, nw) {
+				if err := setIndexFilename(index.AsString(rec["_note_file"]), id, nw); err != nil {
+					fmt.Fprintf(os.Stderr, "  Warning: could not update the file name in the index: %v\n", err)
+				} else {
+					fmt.Printf("  File name in the index: %s → %s\n", old, nw)
+				}
+			}
+			if len(failed) > 0 {
+				fmt.Printf("  But could not write %s on the file — run 'register refresh' once it is writable\n",
+					strings.Join(failed, ", "))
+				partial++
+			}
+			repaired++
+		} else {
+			fmt.Printf("  Failed to create new bookmark for %s\n", newPath)
+			notFound = append(notFound, unresolvedT{id, binderLabel, label, index.AsString(rec["_note_file"])})
+		}
+		fmt.Println("")
+	}
 
 	for _, rec := range broken {
 		id := index.AsString(rec["id"])
@@ -341,30 +384,63 @@ func cmdRepair(args []string) int {
 			continue
 		}
 
-		if rid, failed := repairRecord(rec, newPath); rid != "" {
-			fmt.Printf("  Repaired: re-bound id %s (unchanged)\n", id)
-			// SameName, not !=: a file the Finder or Apple Mail created carries
-			// its name decomposed, the index holds it precomposed, and a raw
-			// comparison calls that a rename. It would rewrite the index to the
-			// decomposed form and report two names that read identically.
-			if old, nw := index.AsString(rec["filename"]), filepath.Base(newPath); old != "" && !index.SameName(old, nw) {
-				if err := setIndexFilename(index.AsString(rec["_note_file"]), id, nw); err != nil {
-					fmt.Fprintf(os.Stderr, "  Warning: could not update the file name in the index: %v\n", err)
-				} else {
-					fmt.Printf("  File name in the index: %s → %s\n", old, nw)
+		bind(rec, newPath, binderLabel, label)
+	}
+
+	for _, rec := range displaced {
+		id := index.AsString(rec["id"])
+		label := repairLabel(rec)
+		binderLabel := strings.Join(nonEmptyBinders(rec), ", ")
+		now, old := resolved[id].Path, resolved[id].AtOldPath
+
+		fmt.Printf("Settling: [%s] %s\n", binderLabel, label)
+		fmt.Printf("  file:      %s\n", now)
+		fmt.Printf("  old place: %s\n", old)
+
+		// The file found elsewhere is the one that was bookmarked. It is taken
+		// without asking when it alone carries the id as well. A program that
+		// saves a new file and keeps the old one under another name leaves
+		// the same picture, so every other case is the user's to decide.
+		newPath := ""
+		why := ""
+		switch problem := candidateProblem(now, id, db, indexIDs); {
+		case problem != "":
+			why = "The file is " + problem
+		case !carriesID(now, id):
+			why = "The file does not carry the id"
+		case carriesID(old, id):
+			why = "Both files carry the id"
+		default:
+			newPath = now
+			fmt.Println("  The file carries the id, the one in its old place does not")
+		}
+		if newPath == "" && interactive {
+			fmt.Fprintf(os.Stderr, "  %s — which one is the record's file?\n", why)
+			fmt.Fprintf(os.Stderr, "    1. %s\n    2. %s\n", now, old)
+			fmt.Fprint(os.Stderr, "  Choose [1-2] or blank to skip: ")
+			choice, _ := stdin.ReadString('\n')
+			switch strings.TrimSpace(choice) {
+			case "1":
+				newPath = now
+			case "2":
+				newPath = old
+			}
+			if newPath != "" {
+				if problem := candidateProblem(newPath, id, db, indexIDs); problem != "" {
+					fmt.Fprintf(os.Stderr, "  Not bound: %s is %s\n", newPath, problem)
+					newPath = ""
 				}
 			}
-			if len(failed) > 0 {
-				fmt.Printf("  But could not write %s on the file — run 'register refresh' once it is writable\n",
-					strings.Join(failed, ", "))
-				partial++
-			}
-			repaired++
-		} else {
-			fmt.Printf("  Failed to create new bookmark for %s\n", newPath)
-			notFound = append(notFound, unresolvedT{id, binderLabel, label, index.AsString(rec["_note_file"])})
+		} else if newPath == "" {
+			fmt.Printf("  %s — rerun with --interactive to choose\n", why)
 		}
-		fmt.Println("")
+		if newPath == "" {
+			notFound = append(notFound, unresolvedT{id, binderLabel, label, index.AsString(rec["_note_file"])})
+			fmt.Println("  Not bound without confirmation — skipped")
+			fmt.Println("")
+			continue
+		}
+		bind(rec, newPath, binderLabel, label)
 	}
 
 	fmt.Printf("Repair complete: %d repaired, %d unresolved.\n", repaired, len(notFound))
